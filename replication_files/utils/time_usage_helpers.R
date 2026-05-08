@@ -2630,7 +2630,7 @@ get_personalized_info_long <- function() {
 }
 
 get_privacy_attribute_weights_by_individual <- function() {
-  conjoint_utilities <- read.csv("data/Conjoint/Conjoint-01092026/tables/individual_parameters_wide_means.csv")
+  conjoint_utilities <- read.csv("data/Conjoint/Conjoint-Finalized/tables/individual_parameters_wide_means.csv")
   
   conjoint_to_belief_id <- c(
     collection_log = "collect-log",
