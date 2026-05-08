@@ -1,6 +1,8 @@
 # Replication Files
 
-Code that produces the figures and tables in the paper. Non-structural results only (Sections 5–7 and Appendices C, D).
+Code that produces the figures and tables in the paper (writeup_v2.tex). No structural results.
+
+# The coverd figures & tables by section.
 
 ## Section 5 — Privacy Practices, Beliefs & Stated Preferences
 
@@ -53,7 +55,7 @@ These artifacts are in the paper but we couldn't locate the generating script �
 - Table `tab:top_websites` (Appendix C.1) — descriptive, no script found
 - Table `tab:data_sharing_purpose` (Appendix C.3) — `other_survey_regressions.R` prints to console but doesn't write `.tex`
 
-## Removed
+## Things we might want to remove (generated but not used in the paper)
 
 The original codebase generated additional outputs not used in the paper. We removed the generating code to keep the replication scope tight.
 
@@ -83,8 +85,3 @@ The original codebase generated additional outputs not used in the paper. We rem
 
 ### From `utils/`
 - `tracker_utils.R`, `aggregate_urls.R`, `union.R`, `union_time_period.R` — dead code, no production script sourced them
-
-## Open Questions
-
-- `Conjoint-Finalized/` vs `Conjoint-01092026/` — `beliefs_vs_conjoint.R` reads from one folder, `time_usage_helpers.R` from the other. Need to confirm whether these folders contain identical data.
-- `time_usage_helpers.R` line 524 reads from `auxiliary_data/...` while everything else reads from `data/...`. Inconsistency to fix.
