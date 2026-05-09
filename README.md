@@ -78,12 +78,6 @@ Replication plan: rewrite as a standalone script that pools across waves, matche
 
 ---
 
-## Open Questions
-
-- **Experimental logistics scripts**: Guy mentioned these should be in `replication_files/`. The `onboarding_sequence_scripts/` folder (recruiting, treatment assignment, email/onboarding pipeline, monitoring) is the most likely candidate but contains no paper analysis code beyond the balance table. Pending clarification on whether the rest should be included.
-
----
-
 ## Things removed (generated but not used in the paper)
 
 The original codebase generated additional outputs not used in the paper. We removed the generating code to keep the replication scope tight.
