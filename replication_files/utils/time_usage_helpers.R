@@ -868,24 +868,29 @@ map_domain_trackers <- function(trackers, domain_classfication) {
   
   domain_classification_2[, name := remove_prefix(name)]
   
-  join_and_count_matches <- function(time_data_2_update, top1_matches_dt, domain_classification_2) {
-    setkey(time_data_2_update, domain_updated) # change website_aggregated to domain_updated
+  join_and_count_matches <- function(df.domain, top1_matches_dt, domain_classification_3) {
+    # NOTE: map_domain_3 expects df.domain to have columns 'domain' (the website
+    # identifier) and 'value' (a non-empty data column used to filter out NA
+    # rows produced by the full outer join). This differs from map_domain (which
+    # uses 'website_aggregated' + 'time_spent') because map_domain_3 is used for
+    # privacy-attribute data (privacy_char_summary_stats_3.R), not time data.
+    setkey(df.domain, domain)
     setkey(top1_matches_dt, left)
-    setkey(domain_classification_2, name)
+    setkey(domain_classification_3, name)
     
     # First full join
-    result_dt <- merge(time_data_2_update, top1_matches_dt, by.x = "domain_updated", by.y = "left", all = TRUE)
+    result_dt <- merge(df.domain, top1_matches_dt, by.x = "domain", by.y = "left", all = TRUE)
     # Second full join
     result_dt <- result_dt %>% mutate(index = row_number())
-    result_dt <- merge(result_dt, domain_classification_2, by.x = "right", by.y = "name", all = TRUE)
+    result_dt <- merge(result_dt, domain_classification_3, by.x = "right", by.y = "name", all = TRUE)
     # Remove useless rows created by Full join.
-    result_dt <- result_dt[!is.na(id) & id != ""] # change time spend to id
+    result_dt <- result_dt[!is.na(value) & value != ""]
     # Count and report
-    original_count <- nrow(time_data_2_update)
+    original_count <- nrow(df.domain)
     final_count <- nrow(result_dt)
-    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$domain_updated))
+    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$domain))
     
-    cat("Original number of rows in time_data_2_update:", original_count, "\n")
+    cat("Original number of rows in df.domain:", original_count, "\n")
     cat("Number of rows with a match:", matched_count, "\n")
     cat("Percentage of original rows with a match:", (matched_count / original_count) * 100, "%\n")
     return(result_dt)
@@ -1102,7 +1107,6 @@ map_domain <- function(time_data_2_update, domain_classification_2) {
   return(enriched_df)
 }
 
-
 map_domain_3 <- function(df.domain, domain_classification_3) {
   # remove useless and convert inputs to data.table
   domain_classification_3 <- domain_classification_3 %>%
@@ -1196,21 +1200,26 @@ map_domain_3 <- function(df.domain, domain_classification_3) {
   domain_classification_3[, name := remove_prefix(name)]
   
   join_and_count_matches <- function(df.domain, top1_matches_dt, domain_classification_3) {
-    setkey(df.domain, website_aggregated)
+    # NOTE: map_domain_3 expects df.domain to have columns 'domain' (the website
+    # identifier) and 'value' (a non-empty data column used to filter out NA
+    # rows produced by the full outer join). This differs from map_domain (which
+    # uses 'website_aggregated' + 'time_spent') because map_domain_3 is used for
+    # privacy-attribute data (privacy_char_summary_stats_3.R), not time data.
+    setkey(df.domain, domain)
     setkey(top1_matches_dt, left)
     setkey(domain_classification_3, name)
     
     # First full join
-    result_dt <- merge(df.domain, top1_matches_dt, by.x = "website_aggregated", by.y = "left", all = TRUE)
+    result_dt <- merge(df.domain, top1_matches_dt, by.x = "domain", by.y = "left", all = TRUE)
     # Second full join
     result_dt <- result_dt %>% mutate(index = row_number())
     result_dt <- merge(result_dt, domain_classification_3, by.x = "right", by.y = "name", all = TRUE)
     # Remove useless rows created by Full join.
-    result_dt <- result_dt[!is.na(time_spent) & time_spent != ""]
+    result_dt <- result_dt[!is.na(value) & value != ""]
     # Count and report
     original_count <- nrow(df.domain)
     final_count <- nrow(result_dt)
-    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$website_aggregated))
+    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$domain))
     
     cat("Original number of rows in df.domain:", original_count, "\n")
     cat("Number of rows with a match:", matched_count, "\n")
