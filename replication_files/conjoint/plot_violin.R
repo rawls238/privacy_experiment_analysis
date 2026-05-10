@@ -1,27 +1,32 @@
 # ============================================================================
-# PLOT VIOLIN: Privacy Valuations and Most Valued Information (Figure 6)
+# PLOT VIOLIN: Privacy Valuations and Most Valued Information
 # ============================================================================
 #
-# This script generates all panels of Figure 6 and their appendix variants:
+# This script generates all panels of the privacy WTP figures:
 #
-#   Main paper:
-#     Fig 6(a): individual_heterogeneity_dollars_with_website_extension.pdf
-#     Fig 6(b): top2_privacy_attributes_extension.pdf
+#   Main paper [fig:privacy_combined, "Privacy Valuations and Most Valued Information"]:
+#     Fig 6(a) [fig:privacy_info_partworth, "WTP for Privacy Attributes"]:
+#       individual_heterogeneity_dollars_with_website_extension.pdf
+#     Fig 6(b) [fig:privacy_info_top_2, "Most Valued Information"]:
+#       top2_privacy_attributes_extension.pdf
 #
-#   Appendix (full conjoint sample):
-#     Fig 6(a): individual_heterogeneity_dollars_with_website_full.pdf
-#     Fig 6(b): top2_privacy_attributes_full.pdf
+#   Appendix [fig:privacy_combined_full, "Privacy Valuations and Most Valued Information (Full Sample)"]:
+#     Fig C.5(a) [fig:privacy_info_partworth_full]:
+#       individual_heterogeneity_dollars_with_website_full.pdf
+#     Fig C.5(b) [fig:privacy_info_top_2_full]:
+#       top2_privacy_attributes_full.pdf
 #
-#   Appendix C.5 (Extension vs Survey comparison):
-#     individual_heterogeneity_experiment_vs_survey.pdf
+#   Appendix [fig:extension_survey_conjoint_sample, "Privacy Valuations between Extension and Survey Sample"]:
+#     Fig C.4: individual_heterogeneity_experiment_vs_survey.pdf
 #
-# Dependencies: code/utils/plot_rules.R
+# Dependencies: ../utils/plot_rules.R
+# Outputs to: ../../output/figures/
 # ============================================================================
 
 library(tidyverse)
 
 # Source unified style rules
-source("code/utils/plot_rules.R")
+source("../utils/plot_rules.R")
 
 # ============================================================================
 # BAD USERS — define or load externally
@@ -146,8 +151,6 @@ convert_to_dollars <- function(indiv_data, model_name) {
 }
 
 with_web_dollars <- convert_to_dollars(with_website_indiv, "With Website Model")
-write_csv(with_web_dollars, "privacy_dollar_values_with_website.csv")
-cat("\nSaved: privacy_dollar_values_with_website.csv\n")
 
 
 # ============================================================================
@@ -477,7 +480,7 @@ cat("\n", strrep("=", 80), "\n")
 cat("CREATING PLOTS\n")
 cat(strrep("=", 80), "\n\n")
 
-FIGURES_DIR <- "results/baseline_survey_descriptives/"
+FIGURES_DIR <- "../../output/figures/"
 
 # --- Main paper: Extension sample ---
 cat("=== Main Paper (Extension Sample) ===\n\n")
@@ -497,20 +500,20 @@ cat("Saved: top2_privacy_attributes_extension.pdf\n")
 # --- Appendix: Full conjoint sample ---
 cat("\n=== Appendix (Full Conjoint Sample) ===\n\n")
 
-cat("--- Fig 6(a) appendix: WTP Violin (full) ---\n")
+cat("--- Fig C.5(a): WTP Violin (full) ---\n")
 make_dollar_plot(
   with_web_dollars,
   paste0(FIGURES_DIR, "individual_heterogeneity_dollars_with_website_full.pdf")
 )
 
-cat("\n--- Fig 6(b) appendix: Top-2 Information (full) ---\n")
+cat("\n--- Fig C.5(b): Top-2 Information (full) ---\n")
 g_full <- make_top2_info_plot(use_full_sample = TRUE)
 ggsave(paste0(FIGURES_DIR, "top2_privacy_attributes_full.pdf"),
        g_full, width = 10, height = 8)
 cat("Saved: top2_privacy_attributes_full.pdf\n")
 
-# --- C.5: Extension vs Survey comparison ---
-cat("\n=== C.5: Extension vs Survey Comparison ===\n\n")
+# --- Appendix C.4: Extension vs Survey comparison ---
+cat("\n=== Appendix C.4: Extension vs Survey Comparison ===\n\n")
 make_comparison_plot(
   with_web_dollars,
   paste0(FIGURES_DIR, "individual_heterogeneity_experiment_vs_survey.pdf")
