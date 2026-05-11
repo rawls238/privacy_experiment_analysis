@@ -1,8 +1,33 @@
+# =============================================================================
+# INFO ACQUISITION HELPERS
+# =============================================================================
+# Utility functions for loading and processing info-acquisition related data
+# (privacy policy visits, event logs, belief data).
+#
+# Sourced from: replication_files/{survey_analysis,information_acquisition_results,
+#                                    time_use_analysis,...}/*.R
+# Working directory contract: caller must setwd to ~/Dropbox/spring2025experiment/code_github
+# so that relative paths below resolve correctly.
+# =============================================================================
 
-source("code/utils/values.R")
+source("replication_files/utils/values.R")
+
+# ---- Data paths (stage 2 convention: wd = code_github, data sits one level up) ----
+DATA_DIR     <- "../data/"
+SURVEY_DIR   <- paste0(DATA_DIR, "Survey/")
+EXT_DATA_DIR <- paste0(DATA_DIR, "final_extension_data/")
+PROC_DIR     <- paste0(DATA_DIR, "processed_data/")
+
+# Individual file paths
+PRIVACY_POLICY_TEXT_CSV    <- paste0(EXT_DATA_DIR, "privacy_policy_text.csv")
+PRIVACY_POLICY_VISITS_CSV  <- paste0(PROC_DIR,     "manual_privacy_policy_visit_annotations.csv")
+EXPERIMENT_CONDITIONS_CSV  <- paste0(EXT_DATA_DIR, "experiment_conditions_pilot_july_2024.csv")
+EVENT_LOGS_CSV             <- paste0(EXT_DATA_DIR, "event_logs.csv")
+SURVEY_MERGED_FINAL_CSV    <- paste0(SURVEY_DIR,   "survey_merged_final.csv")
+
 
 get_privacy_policy_visits <- function() {
-  privacy_policy_text <- read.csv("data/final_extension_data/privacy_policy_text.csv")
+  privacy_policy_text <- read.csv(PRIVACY_POLICY_TEXT_CSV)
   
   ##
   privacy_policy_text  <- aggregate_time_data(privacy_policy_text, field="domain")
@@ -13,7 +38,7 @@ get_privacy_policy_visits <- function() {
     )
   privacy_policy_text  <- aggregate_time_data(privacy_policy_text, field="policy_link")
   privacy_policy_text <- high_level_aggregate(privacy_policy_text, field="policy_link_aggregated")
-  visited_privacy_policy <- read.csv("data/processed_data/manual_privacy_policy_visit_annotations.csv")
+  visited_privacy_policy <- read.csv(PRIVACY_POLICY_VISITS_CSV)
   visited_privacy_policy <- visited_privacy_policy %>% filter(!(experiment_id %in% BAD_USERS) & manual_privacy_classification == "PRIVACY_POLICY")
   
   visited_privacy_policy <- visited_privacy_policy %>%
@@ -55,11 +80,11 @@ get_privacy_policy_visits <- function() {
 get_event_logs <- function() {
   
   
-  meta_data <- read.csv("data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
+  meta_data <- read.csv(EXPERIMENT_CONDITIONS_CSV)
   meta_data <- meta_data %>% select(experiment_id, email, experiment_condition, block_idx, wave_id)
   meta_data <- meta_data %>% mutate(wave_id = ifelse(wave_id == 3, 2, wave_id)) %>%
     mutate(block_by_wave = paste(wave_id,block_idx,sep = '_'))
-  event_logs <- read.csv("data/final_extension_data/event_logs.csv")
+  event_logs <- read.csv(EVENT_LOGS_CSV)
   event_logs <- event_logs %>% left_join(meta_data, by="experiment_id")
   event_logs <- event_logs %>% mutate(tstamp_posix = as_datetime(tstamp),
                                       day = as_date(tstamp_posix))
@@ -76,7 +101,7 @@ get_event_logs <- function() {
       wave_id == 2 ~ TREATMENT_DATE_WAVE_2
     ),
     weeks_since_intervention = as.integer(floor((day - ymd(treatment_date)) / 7))
-  )
+    )
   return(event_logs)
 }
 
@@ -215,7 +240,7 @@ get_internal_privacy_field <- function(df) {
 }
 
 get_privacy_setting_visits <- function() {
-  visited_privacy_policy <- read.csv("data/processed_data/manual_privacy_policy_visit_annotations.csv")
+  visited_privacy_policy <- read.csv(PRIVACY_POLICY_VISITS_CSV)
   visited_privacy_policy <- visited_privacy_policy %>% filter(!(experiment_id %in% BAD_USERS) & manual_privacy_classification %in% c("PRIVACY_SETTINGS", "PRIVACY_SEARCH"))
   
   visited_privacy_policy <- visited_privacy_policy %>%
@@ -228,7 +253,7 @@ get_privacy_setting_visits <- function() {
 }
 
 get_privacy_beliefs <- function() {
-  dat <- read.csv("data/Survey/survey_merged_final.csv", stringsAsFactors = FALSE)
+  dat <- read.csv(SURVEY_MERGED_FINAL_CSV, stringsAsFactors = FALSE)
   
   # beliefscollection → collect
   belief_to_internal <- c(
