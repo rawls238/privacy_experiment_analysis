@@ -1,0 +1,30 @@
+
+\begin{table}[htbp]
+   \caption{Treatment Effect on Self-Reported Data Sharing Behavior}
+   \centering
+   \begin{tabular}{lcccc}
+      \tabularnewline \midrule \midrule
+      Dependent Variables:  & data\_sharing\_1\_binary    & data\_sharing\_2\_binary    & data\_sharing\_3\_binary    & data\_sharing\_4\_binary\\     
+                            & Deleted Cookies             & Opted out                   & Withheld data               & Changed privacy settings \\   
+      Model:                & (1)                         & (2)                         & (3)                         & (4)\\  
+      \midrule
+      \emph{Variables}\\
+      Saliency Treatment    & 0.0084                      & 0.0301                      & 0.0404                      & 0.0337\\   
+                            & (0.0403)                    & (0.0414)                    & (0.0416)                    & (0.0392)\\   
+      Information Treatment & 0.0181                      & 0.0689$^{*}$                & 0.0315                      & 0.0168\\   
+                            & (0.0396)                    & (0.0408)                    & (0.0392)                    & (0.0382)\\   
+      \midrule
+      \emph{Fixed-effects}\\
+      block\_by\_wave       & Yes                         & Yes                         & Yes                         & Yes\\  
+      \midrule
+      \emph{Fit statistics}\\
+      Observations          & 995                         & 995                         & 995                         & 995\\  
+      R$^2$                 & 0.34421                     & 0.36257                     & 0.35996                     & 0.36916\\  
+      Within R$^2$          & 0.00036                     & 0.00495                     & 0.00192                     & 0.00129\\  
+      \midrule \midrule
+      \multicolumn{5}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+      \multicolumn{5}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+   \end{tabular}
+\end{table}
+
+

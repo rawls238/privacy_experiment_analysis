@@ -1,0 +1,30 @@
+
+\begin{table}[htbp]
+   \caption{Treatment Effect on Self-Reported Data Sharing Behavior}
+   \centering
+   \begin{tabular}{lcccc}
+      \tabularnewline \midrule \midrule
+      Dependent Variables:  & data\_sharing\_1\_binary    & data\_sharing\_2\_binary    & data\_sharing\_3\_binary    & data\_sharing\_4\_binary\\     
+                            & Deleted Cookies             & Opted out                   & Withheld data               & Changed privacy settings \\   
+      Model:                & (1)                         & (2)                         & (3)                         & (4)\\  
+      \midrule
+      \emph{Variables}\\
+      Saliency Treatment    & -0.0459                     & -0.0992                     & -0.1524                     & -0.1020\\   
+                            & (0.0946)                    & (0.1321)                    & (0.1138)                    & (0.1078)\\   
+      Information Treatment & 0.0813                      & 0.0432                      & -0.1897                     & -0.0831\\   
+                            & (0.0899)                    & (0.1202)                    & (0.1153)                    & (0.0955)\\   
+      \midrule
+      \emph{Fixed-effects}\\
+      block\_by\_wave       & Yes                         & Yes                         & Yes                         & Yes\\  
+      \midrule
+      \emph{Fit statistics}\\
+      Observations          & 995                         & 995                         & 995                         & 995\\  
+      R$^2$                 & 0.80659                     & 0.74040                     & 0.75981                     & 0.77951\\  
+      Within R$^2$          & 0.02409                     & 0.01983                     & 0.04023                     & 0.01369\\  
+      \midrule \midrule
+      \multicolumn{5}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+      \multicolumn{5}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+   \end{tabular}
+\end{table}
+
+
