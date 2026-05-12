@@ -1,51 +1,80 @@
-# ============================================================================
-# Correlate belief misspecification with conjoint preference intensities
-# ============================================================================
+# =============================================================================
+# BELIEFS VS CONJOINT
+# =============================================================================
+#
+# Produces:
+#   Main paper:
+#     Table C.4 [tab:conjoint_vs_beliefs,
+#                "Belief Misspecification and Privacy Preference Intensity"]:
+#       output/tables/misspec_pref_regression.tex
+#     Table C.5 [tab:baseline_demo_heterogeneity,
+#                "Demographic Heterogeneity in Belief Misspecification and Preferences"]:
+#       output/tables/misspec_pref_demographics.tex
+#
+# Inputs:
+#   ../data/Survey/survey_merged_final.csv
+#   ../data/final_extension_data/experiment_conditions_pilot_july_2024.csv
+#   ../data/Conjoint/Conjoint-Finalized/tables/individual_parameters_wide_means.csv
+#   ../data/final_extension_data/privacy_info.csv  (ground truth)
+#
+# Dependencies:
+#   replication_files/utils/values.R
+#   replication_files/utils/time_usage_helpers.R
+#   replication_files/utils/info_acq_helpers.R
+#
+# Outputs:
+#   output/tables/misspec_pref_regression.tex
+#   output/tables/misspec_pref_demographics.tex
+#
+# Note: Previous version of this script also produced (now removed as dead code):
+#   - misspec_vs_pref_intensity_signed.pdf
+#     (scatter plot of median misspec vs median preference intensity per
+#      attribute; visual companion replaced by Table C.4 in paper)
+# Removed dead library() calls:
+#   - library(xtable)  (zero xtable() call; script uses fixest::etable())
+#   - library(ggrepel) (only used by the removed scatter plot)
+# =============================================================================
 
-rm(list = ls())
+# Set working directory to code_github root so all relative paths resolve.
+setwd("~/Dropbox/spring2025experiment/code_github")
 
-if (Sys.info()[['nodename']] == 'GSB-P4FVDL7QF6'){
-  WD <- "/Users/sggold/Library/CloudStorage/Dropbox/Shared-Project-Folders/Privacy-Experiment/spring2025experiment"
-} else {
-  WD <- "/Users/guyaridor/Dropbox/Privacy-Experiment/spring2025experiment"
-}
+# Source utility scripts
+source("replication_files/utils/values.R")
+source("replication_files/utils/time_usage_helpers.R")
+source("replication_files/utils/info_acq_helpers.R")
 
-setwd(WD)
-
-source("code/utils/values.R")
-source("code/utils/time_usage_helpers.R")
-source("code/utils/info_acq_helpers.R")
-
+# Load required libraries
 library(tidyverse)
 library(fixest)
-library(xtable)
-library(ggrepel)
 
-FIGURES_DIR <- "results/baseline_survey_descriptives/"
-TABLES_DIR  <- "results/baseline_survey_descriptives/"
+# Output directory
+TABLES_DIR <- "output/tables/"
 
-# ============================================================================
+# =============================================================================
 # 1) Load and prepare data
-# ============================================================================
+# =============================================================================
 
-survey_merged <- read.csv("data/Survey/survey_merged_final.csv", stringsAsFactors = FALSE) %>%
+survey_merged <- read.csv("../data/Survey/survey_merged_final.csv",
+                          stringsAsFactors = FALSE) %>%
   mutate(emailid = tolower(emailid))
 
-meta_data <- read.csv("data/final_extension_data/experiment_conditions_pilot_july_2024.csv") %>%
+meta_data <- read.csv("../data/final_extension_data/experiment_conditions_pilot_july_2024.csv") %>%
   mutate(wave_id = ifelse(wave_id == 3, 2, wave_id),
          block_by_wave = paste(wave_id, block_idx, sep = "_"),
          emailid = tolower(email))
 
 survey_merged <- survey_merged %>%
-  left_join(meta_data %>% select(emailid, experiment_id, experiment_condition, wave_id, block_idx, block_by_wave),
+  left_join(meta_data %>%
+              select(emailid, experiment_id, experiment_condition,
+                     wave_id, block_idx, block_by_wave),
             by = "emailid") %>%
   filter(attentioncheck1 == 3,
-         attentioncheck == 2,
+         attentioncheck  == 2,
          sys_ElapsedTime < 6000,
          sys_ElapsedTime > 600)
 
 # Conjoint: two-step crosswalk (RespondentId -> sys_RespNum -> experiment_id)
-conjoint <- read.csv("data/Conjoint/Conjoint-Finalized/tables/individual_parameters_wide_means.csv")
+conjoint <- read.csv("../data/Conjoint/Conjoint-Finalized/tables/individual_parameters_wide_means.csv")
 
 crosswalk <- survey_merged %>%
   select(sys_RespNum, experiment_id) %>%
@@ -55,11 +84,11 @@ crosswalk <- survey_merged %>%
 conjoint <- conjoint %>%
   left_join(crosswalk, by = c("RespondentId" = "sys_RespNum"))
 
-privacy_info <- read.csv("data/final_extension_data/privacy_info.csv")
+privacy_info <- read.csv("../data/final_extension_data/privacy_info.csv")
 
-# ============================================================================
-# 2) Rescale beliefs from 1-5 to 0-100
-# ============================================================================
+# =============================================================================
+# 2) Rescale beliefs from 1-5 Likert to 0-100 percentage
+# =============================================================================
 
 belief_cols <- c(paste0("beliefscollection_r", 1:7),
                  paste0("beliefsuse_r", 1:8),
@@ -71,9 +100,9 @@ for (col in belief_cols) {
   }
 }
 
-# ============================================================================
-# 3) Ground truth (fraction of sites with each practice, 0-100)
-# ============================================================================
+# =============================================================================
+# 3) Ground truth: share of websites with each practice, 0-100
+# =============================================================================
 
 ground_truth <- privacy_info %>%
   mutate(rating_numeric = ifelse(rating == "Yes", 1, 0)) %>%
@@ -82,9 +111,9 @@ ground_truth <- privacy_info %>%
   mutate(q_html_key = paste(feature, field, sep = "-"),
          true_pct_rounded = round(true_pct / 25) * 25)
 
-# ============================================================================
+# =============================================================================
 # 4) Crosswalks: belief survey var -> internal key -> conjoint column
-# ============================================================================
+# =============================================================================
 
 belief_to_internal <- c(
   beliefscollection_r1 = "collect-log",
@@ -152,9 +181,9 @@ labels <- c(
   beliefscontrol_r4 = "Data Stored Securely and Anonymized"
 )
 
-# ============================================================================
+# =============================================================================
 # 5) Build analysis dataset: beliefs (long) x conjoint part-worths (long)
-# ============================================================================
+# =============================================================================
 
 beliefs_long <- survey_merged %>%
   select(experiment_id, all_of(intersect(names(belief_to_t_col), names(survey_merged)))) %>%
@@ -164,7 +193,8 @@ beliefs_long <- survey_merged %>%
     t_col      = belief_to_t_col[belief_var],
     label      = labels[belief_var]
   ) %>%
-  left_join(ground_truth %>% select(q_html_key, true_pct, true_pct_rounded), by = "q_html_key") %>%
+  left_join(ground_truth %>% select(q_html_key, true_pct, true_pct_rounded),
+            by = "q_html_key") %>%
   mutate(
     misspec         = belief_value - true_pct,
     abs_misspec     = abs(misspec),
@@ -204,13 +234,9 @@ joined <- joined %>%
   )
 
 # Demographics (person-level, joined once)
-# Education: 1=Grade school, 2=Some HS, 3=HS/GED, 4=Some college,
-#            5=Trade/vocational, 6=Associate's, 7=Bachelor's,
-#            8=Master's, 9=Professional, 10=Doctorate
-# Income: 1=<$10k, 2=$10-19k, 3=$20-29k, 4=$30-49k, 5=$50-59k,
-#         6=$60-74k, 7=$75-99k, 8=$100-124k, 9=$125-149k,
-#         10=$150-199k, 11=$200k+, 12=Prefer not to answer
-# Gender: 1=Male, 2=Female, 3=Prefer not to answer
+# Education: 1=Grade school ... 7=Bachelor's, 8=Master's, 9=Professional, 10=Doctorate
+# Income:    1=<$10k ... 7=$75-99k ... 11=$200k+, 12=Prefer not to answer
+# Gender:    1=Male, 2=Female, 3=Prefer not to answer
 demog <- survey_merged %>%
   distinct(experiment_id, .keep_all = TRUE) %>%
   select(experiment_id, Age, Education, Gender, Income) %>%
@@ -238,25 +264,26 @@ demog <- survey_merged %>%
 joined <- joined %>%
   left_join(demog, by = "experiment_id")
 
-cat("Analysis dataset:", nrow(joined), "rows\n")
-cat("Non-missing belief-preference pairs:", sum(!is.na(joined$pref_aligned) & !is.na(joined$misspec)), "\n\n")
+cat(sprintf("Analysis dataset: %d rows\n", nrow(joined)))
+cat(sprintf("Non-missing belief-preference pairs: %d\n\n",
+            sum(!is.na(joined$pref_aligned) & !is.na(joined$misspec))))
 
-# ============================================================================
+# =============================================================================
 # 6) Key standard deviations for effect size context
-# ============================================================================
+# =============================================================================
 
 sd_pref        <- sd(joined$pref_aligned, na.rm = TRUE)
-sd_misspec     <- sd(joined$misspec, na.rm = TRUE)
-sd_abs_misspec <- sd(joined$abs_misspec, na.rm = TRUE)
+sd_misspec     <- sd(joined$misspec,      na.rm = TRUE)
+sd_abs_misspec <- sd(joined$abs_misspec,  na.rm = TRUE)
 
 cat("=== Standard deviations ===\n")
-cat("SD pref_aligned:", round(sd_pref, 4), "\n")
-cat("SD misspec:",      round(sd_misspec, 2), "pp\n")
-cat("SD |misspec|:",    round(sd_abs_misspec, 2), "pp\n\n")
+cat(sprintf("SD pref_aligned: %.4f\n", sd_pref))
+cat(sprintf("SD misspec:      %.2f pp\n", sd_misspec))
+cat(sprintf("SD |misspec|:    %.2f pp\n\n", sd_abs_misspec))
 
-# ============================================================================
+# =============================================================================
 # 7) Summary statistics
-# ============================================================================
+# =============================================================================
 
 cat("=== Misspecification bin sizes (rounded truth) ===\n")
 joined %>% filter(!is.na(pref_aligned)) %>% count(misspec_bin) %>% print()
@@ -266,16 +293,16 @@ joined %>%
   filter(!is.na(pref_aligned) & !is.na(misspec)) %>%
   group_by(category) %>%
   summarise(
-    median_pref     = median(pref_aligned),
-    median_abs_pref = median(abs(pref_aligned)),
-    median_misspec  = median(misspec),
+    median_pref        = median(pref_aligned),
+    median_abs_pref    = median(abs(pref_aligned)),
+    median_misspec     = median(misspec),
     median_abs_misspec = median(abs_misspec),
     .groups = "drop"
   ) %>% print()
 
-# ============================================================================
+# =============================================================================
 # 8) Main regressions: misspecification and preferences
-# ============================================================================
+# =============================================================================
 
 reg_linear <- feols(
   pref_aligned ~ misspec | t_col + experiment_id,
@@ -303,7 +330,8 @@ reg_bins_cat <- feols(
 
 cat("\n=== Main results ===\n")
 etable(reg_linear, reg_linear_cat, reg_split, reg_bins, reg_bins_cat,
-       headers = c("Linear", "Linear x Cat", "Over/Under", "Bins", "Bins x Cat"))
+       headers = c("Linear", "Linear x Cat", "Over/Under", "Bins", "Bins x Cat"),
+       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1))
 
 # Effect sizes
 b_linear     <- coef(reg_linear)["misspec"]
@@ -313,20 +341,20 @@ b_under_bin  <- coef(reg_bins)["misspec_binUnderestimate"]
 b_over_bin   <- coef(reg_bins)["misspec_binOverestimate"]
 
 cat("\n--- Effect sizes ---\n")
-cat("Pooled: 1 SD misspec (", round(sd_misspec, 1), "pp) ->",
-    round(b_linear * sd_misspec / sd_pref, 4), "SD of pref\n")
-cat("Collection: 1 SD misspec ->",
-    round(b_collection * sd_misspec / sd_pref, 4), "SD of pref\n")
-cat("Underestimate (linear): 1 SD misspec ->",
-    round(b_under * sd_misspec / sd_pref, 4), "SD of pref\n")
-cat("Underestimate vs Correct (bin):",
-    round(b_under_bin / sd_pref, 4), "SD of pref\n")
-cat("Overestimate vs Correct (bin):",
-    round(b_over_bin / sd_pref, 4), "SD of pref\n")
+cat(sprintf("Pooled: 1 SD misspec (%.1f pp) -> %.4f SD of pref\n",
+            sd_misspec, b_linear * sd_misspec / sd_pref))
+cat(sprintf("Collection: 1 SD misspec -> %.4f SD of pref\n",
+            b_collection * sd_misspec / sd_pref))
+cat(sprintf("Underestimate (linear): 1 SD misspec -> %.4f SD of pref\n",
+            b_under * sd_misspec / sd_pref))
+cat(sprintf("Underestimate vs Correct (bin): %.4f SD of pref\n",
+            b_under_bin / sd_pref))
+cat(sprintf("Overestimate vs Correct (bin): %.4f SD of pref\n",
+            b_over_bin / sd_pref))
 
-# ============================================================================
+# =============================================================================
 # 9) Demographic analysis
-# ============================================================================
+# =============================================================================
 
 reg_misspec_demog <- feols(
   abs_misspec ~ age_bin + high_education + high_income + gender_label | t_col,
@@ -338,28 +366,24 @@ reg_pref_demog <- feols(
 
 cat("\n=== Demographics: misspecification vs preferences ===\n")
 etable(reg_misspec_demog, reg_pref_demog,
-       headers = c("|Misspecification|", "Preferences"))
+       headers = c("|Misspecification|", "Preferences"),
+       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1))
 
-# Effect sizes
 b_educ_misspec <- coef(reg_misspec_demog)["high_education"]
 b_educ_pref    <- coef(reg_pref_demog)["high_education"]
 b_female_pref  <- coef(reg_pref_demog)["gender_labelFemale"]
 
 cat("\n--- Demographic effect sizes ---\n")
-cat("Education on |misspec|:", round(b_educ_misspec, 2), "pp =",
-    round(b_educ_misspec / sd_abs_misspec, 4), "SD\n")
-cat("Education on preferences:", round(b_educ_pref, 4), "=",
-    round(b_educ_pref / sd_pref, 4), "SD\n")
-cat("Female on preferences:", round(b_female_pref, 4), "=",
-    round(b_female_pref / sd_pref, 4), "SD\n")
+cat(sprintf("Education on |misspec|:   %.2f pp = %.4f SD\n",
+            b_educ_misspec, b_educ_misspec / sd_abs_misspec))
+cat(sprintf("Education on preferences: %.4f = %.4f SD\n",
+            b_educ_pref, b_educ_pref / sd_pref))
+cat(sprintf("Female on preferences:    %.4f = %.4f SD\n",
+            b_female_pref, b_female_pref / sd_pref))
 
-# ============================================================================
+# =============================================================================
 # 10) Export tables
-# ============================================================================
-
-# ============================================================================
-# 10) Export tables
-# ============================================================================
+# =============================================================================
 
 dict_main <- c(
   "misspec"                  = "Misspecification (pp)",
@@ -367,7 +391,7 @@ dict_main <- c(
   "underestimate"            = "Underestimate (pp)",
   "misspec_binUnderestimate" = "Underestimate",
   "misspec_binOverestimate"  = "Overestimate",
-  "misspec_rounded"         = "Misspecification (pp)",
+  "misspec_rounded"          = "Misspecification (pp)",
   "misspec:categoryControl"      = "Misspec $\\times$ Control",
   "misspec:categoryUse/Sharing"  = "Misspec $\\times$ Use/Sharing",
   "misspec_binUnderestimate:categoryControl"     = "Underestimate $\\times$ Control",
@@ -376,7 +400,7 @@ dict_main <- c(
   "misspec_binOverestimate:categoryUse/Sharing"  = "Overestimate $\\times$ Use/Sharing",
   "t_col"         = "Attribute FE",
   "experiment_id" = "Participant FE",
-  "pref_aligned"   = "Part-Worth (Aligned)"
+  "pref_aligned"  = "Part-Worth (Aligned)"
 )
 
 dict_demog <- c(
@@ -395,56 +419,16 @@ dict_demog <- c(
 
 etable(reg_bins, reg_linear_rounded, reg_split,
        headers = c("Discrete", "Linear", "Over/Under"),
-       dict = dict_main, tex = TRUE, replace = TRUE,
-       title = "Belief Misspecification and Privacy Preference Intensity",
-       file = paste0(TABLES_DIR, "misspec_pref_regression.tex"))
+       dict    = dict_main, tex = TRUE, replace = TRUE,
+       title   = "Belief Misspecification and Privacy Preference Intensity",
+       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+       file    = paste0(TABLES_DIR, "misspec_pref_regression.tex"))
 
 etable(reg_misspec_demog, reg_pref_demog,
-       headers = c("|Misspecification|", "Preferences"),
-       dict = dict_demog, tex = TRUE, replace = TRUE,
-       title = "Demographic Heterogeneity in Misspecification and Preferences",
-       file = paste0(TABLES_DIR, "misspec_pref_demographics.tex"))
-
-# ============================================================================
-# 11) Scatter plot: attribute-level medians
-# ============================================================================
-
-attr_summary <- joined %>%
-  filter(!is.na(pref_aligned) & !is.na(misspec)) %>%
-  group_by(label, t_col) %>%
-  summarise(
-    median_misspec      = median(misspec),
-    median_pref_aligned = median(pref_aligned),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    category = case_when(
-      grepl("^collection", t_col) ~ "Collection",
-      grepl("^use|^usel", t_col)  ~ "Use/Sharing",
-      grepl("^control", t_col)    ~ "Control"
-    )
-  )
-
-g_signed <- ggplot(attr_summary, aes(x = median_misspec, y = median_pref_aligned,
-                                     label = label, color = category)) +
-  geom_point(size = 3) +
-  geom_text_repel(size = 3, max.overlaps = 20, box.padding = 0.5,
-                  segment.color = "gray60", segment.size = 0.3, show.legend = FALSE) +
-  geom_smooth(method = "lm", se = FALSE, color = "black",
-              inherit.aes = FALSE, aes(x = median_misspec, y = median_pref_aligned)) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
-  scale_color_manual(values = c("Collection" = "#e41a1c", "Use/Sharing" = "#377eb8", "Control" = "#4daf4a")) +
-  labs(
-    x = "Median Belief Misspecification (pp)",
-    y = "Median WTP to Avoid Practice (Part-Worth, aligned)",
-    color = NULL
-  ) +
-  theme_minimal(base_size = 13) +
-  theme(legend.position = "top",
-        plot.margin = margin(5, 20, 5, 5))
-
-ggsave(paste0(FIGURES_DIR, "misspec_vs_pref_intensity_signed.pdf"),
-       g_signed, width = 11, height = 7)
+       headers = c("", "Preferences"),
+       dict    = dict_demog, tex = TRUE, replace = TRUE,
+       title   = "Demographic Heterogeneity in Belief Misspecification and Preferences",
+       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+       file    = paste0(TABLES_DIR, "misspec_pref_demographics.tex"))
 
 cat("\nDone.\n")

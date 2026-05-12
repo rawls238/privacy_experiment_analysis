@@ -315,7 +315,9 @@ for (WEIGHT_SPEC in .specs_to_run) {
                      "Withheld data", "Changed privacy settings"),
          dict   = dict,
          tex    = TRUE,
+         replace = TRUE,                                          
          title  = "Treatment Effect on Self-Reported Data Sharing Behavior",
+         signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
          file   = paste0(TABLES_DIR, "data_sharing_treatment_effects",
                          OUTPUT_SUFFIX, ".tex"))
   
@@ -367,7 +369,9 @@ for (WEIGHT_SPEC in .specs_to_run) {
          headers = c("Disrupted Browsing", "Evaded Extension/Chrome"),
          dict    = dict,
          tex     = TRUE,
+         replace = TRUE,
          depvar  = FALSE,
+         signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
          file    = paste0(TABLES_DIR, "experiment_modified_behavior",
                           OUTPUT_SUFFIX, ".tex"))
   
