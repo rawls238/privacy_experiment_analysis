@@ -318,6 +318,7 @@ for (WEIGHT_SPEC in .specs_to_run) {
          replace = TRUE,                                          
          title  = "Treatment Effect on Self-Reported Data Sharing Behavior",
          signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+         digits = 3,
          file   = paste0(TABLES_DIR, "data_sharing_treatment_effects",
                          OUTPUT_SUFFIX, ".tex"))
   
@@ -372,6 +373,7 @@ for (WEIGHT_SPEC in .specs_to_run) {
          replace = TRUE,
          depvar  = FALSE,
          signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+         digits = 3,
          file    = paste0(TABLES_DIR, "experiment_modified_behavior",
                           OUTPUT_SUFFIX, ".tex"))
   

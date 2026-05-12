@@ -4,6 +4,18 @@ Code that produces the figures and tables in the paper (`writeup_v2.tex`). Non-s
 
 ---
 
+## Style conventions
+
+All `etable()` calls in this repo must use the following arguments to keep output consistent with the paper:
+
+- `digits = 3` — round all coefficients and SEs to 3 decimal places (etable falls back to scientific notation for values too small to display at this precision, e.g. `9.29e-5`).
+- `signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1)` — paper convention.
+- `replace = TRUE` — overwrite the existing `.tex` instead of appending (default is append, which produces duplicates on re-run).
+
+All `.tex` outputs are written to `output/tables/`; all figures are written to `output/figures/`.
+
+---
+
 ## Section 5 — Privacy Practices, Beliefs & Stated Preferences
 
 - `domain_scores_box_plot.pdf` (Fig 4) → `privacy_descriptives/privacy_char_summary_stats_3.R`
@@ -37,8 +49,8 @@ These figures are produced by `time_use_analysis/analysis_assortment_did.R`, whi
 - `individual_heterogeneity_experiment_vs_survey.pdf` → `conjoint/plot_violin.R`
 - `individual_heterogeneity_dollars_with_website_full.pdf` → `conjoint/plot_violin.R`
 - `top2_privacy_attributes_full.pdf` → `conjoint/plot_violin.R`
-- Table `tab:conjoint_vs_beliefs` → `survey_analysis/beliefs_vs_conjoint.R`
-- Table `tab:baseline_demo_heterogeneity` → `survey_analysis/beliefs_vs_conjoint.R`
+- Table `tab:conjoint_vs_beliefs` → `survey_analysis/beliefs_vs_conjoint.R` (output: `misspec_pref_regression.tex`)
+- Table `tab:baseline_demo_heterogeneity` → `survey_analysis/beliefs_vs_conjoint.R` (output: `misspec_pref_demographics.tex`)
 - `heterogeneous_beliefs_site_level_by_exposure_tercile.pdf` → `survey_analysis/top_sites_beliefs_analysis.R`
 - Table `tab:belief_correctness_top_sitesrandom_info` → `survey_analysis/top_sites_beliefs_analysis.R` (output: `top_sites_information_rand_info.tex`)
 - `cumulative_belief_distance.pdf` → `survey_analysis/top_sites_beliefs_analysis.R`
@@ -105,6 +117,11 @@ The original codebase generated additional outputs not used in the paper. We rem
 
 ### `survey_analysis/beliefs_vs_conjoint.R`
 - `misspec_vs_pref_intensity_signed.pdf` — visual companion, replaced by table in paper
+
+### `survey_analysis/beliefs_analysis_overall.R`
+- `agg_belief_correctness.tex` — aggregate-by-category belief vs truth, table version of Fig 5
+- `agg_indiv_field_belief_correctness.tex` — per-attribute belief vs truth, table version of Fig 5
+- `pew_all_effects.tex` — PEW DiD treatment effects regression table
 
 ### `utils/`
 - `tracker_utils.R`, `aggregate_urls.R`, `union.R`, `union_time_period.R` — dead code, no production script sourced them

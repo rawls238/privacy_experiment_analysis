@@ -331,7 +331,9 @@ reg_bins_cat <- feols(
 cat("\n=== Main results ===\n")
 etable(reg_linear, reg_linear_cat, reg_split, reg_bins, reg_bins_cat,
        headers = c("Linear", "Linear x Cat", "Over/Under", "Bins", "Bins x Cat"),
-       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1))
+       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+       digits = 3)
+
 
 # Effect sizes
 b_linear     <- coef(reg_linear)["misspec"]
@@ -367,7 +369,8 @@ reg_pref_demog <- feols(
 cat("\n=== Demographics: misspecification vs preferences ===\n")
 etable(reg_misspec_demog, reg_pref_demog,
        headers = c("|Misspecification|", "Preferences"),
-       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1))
+       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+       digits = 3)
 
 b_educ_misspec <- coef(reg_misspec_demog)["high_education"]
 b_educ_pref    <- coef(reg_pref_demog)["high_education"]
@@ -422,6 +425,7 @@ etable(reg_bins, reg_linear_rounded, reg_split,
        dict    = dict_main, tex = TRUE, replace = TRUE,
        title   = "Belief Misspecification and Privacy Preference Intensity",
        signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+       digits = 3,
        file    = paste0(TABLES_DIR, "misspec_pref_regression.tex"))
 
 etable(reg_misspec_demog, reg_pref_demog,
@@ -429,6 +433,7 @@ etable(reg_misspec_demog, reg_pref_demog,
        dict    = dict_demog, tex = TRUE, replace = TRUE,
        title   = "Demographic Heterogeneity in Belief Misspecification and Preferences",
        signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+       digits = 3,
        file    = paste0(TABLES_DIR, "misspec_pref_demographics.tex"))
 
 cat("\nDone.\n")
