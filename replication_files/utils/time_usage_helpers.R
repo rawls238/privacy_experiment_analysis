@@ -1,30 +1,62 @@
+# =============================================================================
+# TIME USAGE HELPERS
+# =============================================================================
+#
+# Functions used in production scripts to:
+#   - Load and clean browsing time data
+#   - Map domains to categories and privacy info
+#   - Compute privacy scores (full, exposed, personalized)
+#   - Load conjoint utility weights (individual or population)
+#   - Load endline survey personalized info
+#
+# Caller scripts (verified via grep):
+#   replication_files/time_use_analysis/time_usage_treatment_effects_SG.R
+#   replication_files/survey_analysis/top_sites_beliefs_analysis.R
+#   replication_files/privacy_descriptives/privacy_char_summary_stats_3.R
+#   replication_files/utils/info_acq_helpers.R
+#   code/cookie_deletion/cookie_deletion_checks*.R              (stage 1)
+#
+# Data paths assume the calling script setwd()'s to `code_github/`.
+#
+# Note: Previous version of this file also defined 11 functions (now removed
+# as dead code; zero call sites across all .R scripts in the repo):
+#   - clean_urls
+#   - aggregate_time_data_trackers
+#   - standardize_ad_domains_trackers
+#   - high_level_aggregate_trackers
+#   - map_domain_trackers
+#   - map_domain
+#   - map_domain_improved
+#   - map_privacy_data_old
+#   - map_privacy_data_trackers
+#   - map_privacy_data_trackers_2
+#   - map_privacy_data_trackers_SG
+# Removing them dropped this file from ~2900 lines to ~1400 lines.
+# =============================================================================
+
 # Load necessary libraries
 library(tidyverse)
 library(stringdist)
 library(data.table)
 library(parallel)
 
+# ----------------------------------------------------------------------------
+# Data path constants (relative to code_github/)
+# ----------------------------------------------------------------------------
+DATA_DIR     <- "../data/"
+EXT_DATA_DIR <- "../data/final_extension_data/"
+SURVEY_DIR   <- "../data/Survey/"
+CONJOINT_DIR <- "../data/Conjoint/"
 
-clean_urls <- function(data, columns) {
-  # Apply the transformations to each specified column
-  for (col in columns) {
-    data[[col]] <- sub("^https://", "", data[[col]])      # Remove "https://"
-    data[[col]] <- sub("/.*", "", data[[col]])            # Remove everything after "/"
-  }
-  return(data)
-}
+# =============================================================================
+# Core data loading
+# =============================================================================
 
 get_clean_time_data <- function() {
-  time_data_2 <- fread("data/final_extension_data/time_data_2.csv")
+  time_data_2 <- fread(paste0(EXT_DATA_DIR, "time_data_2.csv"))
   privacy_info <- get_privacy_info_wide()
-  exp_conditions <- fread("data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
+  exp_conditions <- fread(paste0(EXT_DATA_DIR, "experiment_conditions_pilot_july_2024.csv"))
   experiment_users <- exp_conditions[experiment_condition != "" & in_experiment == 'true']
-  
-  # Remove people with extension data but no valid survey data
-  # These emails failed survey cleaning (missing demographics/favoritewebsite)
-  # BAD_EMAILS <- c("astarion492@gmail.com", "bluemacaroonss@gmail.com", "garcialeonel19@yahoo.com")
-  # experiment_users <- experiment_users %>%
-  #  filter(!tolower(trimws(email)) %in% tolower(BAD_EMAILS))
   
   experiment_users <- experiment_users %>% mutate(wave_id = ifelse(wave_id == 3, 2, wave_id)) %>%
     mutate(block_by_wave = paste(wave_id,block_idx,sep = '_'))
@@ -35,7 +67,7 @@ get_clean_time_data <- function() {
   target_wave_ids <- exp_conditions[experiment_condition != "" & in_experiment == 'true', experiment_id]
   # Filter time data
   filtered_time_data <- time_data_2[experiment_id %in% target_wave_ids]
-  filtered_time_data <- filtered_time_data  %>% filter((wave_id == 1 & mdy(date) >= START_DATE_WAVE_1 & mdy(date) < END_DATE_WAVE_1) | 
+  filtered_time_data <- filtered_time_data  %>% filter((wave_id == 1 & mdy(date) >= START_DATE_WAVE_1 & mdy(date) < END_DATE_WAVE_1) |
                                                          (wave_id == 2 & mdy(date) >= START_DATE_WAVE_2 & mdy(date) < END_DATE_WAVE_2))
   # Clean data following pipeline
   time_data_2_dropna <- filtered_time_data %>%
@@ -58,8 +90,8 @@ get_clean_time_data <- function() {
   
   # Select final columns and map twitter to X
   final_data <- time_data_2_aggregated_high_privacy %>%
-    select(tstamp, date, user_id, experiment_id, website, website_aggregated, 
-           website_aggregated_high_level, privacy_exist, time_spent, timezone, 
+    select(tstamp, date, user_id, experiment_id, website, website_aggregated,
+           website_aggregated_high_level, privacy_exist, time_spent, timezone,
            elicitation_count, visit_count, wave_id, experiment_condition) %>%
     mutate(
       date = mdy(date),
@@ -77,7 +109,7 @@ get_clean_time_data <- function() {
         TRUE ~ website_aggregated_high_level
       )
     )
-  final_data <- final_data %>% 
+  final_data <- final_data %>%
     mutate(
       post = case_when(
         wave_id == 1 ~ date >= TREATMENT_DATE_WAVE_1,
@@ -92,420 +124,8 @@ get_clean_time_data <- function() {
   return(final_data)
 }
 
-aggregate_time_data_trackers <- function(df, field = NULL) {
-  
-  # If field is NULL, process all columns (backward compatible with old behavior)
-  fields_to_process <- if (is.null(field)) colnames(df) else field
-  
-  for (column in fields_to_process) {
-    
-    out_col <- paste0(column, "_updated")
-    webs <- df[[column]]
-    
-    # --- Dedup: only process unique values ---
-    unique_vals <- unique(webs)
-    
-    # --- Formatting_1: fix translate.goog and www- patterns (VECTORIZED) ---
-    webs1 <- unique_vals
-    
-    is_translate <- grepl("\\.translate\\.goog$", webs1)
-    
-    idx1 <- is_translate & grepl("--", webs1)
-    webs1[idx1] <- gsub("--", "@", webs1[idx1])
-    webs1[idx1] <- gsub("-", ".", webs1[idx1])
-    webs1[idx1] <- sub("\\.translate\\.goog$", "", webs1[idx1])
-    webs1[idx1] <- gsub("@", "-", webs1[idx1])
-    
-    idx2 <- is_translate & !grepl("--", webs1)
-    webs1[idx2] <- gsub("-", ".", webs1[idx2])
-    webs1[idx2] <- sub("\\.translate\\.goog$", "", webs1[idx2])
-    
-    webs1 <- sub("^www-", "www.", webs1)
-    webs1 <- sub("-com", ".com", webs1)
-    
-    # --- Formatting_2: remove .gov ---
-    webs2 <- sub("\\.gov", "", webs1)
-    
-    # --- Formatting_3: remove double postfix ---
-    patterns <- c("\\.net", "\\.com", "\\.co", "\\.org", "\\.edu", "\\.io",
-                  "\\.live", "\\.ac", "\\.go")
-    pattern_to_remove <- paste(patterns, collapse = "|")
-    webs3 <- gsub(paste0("(", pattern_to_remove, ")(\\..*)?$"), "", webs2)
-    
-    # --- Formatting_4: remove prefix + tracker-specific suffix list ---
-    # NOTE: This suffix list is intentionally different from aggregate_time_data().
-    # Tracker domains like clarity.ms, ad.gt, xpln.tech are real tracker brands,
-    # NOT country TLDs, so we do NOT strip them here.
-    cleaned_webs <- gsub('^(open\\.|en\\.|www?\\d*\\.)', '', webs3)
-    
-    suffixes <- c(
-      '\\.xzy$', '\\.ai$', '\\.news$', '\\.dev$', '\\.eu$', '\\.it$', '\\.my$', '\\.sc$', '\\.so$', '\\.ag',
-      '\\.live$', '\\.de$', '\\.fr$', '\\.bz$', '\\.us$', '\\.lk$', '\\.icu$', '\\.app$', '\\.box$',
-      '\\.online$', '\\.tv$', '\\.gg$', '\\.me$', '\\.max$', '\\.rs$', '\\.pe$', '\\.uk$', '\\.at$', '\\.ai$',
-      '\\.cc$', '\\.es$', '\\.to$', '\\.il$', '\\.shop$', '\\.ru$', '\\.cn$', '\\.in$', '\\.br$', '\\.jp$',
-      '\\.mx$', '\\.se$', '\\.no$', '\\.fi$', '\\.be$', '\\.ch$', '\\.tw$', '\\.za$', '\\.us$', '\\.uk$',
-      '\\.jobs$', '\\.li$', '\\.biz$', '\\.qa$', '\\.fco.gov.uk$'
-    )
-    pattern <- paste(suffixes, collapse = "|")
-    webs4 <- ifelse(grepl("www\\.gov\\.uk$", webs3), "gov", gsub(pattern, '', cleaned_webs))
-    
-    # --- Aggregation rules (identical to original) ---
-    webs5 <- webs4
-    webs5 <- gsub(".*qualtrics.*", "qualtrics", webs5)
-    webs5 <- gsub("l\\.facebook|lm\\.facebook|m\\.facebook\\.com", "facebook", webs5)
-    webs5 <- gsub(".*cloudresearch.*", "cloudresearch", webs5)
-    webs5 <- gsub("^(x|twitter|t)$", "twitter", webs5)
-    webs5 <- gsub("^old\\.reddit.*$", "reddit", webs5)
-    webs5 <- gsub("^new\\.reddit.*$", "reddit", webs5)
-    webs5 <- gsub(".*\\.(microsoftonline|microsoft365)(\\..*)?$", "microsoft", webs5, perl = TRUE)
-    webs5 <- gsub(".*\\.(amazonaws|amazoncognito)(\\..*)?$", "amazon", webs5, perl = TRUE)
-    webs5 <- gsub(".*\\.(news.yahoo)(\\..*)?$", "news.yahoo", webs5, perl = TRUE)
-    
-    # Handle 'id.me' specific case (needs original values)
-    webs5[grepl("\\.id\\.me$", unique_vals)] <- "id.me"
-    
-    # --- Map back to full data ---
-    lookup <- setNames(webs5, unique_vals)
-    df[[out_col]] <- as.character(lookup[webs])
-  }
-  
-  return(df)
-}
-
-standardize_ad_domains_trackers <- function(domain_column) {
-  result <- domain_column
-  result <- gsub(".*safeframe.googlesyndication.*", "safeframe.googlesyndication", result)
-  result <- gsub(".*amazon-adsystem.*", "amazon-adsystem", result)
-  result <- gsub(".*rubiconproject.*", "rubiconproject", result)
-  result <- gsub(".*casalemedia*", "casalemedia", result)
-  result <- gsub(".*justpremium*", "justpremium", result)
-  result <- gsub(".*doubleclick*", "doubleclick", result)
-  result <- gsub(".*online-metrix*", "online-metrix", result)
-  result <- gsub(".*ap.dotnxdomain*", "ap.dotnxdomain", result)
-  result <- gsub(".*adsco.re*", "adsco.re", result)
-  result <- gsub(".*facebook*", "facebook", result)
-  result <- gsub(".*quantserve*", "quantserve", result)
-  result <- gsub(".*rfihub*", "rfihub", result)
-  result <- gsub(".*openx*", "openx", result)
-  result <- gsub(".*criteo*", "criteo", result)
-  result <- gsub(".*liadm*", "liadm", result)
-  result <- gsub(".*ad.gt*", "ad.gt", result)
-  result <- gsub(".*ml314*", "ml314", result)
-  result <- gsub(".*3lift*", "3lift", result)
-  result <- gsub(".*connextra*", "connextra", result)
-  result <- gsub(".*a-mo*", "a-mo", result)
-  result <- gsub(".*ipredictive*", "ipredictive", result)
-  result <- gsub(".*omnitagjs*", "omnitagjs", result)
-  result <- gsub(".*yellowblue*", "yellowblue", result)
-  result <- gsub(".*adnxs*", "adnxs", result)
-  result <- gsub(".*ad-score*", "ad-score", result)
-  result <- gsub(".*adrta*", "adrta", result)
-  result <- gsub(".*tribalfusion*", "tribalfusion", result)
-  result <- gsub(".*wiley*", "wiley", result)
-  result <- gsub(".*ingest.sentry*", "ingest.sentry", result)
-  result <- gsub(".*acuityplatform*", "acuityplatform", result)
-  result <- gsub(".*outbrain*", "outbrain", result)
-  result <- gsub(".*teads*", "teads", result)
-  result <- gsub(".*pub.network*", "pub.network", result)
-  result <- gsub(".*webcontentassessor*", "webcontentassessor", result)
-  result <- gsub(".*gstatic*", "gstatic", result)
-  result <- gsub(".*insightexpressai*", "insightexpressai", result)
-  result <- gsub(".*demdex*", "demdex", result)
-  result <- gsub(".*twitter*", "twitter", result)
-  result <- gsub(".*servenobid*", "servenobid", result)
-  result <- gsub(".*ads.linkedin*", "ads.linkedin", result)
-  result <- gsub(".*usbank*", "usbank", result)
-  result <- gsub(".*adsafeprotected*", "adsafeprotected", result)
-  result <- gsub(".*nr-data*", "nr-data", result)
-  result <- gsub(".*reson8*", "reson8", result)
-  result <- gsub(".*partners.tremorhub*", "partners.tremorhub", result)
-  result <- gsub(".*adzerk*", "adzerk", result)
-  result <- gsub(".*\\.lego.*", "lego", result)
-  result <- gsub(".*moatads*", "moatads", result)
-  result <- gsub(".*innovid*", "innovid", result)
-  result <- gsub(".*indexww*", "indexww", result)
-  result <- gsub(".*\\.bing.*", "bing", result)
-  result <- gsub(".*postrelease*", "postrelease", result)
-  result <- gsub(".*smaato*", "smaato", result)
-  result <- gsub(".*ebay*", "ebay", result)
-  result <- gsub(".*sentry*", "sentry", result)
-  result <- gsub(".*smartadserver*", "smartadserver", result)
-  result <- gsub(".*browsiprod*", "browsiprod", result)
-  result <- gsub(".*pubmatic*", "pubmatic", result)
-  result <- gsub(".*\\.fwmrm.*", "fwmrm", result)
-  result <- gsub(".*contextweb*", "contextweb", result)
-  result <- gsub(".*targeting.unrulymedia*", "targeting.unrulymedia", result)
-  result <- gsub(".*admixer*", "admixer", result)
-  result <- gsub(".*taboola*", "taboola", result)
-  result <- gsub(".*adx.opera*", "adx.opera", result)
-  result <- gsub(".*srv.stackadapt*", "srv.stackadapt", result)
-  result <- gsub(".*sony*", "sony", result)
-  result <- gsub(".*rmbl.ws*", "rmbl.ws", result)
-  result <- gsub(".*adswizz*", "adswizz", result)
-  result <- gsub(".*hb.brainlyads*", "hb.brainlyads", result)
-  result <- gsub(".*ads.audio.thisisdax*", "ads.audio.thisisdax", result)
-  result <- gsub(".*adsrvr*", "adsrvr", result)
-  result <- gsub(".*4dex*", "4dex", result)
-  result <- gsub(".*vip.townnews*", "vip.townnews", result)
-  result <- gsub(".*ay.delivery*", "ay.delivery", result)
-  result <- gsub(".*stickyadstv*", "stickyadstv", result)
-  result <- gsub(".*stackadapt*", "stackadapt", result)
-  result <- gsub(".*bazaarvoice*", "bazaarvoice", result)
-  result <- gsub(".*measure.office*", "measure.office", result)
-  result <- gsub(".*ensighten*", "ensighten", result)
-  result <- gsub(".*securedvisit*", "securedvisit", result)
-  result <- gsub(".*services.livejournal*", "services.livejournal", result)
-  result <- gsub(".*omtrdc*", "omtrdc", result)
-  result <- gsub(".*w55c*", "w55c", result)
-  result <- gsub(".*sportradar*", "sportradar", result)
-  result <- gsub(".*sportradarserving*", "sportradar", result)
-  result <- gsub(".*conde.digital*", "conde.digital", result)
-  result <- gsub(".*admanmedia*", "admanmedia", result)
-  result <- gsub(".*godaddy*", "godaddy", result)
-  result <- gsub(".*disqus*", "disqus", result)
-  result <- gsub(".*linksynergy*", "linksynergy", result)
-  result <- gsub(".*snplow*", "snplow", result)
-  result <- gsub(".*spotify*", "spotify", result)
-  result <- gsub(".*cdc.*", "cdc", result)
-  result <- gsub(".*tvsquared*", "tvsquared", result)
-  result <- gsub(".*cnn*", "cnn", result)
-  result <- gsub(".*yahoo*", "yahoo", result)
-  result <- gsub(".*adxpremium.services*", "adxpremium.services", result)
-  result <- gsub(".*expedia*", "expedia", result)
-  result <- gsub(".*glassboxdigital*", "glassboxdigital", result)
-  result <- gsub(".*bidagent.xad*", "bidagent.xad", result)
-  result <- gsub(".*newscgp*", "newscgp", result)
-  result <- gsub(".*wmt*", "wmt", result)
-  result <- gsub(".*walmart*", "walmart", result)
-  result <- gsub(".*\\.unc.*", "unc", result)
-  result <- gsub(".*transunionprod*", "transunion", result)
-  result <- gsub(".*transunion.*", "transunion", result)
-  result <- gsub(".*visa*", "visa", result)
-  result <- gsub(".*visait*", "visait", result)
-  result <- gsub(".*citi*", "citi", result)
-  result <- gsub(".*demand.supply*", "demand.supply", result)
-  result <- gsub(".*cloudflare*", "cloudflare", result)
-  result <- gsub(".*cloudflareinsights*", "cloudflare", result)
-  result <- gsub(".*cloudflarestream*", "cloudflare", result)
-  result <- gsub(".*gbqofs*", "gbqofs", result)
-  result <- gsub(".*zog.link*", "zog.link", result)
-  result <- gsub(".*data.adobedc*", "data.adobedc", result)
-  result <- gsub(".*ingage.tech*", "ingage.tech", result)
-  result <- gsub(".*appspot*", "appspot", result)
-  result <- gsub(".*amazonaws*", "aws", result)
-  result <- gsub(".*springyaws*", "aws", result)
-  result <- gsub(".*aws.*", "aws", result)
-  result <- gsub(".*aws-org*", "aws", result)
-  result <- gsub(".*amazonservices*", "amazon", result)
-  result <- gsub(".*googletagmanager*", "google", result)
-  result <- gsub(".*googlesyndication*", "google", result)
-  result <- gsub(".*google-analytics*", "google", result)
-  result <- gsub(".*googleapis*", "google", result)
-  result <- gsub(".*googleadservices*", "google", result)
-  result <- gsub(".*google*", "google", result)
-  result <- gsub(".*azurefd*", "azure", result)
-  result <- gsub(".*azureedge*", "azure", result)
-  result <- gsub(".*azurewebsites*", "azure", result)
-  result <- gsub(".*azurefilm*", "azure", result)
-  result <- gsub(".*azure*", "azure", result)
-  result <- gsub(".*sonyic*", "sonyic", result)
-  result <- gsub(".*yottaa-network*", "yottaa", result)
-  result <- gsub(".*yottaa*", "yottaa", result)
-  result <- gsub(".*server-side-tagging*", "server-side", result)
-  result <- gsub(".*server-side.*", "server-side", result)
-  result <- gsub(".*autodesk*", "autodesk", result)
-  result <- gsub(".*landerstoyota*", "toyota", result)
-  result <- gsub(".*toyotafinancial*", "toyota", result)
-  result <- gsub(".*toyota*", "toyota", result)
-  result <- gsub(".*playstream.media*", "playstream.media", result)
-  result <- gsub(".*comptroller.texas*", "comptroller.texas", result)
-  result <- gsub(".*report.gbss*", "report.gbss", result)
-  result <- gsub(".*tremorhub*", "tremorhub", result)
-  result <- gsub(".*digital.nuance*", "digital.nuance", result)
-  result <- gsub(".*yandex*", "yandex", result)
-  result <- gsub(".*philips.*", "philips", result)
-  result <- gsub(".*mobiletracking*", "mobiletracking", result)
-  result <- gsub(".*conjoint.ly*", "conjointly", result)
-  result <- gsub(".*conjointly*", "conjointly", result)
-  result <- gsub(".*piwik*", "piwik", result)
-  result <- gsub(".*piwik2*", "piwik", result)
-  result <- gsub(".*piwik-prod*", "piwik", result)
-  result <- gsub(".*piwik.pro*", "piwik", result)
-  result <- gsub(".*piwik*", "matomo", result)
-  result <- gsub(".*mixpo*", "mixpo", result)
-  result <- gsub(".*pandadoc*", "pandadoc", result)
-  result <- gsub(".*polarbyte*", "polarbyte", result)
-  result <- gsub(".*owox*", "owox", result)
-  result <- gsub(".*polarbyte*", "polarbyte", result)
-  result <- gsub(".*rudderstack*", "rudderstack", result)
-  result <- gsub(".*sonyic*.", "sonyic", result)
-  result <- gsub(".*smetrics.*", "smetrics", result)
-  result <- gsub(".*aegpresents.*", "aegpresents", result)
-  result <- gsub(".*aeg.*", "aeg", result)
-  result <- gsub(".*aegpresents.*", "aeg", result)
-  result <- gsub(".*matomo.*", "matomo", result)
-  result <- gsub(".*amazon-adsystem.*", "amazon", result)
-  result <- gsub(".*synchrony.*", "synchrony", result)
-  result <- gsub(".*sentry.*", "sentry", result)
-  result <- gsub(".*adnxs-simple*", "adnxs", result)
-  result <- gsub(".*openx.*", "openx", result)
-  result <- gsub(".*teadsyquarryderived*", "teads", result)
-  result <- gsub(".*googletagservices*", "google", result)
-  result <- gsub(".*fastclick*", "fastclick", result)
-  result <- gsub(".*cdn.optimizely*", "cdn.optimizely", result)
-  result <- gsub(".*rlcdn.*", "rlcdn", result)
-  result <- gsub(".*jwpltx.*", "jwpltx", result)
-  result <- gsub(".*serving-sys.*", "serving-sys", result)
-  result <- gsub(".*emxdgt.*", "emxdgt", result)
-  result <- gsub(".*360yield.*", "360yield", result)
-  result <- gsub(".*sony8*", "sony", result)
-  result <- gsub(".*sonyline*", "sony", result)
-  result <- gsub(".*sonyadime*", "sony", result)
-  result <- gsub(".*sonylabel*", "sony", result)
-  result <- gsub(".*sonyexteriors*", "sony", result)
-  result <- gsub(".*sonycleaning*", "sony", result)
-  result <- gsub(".*sonys.inq*", "sony", result)
-  result <- gsub(".*sonyart*", "sony", result)
-  result <- gsub(".*sonyart*", "sony", result)
-  result <- gsub(".*sonylifetv*", "sony", result)
-  result <- gsub(".*sonyrecruiting*", "sony", result)
-  result <- gsub(".*sonycollection*", "sony", result)
-  result <- gsub(".*prebid.*", "prebid", result)
-  result <- gsub(".*merchant-center-analytics.goog*", "google", result)
-  result <- gsub(".*samplicio.*", "samplicio", result)
-  result <- gsub(".*chartbeat.*", "chartbeat", result)
-  result <- gsub(".*flashtalking.*", "flashtalking", result)
-  result <- gsub(".*yieldmo.*", "yieldmo", result)
-  result <- gsub(".*extremereach*", "extremereach", result)
-  result <- gsub(".*creativecdn*", "creativecdn", result)
-  result <- gsub(".*chartbeat*", "chartbeat", result)
-  result <- gsub(".*pushnami*", "pushnami", result)
-  result <- gsub(".*gumgum*", "gumgum", result)
-  result <- gsub(".*yieldmo*", "yieldmo", result)
-  result <- gsub(".*adform*", "adform", result)
-  result <- gsub(".*smilewanted*", "smilewanted", result)
-  result <- gsub(".*adform*", "adform", result)
-  result <- gsub(".*skimresources*", "skimresources", result)
-  result <- gsub(".*serverbid*", "serverbid", result)
-  result <- gsub(".*kueezrtb*", "kueezrtb", result)
-  result <- gsub(".*adform*", "adform", result)
-  result <- gsub(".*clickagy*", "clickagy", result)
-  result <- gsub(".*flashtalking*", "flashtalking", result)
-  result <- gsub(".*adobedtm*", "adobedtm", result)
-  result <- gsub(".*adobe*", "adobe", result)
-  result <- gsub(".*adform*", "adform", result)
-  result <- gsub(".*chase*", "chase", result)
-  result <- gsub("\\.112\\.2o7", "", result)
-  result <- gsub("\\.122\\.2o7", "", result)
-  return(result)
-}
-
-
-high_level_aggregate_trackers <- function(df, field = NULL) {
-  
-  # If field is NULL, process all columns; otherwise process specified column
-  fields_to_process <- if (is.null(field)) colnames(df) else field
-  
-  # Step 1: TLD patterns to strip
-  patterns <- c(
-    "\\.xyz$", "\\.cloud$", "\\.eu$", "\\.live$", "\\.link$", "\\.app.link$", "\\.site$",
-    "\\.my.site$", "\\.top$", "\\.com___$", "\\.com$", "\\.com\\.$", "\\.com.pa$",
-    "\\.com.ua$", "\\.community$", "\\.it$", "\\.web$", "\\.website$", "\\.surveyrouter$",
-    "\\.co$", "\\.so$", "\\.show$", "\\.club$", "\\.art$", "\\.org$", "\\.go$",
-    "\\.edu$", "\\.health$", "\\.auth0$", "\\.us.auth0$", "\\.life$", "\\.coop$",
-    "\\.ec$", "\\.k12.fl$", "\\.best$", "\\.si$", "\\.blogspot$", "\\.blog$", "\\.pages$", "\\.pub$"
-  )
-  pattern_regex <- paste(patterns, collapse = "|")
-  
-  # Step 2: KEEP_LAST_2 - tracker-specific TLDs that are brand identifiers
-  KEEP_LAST_2 <- c(
-    "ms",    # clarity.ms
-    "gt",    # ad.gt
-    "wp",    # pixel.wp, stats.wp
-    "gthq",  # ad.gthq
-    "2mdn",  # s0.2mdn
-    "1rx",   # a-iad3.1rx
-    "tynt",  # de.tynt
-    "tech",  # xpln.tech, 4dex.tech
-    "re",    # adsco.re
-    "t13",   # s2s.t13
-    "a47b",  # aam.a47b
-    "ns1p",  # pp-m.ns1p
-    "goog",  # syndicatedsearch.goog
-    "im",    # spot.im
-    "ex",    # collector.ex
-    "am",    # tru.am
-    "bi",    # events.newsroom.bi
-    "wknd",  # ssp.wknd
-    "page",  # rum.hlx.page
-    "mdhv",  # jelly-v6.mdhv
-    "mrf",   # sdk.mrf
-    "tawk",  # va.tawk
-    "bc0a",  # ixfd2-api.bc0a
-    "bidr",  # media.bidr
-    "wix",   # frog.wix
-    "mgid",  # servicer.mgid
-    "zdbb",  # jogger.zdbb
-    "jst",   # aly.jst
-    "mail",  # top-fwz1.mail
-    "ee",    # orb.ee
-    "trkn",  # aa.trkn
-    "vdo",   # analytics.vdo
-    "zoho",  # pagesense-collect.zoho
-    "cq0",   # doh.cq0
-    "xad",   # bidagent.xad
-    "ad-m",  # n-2-laxx.ad-m
-    "3gl",   # rjs.3gl
-    "esm1",  # banners2.esm1
-    "ew3",   # ca.ew3
-    "lqm",   # tracking.lqm
-    "zqtk",  # aps.zqtk
-    "turn",  # d.turn
-    "tldw",  # counter.tldw
-    "brid",  # stats-dev.brid
-    "fomo",  # stats.fomo
-    "jads",  # poweredby.jads
-    "powr",  # counter.powr
-    "clrt",  # js.clrt
-    "ws",    # rmbl.ws
-    "fbot",  # public.fbot
-    "daum",  # bc.ad.daum
-    "espn",  # dcf.espn
-    "wf",    # gbxreport-prod.wf
-    "t-x"    # d.t-x
-  )
-  
-  for (column in fields_to_process) {
-    out_col <- paste0(column, "_high_level")
-    webs <- df[[column]]
-    unique_vals <- unique(webs)
-    
-    # Strip TLD patterns
-    webs_cleaned <- gsub(pattern_regex, "", unique_vals, perl = TRUE)
-    
-    # Get last segment
-    last_seg <- sub(".*\\.", "", webs_cleaned)
-    
-    # Get last 2 segments
-    last_2 <- ifelse(
-      grepl("\\.", webs_cleaned),
-      sub(".*?([^.]+\\.[^.]+)$", "\\1", webs_cleaned),
-      webs_cleaned
-    )
-    
-    # Apply KEEP_LAST_2 logic
-    result <- ifelse(last_seg %in% KEEP_LAST_2, last_2, last_seg)
-    
-    # Map back to full data
-    lookup <- setNames(result, unique_vals)
-    df[[out_col]] <- as.character(lookup[webs])
-  }
-  
-  return(df)
-}
-
 get_privacy_info_raw <- function () {
-  privacy_info <- fread("data/final_extension_data/privacy_info.csv")
+  privacy_info <- fread(paste0(EXT_DATA_DIR, "privacy_info.csv"))
   privacy_info <- privacy_info %>% mutate(numeric_rating = ifelse(rating == "Yes", 1, 0))
   privacy_info$domain = gsub('^(open\\.|en\\.|www?\\d*\\.)', '',   privacy_info$domain) # remove www.
   privacy_info <- privacy_info %>%
@@ -569,7 +189,7 @@ get_domain_classification <- function() {
 get_personalized_scores <- function(time_dat) {
   privacy_info <- get_privacy_info_wide()
   #privacy_info <- privacy_info %>% left_join(domain_classfication, by=c("domain_aggregated_high_level"="name_aggregated_high_level"))
-   
+  
   beta_cols <- names(time_dat)[startsWith(names(time_dat), "beta_")]
   
   # 0) Explicit aliases for known naming mismatches
@@ -615,7 +235,7 @@ get_personalized_scores <- function(time_dat) {
   p_cols_P <- colnames(P_mat)
   p_cols_B <- setdiff(colnames(B), "experiment_id")
   p_cols   <- intersect(p_cols_P, p_cols_B)
-
+  
   
   # If you expect full overlap, assert here:
   # stopifnot(setequal(p_cols_P, p_cols_B))
@@ -642,7 +262,7 @@ get_personalized_scores <- function(time_dat) {
   denom[denom == 0] <- NA_real_                   # avoid divide-by-zero → NA
   
   # final scores: in [0,1]
-  S <- sweep(N, 2, denom, "/")  
+  S <- sweep(N, 2, denom, "/")
   
   # ---- Single aggregated score for requested attributes (q1_html_key & q2_html_key) ----
   user_keys <- time_dat %>%
@@ -667,7 +287,7 @@ get_personalized_scores <- function(time_dat) {
   
   # Helper to accumulate contributions for one attr vector of column indices
   accum_attr <- function(idx_vec) {
-    # replace NA indices with 1 (dummy col), we’ll zero-weight them via mask
+    # replace NA indices with 1 (dummy col), we'll zero-weight them via mask
     idx_fill <- ifelse(is.na(idx_vec), 1L, idx_vec)
     
     # p-values per (site,user) for this attr:
@@ -750,7 +370,7 @@ get_personalized_scores <- function(time_dat) {
 }
 
 get_privacy_info_wide <- function() {
-  privacy_info <- fread("data/final_extension_data/privacy_info.csv")
+  privacy_info <- fread(paste0(EXT_DATA_DIR, "privacy_info.csv"))
   privacy_info <- privacy_info %>% mutate(numeric_rating = ifelse(rating == "Yes", 1, 0))
   privacy_info <- privacy_info %>% group_by(html_key, domain) %>% summarise(provided_privacy = mean(numeric_rating)) %>% ungroup()
   privacy_info_wide <- privacy_info %>%
@@ -774,151 +394,6 @@ get_privacy_info_wide <- function() {
       TRUE ~ domain_aggregated_high_level
     ))
   return(privacy_info_wide)
-}
-
-map_domain_trackers <- function(trackers, domain_classfication) {
-  # change variable names
-  domain_classification_2 <- domain_classfication %>%
-    select(-date)
-  time_data_2_update = trackers
-  setDT(time_data_2_update)
-  setDT(domain_classification_2)
-  
-  web_in <- time_data_2_update$domain_updated # change to domain updated
-  web_ex <- domain_classification_2$name
-  
-  Formatting <- function(webs) {
-    unique_webs <- unique(webs)
-    cleaned_webs <- gsub('^(open\\.|en\\.|www?\\d*\\.)', '', unique_webs)
-    return(cleaned_webs)
-  }
-  
-  Split <- function(webs_formatted) {
-    strsplit(webs_formatted, "\\.")
-  }
-  
-  Split_remove_last <- function(webs_formatted) {
-    sapply(strsplit(webs_formatted, "\\."), function(x) if(length(x) > 1){x[-length(x)]} else {x[length(x)]})
-  }
-  
-  Makepair <- function(webs_in, webs_ex) {
-    webs_inter <- Formatting(webs_in)
-    webs_exter <- Formatting(webs_ex)
-    
-    exter_splits <- lapply(webs_exter, Split_remove_last)
-    exter_domains <- unlist(exter_splits)
-    exter_dt <- data.table(
-      domain = exter_domains,
-      exter = rep(webs_exter, sapply(exter_splits, length))
-    )
-    setkey(exter_dt, domain)
-    matched_pairs <- vector("list", length(webs_inter))
-    names(matched_pairs) <- webs_inter
-    
-    for (inter in webs_inter) {
-      inter_domains <- unlist(Split(inter))
-      matches <- unique(exter_dt[domain %in% inter_domains, exter])
-      matched_pairs[[inter]] <- matches
-    }
-    
-    return(matched_pairs)
-  }
-  
-  map_matched <- Makepair(web_in, web_ex)
-  
-  get_top_match <- function(map_matched) {
-    top_matches <- character(length(map_matched))
-    names(top_matches) <- names(map_matched)
-    
-    for (a in names(map_matched)) {
-      candidates <- map_matched[[a]]
-      
-      if (length(candidates) == 0) {
-        top_matches[a] <- NA_character_
-        next
-      }
-      
-      a_parts <- unlist(strsplit(a, "\\."))
-      
-      best_match <- candidates[which.max(sapply(candidates, function(b) {
-        b_parts <- unlist(strsplit(b, "\\."))
-        matched_parts <- length(intersect(a_parts, b_parts))
-        return(matched_parts * 1000 + nchar(b))  # Prioritize matched parts, then length
-      }))]
-      
-      top_matches[a] <- best_match
-    }
-    
-    return(top_matches)
-  }
-  
-  top1_matches <- get_top_match(map_matched)
-  
-  top1_matches_dt <- data.table(
-    left = names(top1_matches),
-    right = unlist(top1_matches)
-  )
-  
-  top1_matches_dt <- top1_matches_dt[!(right == "english-heritage.org.uk" & !grepl("english-heritage", left))]
-  
-  # Remove 'www' prefix using data.table
-  remove_prefix <- function(domain) {
-    gsub('^(open\\.|en\\.|www?\\d*\\.)', '', domain)
-  }
-  
-  domain_classification_2[, name := remove_prefix(name)]
-  
-  join_and_count_matches <- function(df.domain, top1_matches_dt, domain_classification_3) {
-    # NOTE: map_domain_3 expects df.domain to have columns 'domain' (the website
-    # identifier) and 'value' (a non-empty data column used to filter out NA
-    # rows produced by the full outer join). This differs from map_domain (which
-    # uses 'website_aggregated' + 'time_spent') because map_domain_3 is used for
-    # privacy-attribute data (privacy_char_summary_stats_3.R), not time data.
-    setkey(df.domain, domain)
-    setkey(top1_matches_dt, left)
-    setkey(domain_classification_3, name)
-    
-    # First full join
-    result_dt <- merge(df.domain, top1_matches_dt, by.x = "domain", by.y = "left", all = TRUE)
-    # Second full join
-    result_dt <- result_dt %>% mutate(index = row_number())
-    result_dt <- merge(result_dt, domain_classification_3, by.x = "right", by.y = "name", all = TRUE)
-    # Remove useless rows created by Full join.
-    result_dt <- result_dt[!is.na(value) & value != ""]
-    # Count and report
-    original_count <- nrow(df.domain)
-    final_count <- nrow(result_dt)
-    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$domain))
-    
-    cat("Original number of rows in df.domain:", original_count, "\n")
-    cat("Number of rows with a match:", matched_count, "\n")
-    cat("Percentage of original rows with a match:", (matched_count / original_count) * 100, "%\n")
-    return(result_dt)
-  }
-  
-  enriched_dt <- join_and_count_matches(time_data_2_update, top1_matches_dt, domain_classification_2)
-  enriched_df = as.tibble(enriched_dt)
-  
-  
-  # THIS PART IS SLOW
-  enriched_df <- enriched_df %>% mutate(category = map_chr(categories, ~ {
-    if (is.na(.x)) {
-      NA_character_  # Return NA if the value is missing
-    } else {
-      parsed <- fromJSON(.x)
-      if (length(parsed) == 0) {
-        NA_character_  # Handle empty lists
-      } else {
-        parsed %>% bind_rows() %>% arrange(desc(confidence)) %>% slice(1) %>% pull(name)
-      }
-    }
-  }))
-  enriched_df <- enriched_df %>% mutate(category = ifelse(is.na(category), "", sub("^/", "", category))) %>%
-    separate(category, into = c("category_level_1", "category_level_2", "category_level_3"), sep = "/", fill = "right", extra = "merge")
-  # remove fields that we are not interested.
-  enriched_df <- enriched_df |>
-    select(-right, -categories)
-  return(enriched_df)
 }
 
 compute_privacy_scores <- function(df) {
@@ -966,145 +441,6 @@ compute_privacy_scores <- function(df) {
   
   df %>%
     left_join(scores, by = id_cols)
-}
-
-
-map_domain <- function(time_data_2_update, domain_classification_2) {
-  # remove useless and convert inputs to data.table
-  domain_classification_2 <- domain_classification_2 %>%
-    select(-date)
-  setDT(time_data_2_update)
-  setDT(domain_classification_2)
-  
-  # Extract and format websites
-  web_in <- time_data_2_update$website_aggregated
-  web_ex <- domain_classification_2$name
-  
-  Formatting <- function(webs) {
-    unique_webs <- unique(webs)
-    cleaned_webs <- gsub('^(open\\.|en\\.|www?\\d*\\.)', '', unique_webs)
-    return(cleaned_webs)
-  }
-  
-  Split <- function(webs_formatted) {
-    strsplit(webs_formatted, "\\.")
-  }
-  
-  Split_remove_last <- function(webs_formatted) {
-    sapply(strsplit(webs_formatted, "\\."), function(x) if(length(x) > 1){x[-length(x)]} else {x[length(x)]})
-  }
-  
-  Makepair <- function(webs_in, webs_ex) {
-    webs_inter <- Formatting(webs_in)
-    webs_exter <- Formatting(webs_ex)
-    
-    exter_splits <- lapply(webs_exter, Split_remove_last)
-    exter_domains <- unlist(exter_splits)
-    exter_dt <- data.table(
-      domain = exter_domains,
-      exter = rep(webs_exter, sapply(exter_splits, length))
-    )
-    setkey(exter_dt, domain)
-    matched_pairs <- vector("list", length(webs_inter))
-    names(matched_pairs) <- webs_inter
-    
-    for (inter in webs_inter) {
-      inter_domains <- unlist(Split(inter))
-      matches <- unique(exter_dt[domain %in% inter_domains, exter])
-      matched_pairs[[inter]] <- matches
-    }
-    
-    return(matched_pairs)
-  }
-  
-  map_matched <- Makepair(web_in, web_ex)
-  
-  get_top_match <- function(map_matched) {
-    top_matches <- character(length(map_matched))
-    names(top_matches) <- names(map_matched)
-    
-    for (a in names(map_matched)) {
-      candidates <- map_matched[[a]]
-      
-      if (length(candidates) == 0) {
-        top_matches[a] <- NA_character_
-        next
-      }
-      
-      a_parts <- unlist(strsplit(a, "\\."))
-      
-      best_match <- candidates[which.max(sapply(candidates, function(b) {
-        b_parts <- unlist(strsplit(b, "\\."))
-        matched_parts <- length(intersect(a_parts, b_parts))
-        return(matched_parts * 1000 + nchar(b))  # Prioritize matched parts, then length
-      }))]
-      
-      top_matches[a] <- best_match
-    }
-    
-    return(top_matches)
-  }
-  
-  top1_matches <- get_top_match(map_matched)
-  
-  top1_matches_dt <- data.table(
-    left = names(top1_matches),
-    right = unlist(top1_matches)
-  )
-  
-  top1_matches_dt <- top1_matches_dt[!(right == "english-heritage.org.uk" & !grepl("english-heritage", left))]
-  
-  # Remove 'www' prefix using data.table
-  remove_prefix <- function(domain) {
-    gsub('^(open\\.|en\\.|www?\\d*\\.)', '', domain)
-  }
-  
-  domain_classification_2[, name := remove_prefix(name)]
-  
-  join_and_count_matches <- function(time_data_2_update, top1_matches_dt, domain_classification_2) {
-    setkey(time_data_2_update, website_aggregated)
-    setkey(top1_matches_dt, left)
-    setkey(domain_classification_2, name)
-    
-    # First full join
-    result_dt <- merge(time_data_2_update, top1_matches_dt, by.x = "website_aggregated", by.y = "left", all = TRUE)
-    # Second full join
-    result_dt <- result_dt %>% mutate(index = row_number())
-    result_dt <- merge(result_dt, domain_classification_2, by.x = "right", by.y = "name", all = TRUE)
-    # Remove useless rows created by Full join.
-    result_dt <- result_dt[!is.na(time_spent) & time_spent != ""]
-    # Count and report
-    original_count <- nrow(time_data_2_update)
-    final_count <- nrow(result_dt)
-    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$website_aggregated))
-    
-    cat("Original number of rows in time_data_2_update:", original_count, "\n")
-    cat("Number of rows with a match:", matched_count, "\n")
-    cat("Percentage of original rows with a match:", (matched_count / original_count) * 100, "%\n")
-    return(result_dt)
-  }
-  
-  enriched_dt <- join_and_count_matches(time_data_2_update, top1_matches_dt, domain_classification_2)
-  enriched_df = as.tibble(enriched_dt)
-  
-  enriched_df <- enriched_df %>% mutate(category = map_chr(categories, ~ {
-    if (is.na(.x)) {
-      NA_character_  # Return NA if the value is missing
-    } else {
-      parsed <- fromJSON(.x)
-      if (length(parsed) == 0) {
-        NA_character_  # Handle empty lists
-      } else {
-        parsed %>% bind_rows() %>% arrange(desc(confidence)) %>% slice(1) %>% pull(name)
-      }
-    }
-  }))
-  enriched_df <- enriched_df %>% mutate(category = ifelse(is.na(category), "", sub("^/", "", category))) %>%
-    separate(category, into = c("category_level_1", "category_level_2", "category_level_3"), sep = "/", fill = "right", extra = "merge")
-  # remove fields that we are not interested.
-  enriched_df <- enriched_df |>
-    select(-right, -categories)
-  return(enriched_df)
 }
 
 map_domain_3 <- function(df.domain, domain_classification_3) {
@@ -1250,390 +586,6 @@ map_domain_3 <- function(df.domain, domain_classification_3) {
   return(enriched_df)
 }
 
-map_domain_improved <- function(time_data_2_update, domain_classification_2) {
-  # Remove unnecessary columns and convert to data.table
-  domain_classification_2 <- domain_classification_2 %>%
-    select(-date)
-  setDT(time_data_2_update)
-  setDT(domain_classification_2)
-  
-  # Extract and format websites
-  web_in <- time_data_2_update$website_aggregated
-  web_ex <- domain_classification_2$name
-  
-  # Helper functions
-  Formatting <- function(webs) {
-    unique_webs <- unique(webs)
-    cleaned_webs <- gsub('^(open\\.|en\\.|www?\\d*\\.)', '', unique_webs)
-    return(cleaned_webs)
-  }
-  
-  Split <- function(webs_formatted) {
-    strsplit(webs_formatted, "\\.")
-  }
-  
-  # ✅ FIX: Safe version from map_domain (handles single-part domains)
-  Split_remove_last <- function(webs_formatted) {
-    sapply(strsplit(webs_formatted, "\\."), function(x) {
-      if(length(x) > 1) {
-        x[-length(x)]
-      } else {
-        x[length(x)]  # Keep single-part domains
-      }
-    })
-  }
-  
-  # Makepair function
-  Makepair <- function(webs_in, webs_ex) {
-    webs_inter <- Formatting(webs_in)
-    webs_exter <- Formatting(webs_ex)
-    
-    exter_splits <- lapply(webs_exter, Split_remove_last)
-    exter_domains <- unlist(exter_splits)
-    exter_dt <- data.table(
-      domain = exter_domains,
-      exter = rep(webs_exter, sapply(exter_splits, length))
-    )
-    setkey(exter_dt, domain)
-    
-    matched_pairs <- vector("list", length(webs_inter))
-    names(matched_pairs) <- webs_inter
-    
-    for (inter in webs_inter) {
-      inter_domains <- unlist(Split(inter))
-      matches <- unique(exter_dt[domain %in% inter_domains, exter])
-      matched_pairs[[inter]] <- matches
-    }
-    
-    return(matched_pairs)
-  }
-  
-  # Create matched pairs
-  map_matched <- Makepair(web_in, web_ex)
-  
-  # Get top match function
-  get_top_match <- function(map_matched) {
-    top_matches <- character(length(map_matched))
-    names(top_matches) <- names(map_matched)
-    
-    for (a in names(map_matched)) {
-      candidates <- map_matched[[a]]
-      
-      if (length(candidates) == 0) {
-        top_matches[a] <- NA_character_
-        next
-      }
-      
-      a_parts <- unlist(strsplit(a, "\\."))
-      
-      best_match <- candidates[which.max(sapply(candidates, function(b) {
-        b_parts <- unlist(strsplit(b, "\\."))
-        matched_parts <- length(intersect(a_parts, b_parts))
-        return(matched_parts * 1000 + nchar(b))  # Prioritize matched parts, then length
-      }))]
-      
-      top_matches[a] <- best_match
-    }
-    
-    return(top_matches)
-  }
-  
-  # Get top matches
-  top1_matches <- get_top_match(map_matched)
-  
-  top1_matches_dt <- data.table(
-    left = names(top1_matches),
-    right = unlist(top1_matches)
-  )
-  
-  # Filter out problematic matches
-  top1_matches_dt <- top1_matches_dt[
-    !(right == "english-heritage.org.uk" & !grepl("english-heritage", left))
-  ]
-  
-  # Remove 'www' prefix using data.table
-  remove_prefix <- function(domain) {
-    gsub('^(open\\.|en\\.|www?\\d*\\.)', '', domain)
-  }
-  
-  domain_classification_2[, name := remove_prefix(name)]
-  
-  # Join and count matches function
-  join_and_count_matches <- function(time_data_2_update, top1_matches_dt, domain_classification_2) {
-    setkey(time_data_2_update, website_aggregated)
-    setkey(top1_matches_dt, left)
-    setkey(domain_classification_2, name)
-    
-    # First join
-    result_dt <- merge(time_data_2_update, top1_matches_dt, 
-                       by.x = "website_aggregated", by.y = "left", all = TRUE)
-    
-    # ✅ ADD: Index column from map_domain (better tracking)
-    result_dt <- result_dt %>% mutate(index = row_number())
-    
-    # Second join
-    result_dt <- merge(result_dt, domain_classification_2, 
-                       by.x = "right", by.y = "name", all = TRUE)
-    
-    # Remove useless rows created by full join
-    result_dt <- result_dt[!is.na(time_spent) & time_spent != ""]
-    
-    # Count and report
-    original_count <- nrow(time_data_2_update)
-    final_count <- nrow(result_dt)
-    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$website_aggregated))
-    
-    cat("Original number of rows in time_data_2_update:", original_count, "\n")
-    cat("Number of rows with a match:", matched_count, "\n")
-    cat("Percentage of original rows with a match:", 
-        round((matched_count / original_count) * 100, 2), "%\n")
-    
-    return(result_dt)
-  }
-  
-  # Perform joins
-  enriched_dt <- join_and_count_matches(time_data_2_update, top1_matches_dt, domain_classification_2)
-  
-  # ✅ IMPROVED: Better diagnostics
-  cat("\n--- Category Parsing Diagnostics ---\n")
-  cat("Rows in enriched_dt:", nrow(enriched_dt), "\n")
-  cat("Columns in enriched_dt:", paste(colnames(enriched_dt), collapse = ", "), "\n")
-  
-  enriched_df <- as_tibble(enriched_dt)
-  
-  categories_length <- length(enriched_df$categories)
-  cat("Length of categories column:", categories_length, "\n")
-  
-  # ✅ ROBUST: Parse categories with error handling
-  parsed_categories <- map(enriched_df$categories, ~ {
-    if (is.na(.x)) {
-      return(NA_character_)
-    } else {
-      parsed <- tryCatch(
-        fromJSON(.x),
-        error = function(e) {
-          # Optional: log which JSON failed
-          # cat("JSON parse error:", .x, "\n")
-          return(NULL)
-        }
-      )
-      
-      if (is.null(parsed) || length(parsed) == 0) {
-        return(NA_character_)
-      } else {
-        tryCatch({
-          parsed %>% 
-            bind_rows() %>% 
-            arrange(desc(confidence)) %>% 
-            slice(1) %>% 
-            pull(name)
-        }, error = function(e) {
-          return(NA_character_)
-        })
-      }
-    }
-  })
-  
-  # ✅ ROBUST: Handle length mismatches
-  if (length(parsed_categories) < nrow(enriched_df)) {
-    cat("Warning: Padding parsed_categories from", length(parsed_categories), 
-        "to", nrow(enriched_df), "\n")
-    parsed_categories <- c(
-      parsed_categories, 
-      rep(NA_character_, nrow(enriched_df) - length(parsed_categories))
-    )
-  } else if (length(parsed_categories) > nrow(enriched_df)) {
-    cat("Warning: Truncating parsed_categories from", length(parsed_categories), 
-        "to", nrow(enriched_df), "\n")
-    parsed_categories <- parsed_categories[1:nrow(enriched_df)]
-  }
-  
-  cat("Length of parsed_categories after adjustment:", length(parsed_categories), "\n")
-  
-  # Assign and clean
-  enriched_df$category <- parsed_categories
-  enriched_df$category <- as.character(enriched_df$category)
-  
-  # ✅ ROBUST: Handle NULLs and empty strings
-  enriched_df$category[sapply(enriched_df$category, is.null)] <- NA_character_
-  enriched_df$category[enriched_df$category == ""] <- NA_character_
-  
-  cat("Number of NA values in category:", sum(is.na(enriched_df$category)), "\n")
-  
-  # ✅ ROBUST: separate() with error handling
-  tryCatch({
-    enriched_df <- enriched_df %>% 
-      mutate(category = ifelse(is.na(category), "", sub("^/", "", category))) %>%
-      separate(
-        category, 
-        into = c("category_level_1", "category_level_2", "category_level_3"), 
-        sep = "/", 
-        fill = "right", 
-        extra = "merge", 
-        remove = FALSE
-      )
-    
-    cat("Successfully separated category column\n")
-    
-  }, error = function(e) {
-    cat("Error in separate function:", e$message, "\n")
-    cat("Creating fallback category columns with NA\n")
-    
-    # Fallback: create empty columns
-    enriched_df$category_level_1 <<- NA_character_
-    enriched_df$category_level_2 <<- NA_character_
-    enriched_df$category_level_3 <<- NA_character_
-  })
-  
-  cat("Rows in enriched_df after separate:", nrow(enriched_df), "\n")
-  cat("Columns in enriched_df after separate:", 
-      paste(colnames(enriched_df), collapse = ", "), "\n")
-  cat("--- End Diagnostics ---\n\n")
-  
-  # ✅ CLEAN: Remove intermediate columns
-  enriched_df <- enriched_df %>%
-    select(-right, -categories, -category)
-  
-  return(enriched_df)
-}
-
-# map privacy_info (old version)
-map_privacy_data_old <- function(time_data_2_domain_class_high_level, privacy) {
-  enriched_data_1 = time_data_2_domain_class_high_level
-  setDT(enriched_data_1)
-  setDT(privacy)
-  web_in <- enriched_data_1$website_aggregated_high_level
-  web_ex <- privacy$domain
-  
-  Formatting <- function(webs) {
-    unique_webs <- unique(webs)
-    return(unique_webs)
-  }
-  
-  Split <- function(webs_formatted) {
-    strsplit(webs_formatted, "\\.")
-  }
-  
-  Split_remove_last <- function(webs_formatted) {
-    sapply(strsplit(webs_formatted, "\\."), function(x) x[-length(x)])
-  }
-  
-  # Makepair_1 function
-  Makepair_1 <- function(webs_in, webs_ex) {
-    webs_inter <- Formatting(webs_in)
-    webs_exter <- Formatting(webs_ex)
-    
-    exter_splits <- lapply(webs_exter, Split_remove_last)
-    exter_domains <- unlist(exter_splits)
-    exter_dt <- data.table(
-      domain = exter_domains,
-      exter = rep(webs_exter, sapply(exter_splits, length))
-    )
-    setkey(exter_dt, domain)
-    
-    matched_pairs <- vector("list", length(webs_inter))
-    names(matched_pairs) <- webs_inter
-    
-    for (inter in webs_inter) {
-      inter_domains <- unlist(Split(inter))
-      
-      # Check if inter_domains is not empty
-      if (length(inter_domains) > 0) {
-        #root_domain <- inter_domains[length(inter_domains)]
-        #matches <- unique(exter_dt[domain %in% root_domain, exter])
-        matches <- unique(unlist(lapply(inter_domains, function(domain_part) {
-          exter_dt[domain %in% domain_part, exter]
-        })))
-        matched_pairs[[inter]] <- matches
-      } else {
-        # Handle cases where inter_domains is empty (optional based on your logic)
-        matched_pairs[[inter]] <- NULL
-      }
-    }
-    return(matched_pairs)
-  }
-  
-  
-  # Create matched pairs
-  map_matched <- Makepair_1(web_in, web_ex)
-  map_matched$bestbuy.cspace
-  
-  # Get top match function
-  get_top_match <- function(map_matched) {
-    top_matches <- character(length(map_matched))
-    names(top_matches) <- names(map_matched)
-    
-    for (a in names(map_matched)) {
-      candidates <- map_matched[[a]]
-      
-      if (length(candidates) == 0) {
-        top_matches[a] <- NA_character_
-        next
-      }
-      
-      a_parts <- unlist(strsplit(a, "\\."))
-      
-      best_match <- candidates[which.max(sapply(candidates, function(b) {
-        b_parts <- unlist(strsplit(b, "\\."))
-        matched_parts <- length(intersect(a_parts, b_parts))
-        return(matched_parts * 1000 + nchar(b))  # Prioritize matched parts, then length
-      }))]
-      
-      top_matches[a] <- best_match
-    }
-    
-    return(top_matches)
-  }
-  
-  
-  # Get top matches
-  top1_matches <- get_top_match(map_matched)
-  
-  top1_matches_dt <- data.table(
-    left = names(top1_matches),
-    right = unlist(top1_matches)
-  )
-  
-  top1_matches_dt <- top1_matches_dt[
-    !(right == "history.com" & left == "historyhub.history")
-  ][order(right)]
-  
-  top1_matches_dt <- top1_matches_dt[left != "" & right != ""]
-  
-  # Add and count matches function
-  add_and_count_matches <- function(enriched_data_1, top1_matches_dt, privacy) {
-    setkey(enriched_data_1, website_aggregated_high_level)
-    setkey(top1_matches_dt, left)
-    setkey(privacy, domain)
-    
-    # First full join
-    result_dt <- merge(enriched_data_1, top1_matches_dt, by.x = "website_aggregated_high_level", by.y = "left", all = TRUE)
-    # Second full join
-    result_dt <- merge(result_dt, privacy, by.x = "right", by.y = "domain", all = TRUE)
-    # Remove useless rows created by Full join.
-    if ("time_spent" %in% colnames(result_dt)) {
-      result_dt <- result_dt[!is.na(time_spent) & time_spent != ""]
-    }
-    result_dt[, privacy_exist := !is.na(right) & right != ""]
-    # Count and report
-    original_count <- nrow(enriched_data_1)
-    final_count <- nrow(result_dt)
-    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$website))
-    
-    cat("Original number of rows in enriched_data_1:", original_count, "\n")
-    cat("Number of rows with a match:", matched_count, "\n")
-    cat("Percentage of original rows with a match:", (matched_count / original_count) * 100, "%\n")
-    result_dt = result_dt |>
-      select(-right)
-    return(result_dt)
-  }
-  
-  # Add matches and count them
-  enriched_dt <- add_and_count_matches(enriched_data_1, top1_matches_dt, privacy)
-  enriched_df = as.tibble(enriched_dt)
-  return(enriched_df)
-}
-
 map_privacy_data <- function(time_data_2_domain_class_high_level, privacy) {
   # Match user browsing data to privacy information using exact matching
   # Input: time_data with website columns, privacy from get_privacy_info_wide()
@@ -1661,10 +613,10 @@ map_privacy_data <- function(time_data_2_domain_class_high_level, privacy) {
   
   # Exact matching (replaces previous complex Makepair_1/get_top_match logic)
   result_dt <- merge(
-    enriched_data_1, 
-    privacy, 
-    by.x = "matching_key", 
-    by.y = "domain_aggregated_high_level", 
+    enriched_data_1,
+    privacy,
+    by.x = "matching_key",
+    by.y = "domain_aggregated_high_level",
     all.x = TRUE
   )
   
@@ -1684,417 +636,6 @@ map_privacy_data <- function(time_data_2_domain_class_high_level, privacy) {
   enriched_df = as_tibble(result_dt)
   return(enriched_df)
 }
-
-# map privacy_info
-map_privacy_data_trackers <- function(trackers_domain_class, privacy) {
-  enriched_data_1 = trackers_domain_class
-  setDT(enriched_data_1)
-  setDT(privacy)
-  web_in <- enriched_data_1$domain_updated_high_level
-  web_ex <- privacy$domain
-  
-  Formatting <- function(webs) {
-    unique_webs <- unique(webs)
-    return(unique_webs)
-  }
-  
-  Split <- function(webs_formatted) {
-    strsplit(webs_formatted, "\\.")
-  }
-  
-  Split_remove_last <- function(webs_formatted) {
-    sapply(strsplit(webs_formatted, "\\."), function(x) x[-length(x)])
-  }
-  
-  # Makepair_1 function
-  Makepair_1 <- function(webs_in, webs_ex) {
-    webs_inter <- Formatting(webs_in)
-    webs_exter <- Formatting(webs_ex)
-    
-    exter_splits <- lapply(webs_exter, Split_remove_last)
-    exter_domains <- unlist(exter_splits)
-    exter_dt <- data.table(
-      domain = exter_domains,
-      exter = rep(webs_exter, sapply(exter_splits, length))
-    )
-    setkey(exter_dt, domain)
-    
-    matched_pairs <- vector("list", length(webs_inter))
-    names(matched_pairs) <- webs_inter
-    
-    for (inter in webs_inter) {
-      inter_domains <- unlist(Split(inter))
-      
-      # Check if inter_domains is not empty
-      if (length(inter_domains) > 0) {
-        #root_domain <- inter_domains[length(inter_domains)]
-        #matches <- unique(exter_dt[domain %in% root_domain, exter])
-        matches <- unique(unlist(lapply(inter_domains, function(domain_part) {
-          exter_dt[domain %in% domain_part, exter]
-        })))
-        matched_pairs[[inter]] <- matches
-      } else {
-        # Handle cases where inter_domains is empty (optional based on your logic)
-        matched_pairs[[inter]] <- NULL
-      }
-    }
-    return(matched_pairs)
-  }
-  
-  
-  # Create matched pairs
-  map_matched <- Makepair_1(web_in, web_ex)
-  
-  # Get top match function
-  get_top_match <- function(map_matched) {
-    top_matches <- character(length(map_matched))
-    names(top_matches) <- names(map_matched)
-    
-    for (a in names(map_matched)) {
-      candidates <- map_matched[[a]]
-      
-      if (length(candidates) == 0) {
-        top_matches[a] <- NA_character_
-        next
-      }
-      
-      a_parts <- unlist(strsplit(a, "\\."))
-      
-      best_match <- candidates[which.max(sapply(candidates, function(b) {
-        b_parts <- unlist(strsplit(b, "\\."))
-        matched_parts <- length(intersect(a_parts, b_parts))
-        return(matched_parts * 1000 + nchar(b))  # Prioritize matched parts, then length
-      }))]
-      
-      top_matches[a] <- best_match
-    }
-    
-    return(top_matches)
-  }
-  
-  
-  # Get top matches
-  top1_matches <- get_top_match(map_matched)
-  
-  top1_matches_dt <- data.table(
-    left = names(top1_matches),
-    right = unlist(top1_matches)
-  )
-  
-  top1_matches_dt <- top1_matches_dt[
-    !(right == "history.com" & left == "historyhub.history")
-  ][order(right)]
-  
-  top1_matches_dt <- top1_matches_dt[left != "" & right != ""]
-  
-  
-  # Add and count matches function
-  add_and_count_matches <- function(enriched_data_1, top1_matches_dt, privacy) {
-    setkey(enriched_data_1, domain_updated_high_level)
-    setkey(top1_matches_dt, left)
-    setkey(privacy, domain_privacy)
-    
-    # First full join
-    result_dt <- merge(enriched_data_1, top1_matches_dt, by.x = "domain_updated_high_level", by.y = "left", all = TRUE)
-    # Second full join
-    result_dt <- merge(result_dt, privacy, by.x = "right", by.y = "domain_privacy", all = TRUE)
-    # Remove useless rows created by Full join.
-    if ("id" %in% colnames(result_dt)) {
-      result_dt <- result_dt[!is.na(id) & id != ""]
-    }
-    result_dt[, privacy_exist := !is.na(right) & right != ""]
-    # Count and report
-    original_count <- nrow(enriched_data_1)
-    final_count <- nrow(result_dt)
-    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$domain))
-    
-    cat("Original number of rows in enriched_data_1:", original_count, "\n")
-    cat("Number of rows with a match:", matched_count, "\n")
-    cat("Percentage of original rows with a match:", (matched_count / original_count) * 100, "%\n")
-    result_dt = result_dt |>
-      select(-right)
-    return(result_dt)
-  }
-  
-  # Add matches and count them
-  enriched_dt <- add_and_count_matches(enriched_data_1, top1_matches_dt, privacy)
-  enriched_df = as.tibble(enriched_dt)
-  return(enriched_df)
-}
-
-# map privacy_info
-map_privacy_data_trackers_2 <- function(trackers_domain_class, privacy) {
-  enriched_data_1 = trackers_domain_class
-  setDT(enriched_data_1)
-  setDT(privacy)
-  web_in <- enriched_data_1$domain_updated
-  web_ex <- privacy$domain
-  
-  Formatting <- function(webs) {
-    unique_webs <- unique(webs)
-    return(unique_webs)
-  }
-  
-  Split <- function(webs_formatted) {
-    strsplit(webs_formatted, "\\.")
-  }
-  
-  Split_remove_last <- function(webs_formatted) {
-    sapply(strsplit(webs_formatted, "\\."), function(x) x[-length(x)])
-  }
-  
-  # Makepair_1 function
-  Makepair_1 <- function(webs_in, webs_ex) {
-    webs_inter <- Formatting(webs_in)
-    webs_exter <- Formatting(webs_ex)
-    
-    exter_splits <- lapply(webs_exter, Split_remove_last)
-    exter_domains <- unlist(exter_splits)
-    exter_dt <- data.table(
-      domain = exter_domains,
-      exter = rep(webs_exter, sapply(exter_splits, length))
-    )
-    setkey(exter_dt, domain)
-    
-    matched_pairs <- vector("list", length(webs_inter))
-    names(matched_pairs) <- webs_inter
-    
-    for (inter in webs_inter) {
-      inter_domains <- unlist(Split(inter))
-      
-      # Check if inter_domains is not empty
-      if (length(inter_domains) > 0) {
-        #root_domain <- inter_domains[length(inter_domains)]
-        #matches <- unique(exter_dt[domain %in% root_domain, exter])
-        matches <- unique(unlist(lapply(inter_domains, function(domain_part) {
-          exter_dt[domain %in% domain_part, exter]
-        })))
-        matched_pairs[[inter]] <- matches
-      } else {
-        # Handle cases where inter_domains is empty (optional based on your logic)
-        matched_pairs[[inter]] <- NULL
-      }
-    }
-    return(matched_pairs)
-  }
-  
-  
-  # Create matched pairs
-  map_matched <- Makepair_1(web_in, web_ex)
-  
-  # Get top match function
-  get_top_match <- function(map_matched) {
-    top_matches <- character(length(map_matched))
-    names(top_matches) <- names(map_matched)
-    
-    for (a in names(map_matched)) {
-      candidates <- map_matched[[a]]
-      
-      if (length(candidates) == 0) {
-        top_matches[a] <- NA_character_
-        next
-      }
-      
-      a_parts <- unlist(strsplit(a, "\\."))
-      
-      best_match <- candidates[which.max(sapply(candidates, function(b) {
-        b_parts <- unlist(strsplit(b, "\\."))
-        matched_parts <- length(intersect(a_parts, b_parts))
-        return(matched_parts * 1000 + nchar(b))  # Prioritize matched parts, then length
-      }))]
-      
-      top_matches[a] <- best_match
-    }
-    
-    return(top_matches)
-  }
-  
-  
-  # Get top matches
-  top1_matches <- get_top_match(map_matched)
-  
-  top1_matches_dt <- data.table(
-    left = names(top1_matches),
-    right = unlist(top1_matches)
-  )
-  
-  top1_matches_dt <- top1_matches_dt[
-    !(right == "history.com" & left == "historyhub.history")
-  ][order(right)]
-  
-  top1_matches_dt <- top1_matches_dt[left != "" & right != ""]
-  
-  # Add and count matches function
-  add_and_count_matches <- function(enriched_data_1, top1_matches_dt, privacy) {
-    setkey(enriched_data_1, domain_updated)
-    setkey(top1_matches_dt, left)
-    setkey(privacy, domain_privacy)
-    
-    # First full join
-    result_dt <- merge(enriched_data_1, top1_matches_dt, by.x = "domain_updated", by.y = "left", all = TRUE)
-    # Second full join
-    result_dt <- merge(result_dt, privacy, by.x = "right", by.y = "domain_privacy", all = TRUE)
-    # Remove useless rows created by Full join.
-    if ("id" %in% colnames(result_dt)) {
-      result_dt <- result_dt[!is.na(id) & id != ""]
-    }
-    result_dt[, privacy_exist := !is.na(right) & right != ""]
-    # Count and report
-    original_count <- nrow(enriched_data_1)
-    final_count <- nrow(result_dt)
-    matched_count <- sum(!is.na(result_dt$right) & !is.na(result_dt$domain))
-    
-    cat("Original number of rows in enriched_data_1:", original_count, "\n")
-    cat("Number of rows with a match:", matched_count, "\n")
-    cat("Percentage of original rows with a match:", (matched_count / original_count) * 100, "%\n")
-    result_dt = result_dt |>
-      select(-right)
-    return(result_dt)
-  }
-  
-  # Add matches and count them
-  enriched_dt <- add_and_count_matches(enriched_data_1, top1_matches_dt, privacy)
-  enriched_df = as.tibble(enriched_dt)
-  return(enriched_df)
-}
-
-
-# map privacy_info 
-map_privacy_data_trackers_SG <- function(trackers_domain_class, privacy_to_match) {
-  enriched_data_1 = trackers_domain_class
-  privacy = privacy_to_match
-  setDT(enriched_data_1)
-  setDT(privacy)
-  web_in <- enriched_data_1$domain_updated_high_level
-  web_ex <- privacy$domain_privacy
-  
-  Formatting <- function(webs) {
-    unique_webs <- unique(webs)
-    return(unique_webs)
-  }
-  
-  Split <- function(webs_formatted) {
-    strsplit(webs_formatted, "\\.")
-  }
-  
-  Split_remove_last <- function(webs_formatted) {
-    sapply(strsplit(webs_formatted, "\\."), function(x) x[-length(x)])
-  }
-  
-  # Makepair_1 function
-  Makepair_1 <- function(webs_in, webs_ex) {
-    webs_inter <- Formatting(webs_in)
-    webs_exter <- Formatting(webs_ex)
-    
-    exter_splits <- lapply(webs_exter, Split_remove_last)
-    exter_domains <- unlist(exter_splits)
-    exter_dt <- data.table(
-      domain = exter_domains,
-      exter = rep(webs_exter, sapply(exter_splits, length))
-    )
-    setkey(exter_dt, domain)
-    
-    matched_pairs <- vector("list", length(webs_inter))
-    names(matched_pairs) <- webs_inter
-    
-    for (inter in webs_inter) {
-      inter_domains <- unlist(Split(inter))
-      
-      # Check if inter_domains is not empty
-      if (length(inter_domains) > 0) {
-        #root_domain <- inter_domains[length(inter_domains)]
-        #matches <- unique(exter_dt[domain %in% root_domain, exter])
-        matches <- unique(unlist(lapply(inter_domains, function(domain_part) {
-          exter_dt[domain %in% domain_part, exter]
-        })))
-        matched_pairs[[inter]] <- matches
-      } else {
-        # Handle cases where inter_domains is empty (optional based on your logic)
-        matched_pairs[[inter]] <- NULL
-      }
-    }
-    return(matched_pairs)
-  }
-  
-  
-  # Create matched pairs
-  map_matched <- Makepair_1(web_in, web_ex)
-  
-  # Get top match function
-  get_top_match <- function(map_matched) {
-    top_matches <- character(length(map_matched))
-    names(top_matches) <- names(map_matched)
-    
-    for (a in names(map_matched)) {
-      candidates <- map_matched[[a]]
-      
-      if (length(candidates) == 0) {
-        top_matches[a] <- NA_character_
-        next
-      }
-      
-      a_parts <- unlist(strsplit(a, "\\."))
-      
-      best_match <- candidates[which.max(sapply(candidates, function(b) {
-        b_parts <- unlist(strsplit(b, "\\."))
-        matched_parts <- length(intersect(a_parts, b_parts))
-        return(matched_parts * 1000 + nchar(b))  # Prioritize matched parts, then length
-      }))]
-      
-      top_matches[a] <- best_match
-    }
-    
-    return(top_matches)
-  }
-  
-  
-  # Get top matches
-  top1_matches <- get_top_match(map_matched)
-  
-  top1_matches_dt <- data.table(
-    left = names(top1_matches),
-    right = unlist(top1_matches)
-  )
-  
-  top1_matches_dt <- top1_matches_dt[
-    !(right == "history.com" & left == "historyhub.history")
-  ][order(right)]
-  
-  top1_matches_dt <- top1_matches_dt[left != "" & right != ""]
-
-  # Add and count matches function
-  add_and_count_matches <- function(enriched_data_1, top1_matches_dt, privacy) {
-    setkey(enriched_data_1, domain_updated_high_level)
-    setkey(top1_matches_dt, left)
-    setkey(privacy, domain_privacy)
-    
-    # First full join
-    result_dt_1 <- merge(enriched_data_1, top1_matches_dt, by.x = "domain_updated_high_level", by.y = "left", all = TRUE)
-    cat("check1", ncol(result_dt_1))
-    # Second full join
-    result_dt_2 <- merge(result_dt_1, privacy, by.x = "right", by.y = "domain_privacy", all = TRUE)
-    result_dt_2[, privacy_exist := !is.na(right) & right != ""]
-    # Remove useless rows created by Full join.
-    if ("id" %in% colnames(result_dt_2)) {
-      result_dt_2 <- result_dt_2[!is.na(id) & id != ""]
-    }
-    # Count and report
-    original_count <- nrow(enriched_data_1)
-    final_count <- nrow(result_dt_2)
-    matched_count <- sum(!is.na(result_dt_2$right) & !is.na(result_dt_2$domain))
-    cat("Original number of rows in enriched_data_1:", original_count, "\n")
-    cat("Number of rows with a match:", matched_count, "\n")
-    cat("Percentage of original rows with a match:", (matched_count / original_count) * 100, "%\n")
-    return(result_dt_2)
-  }
-  
-  # Add matches and count them
-  enriched_dt <- add_and_count_matches(enriched_data_1, top1_matches_dt, privacy)
-  print(ncol(enriched_dt))
-  enriched_df = as.tibble(enriched_dt)
-  return(enriched_df)
-}
-
 
 # Refactored aggregate_time_data with field parameter
 aggregate_time_data <- function(df, field = "website") {
@@ -2377,7 +918,7 @@ get_aggregated_time_data_with_privacy_info <- function() {
     group_by(experiment_id, website_aggregated_high_level, post) %>%
     summarise(
       time_spent = sum(time_spent),
-      time_share = time_spent / first(total_time_spent), 
+      time_share = time_spent / first(total_time_spent),
       visit_count = sum(visit_count),
       visit_share = visit_count / first(total_visits),
     ) %>% ungroup()
@@ -2537,7 +1078,7 @@ compute_exposed_privacy_scores <- function(df) {
           n_dialog_prefs <- effective_n_dialog * 2
           if_else(
             n_dialog_prefs + n_random_info > 0,
-            (dialog_privacy_score * n_dialog_prefs + replace_na(exposure_privacy_score, 0) * n_random_info) / 
+            (dialog_privacy_score * n_dialog_prefs + replace_na(exposure_privacy_score, 0) * n_random_info) /
               (n_dialog_prefs + n_random_info),
             NA_real_
           )
@@ -2548,7 +1089,7 @@ compute_exposed_privacy_scores <- function(df) {
           total_w <- q1_w * effective_n_dialog + q2_w * effective_n_dialog + random_attr_w * effective_n_dialog
           if_else(
             effective_n_dialog > 0 & total_w > 0,
-            (q1_w * effective_n_dialog * q1_rp + q2_w * effective_n_dialog * q2_rp + 
+            (q1_w * effective_n_dialog * q1_rp + q2_w * effective_n_dialog * q2_rp +
                random_attr_w * effective_n_dialog * random_attr_rp) / total_w,
             NA_real_
           )
@@ -2559,7 +1100,7 @@ compute_exposed_privacy_scores <- function(df) {
           total_w <- q1_w * effective_n_dialog + q2_w * effective_n_dialog + random_attr_w * effective_n_dialog
           if_else(
             effective_n_dialog > 0 & total_w > 0,
-            (q1_w * effective_n_dialog * q1_rp + q2_w * effective_n_dialog * q2_rp + 
+            (q1_w * effective_n_dialog * q1_rp + q2_w * effective_n_dialog * q2_rp +
                random_attr_w * effective_n_dialog * random_attr_rp) / total_w,
             NA_real_
           )
@@ -2578,14 +1119,14 @@ compute_exposed_privacy_scores <- function(df) {
 }
 
 get_personalized_info_only <- function() {
-  wave1_info <- read.csv("data/endline_survey_top_sites_and_info/endline_survey_info_without_imputation_wave_1.csv",
+  wave1_info <- read.csv(paste0(DATA_DIR, "endline_survey_top_sites_and_info/endline_survey_info_without_imputation_wave_1.csv"),
                          stringsAsFactors = FALSE)
-  wave2_info <- read.csv("data/endline_survey_top_sites_and_info/endline_survey_info_without_imputation_wave_2.csv",
+  wave2_info <- read.csv(paste0(DATA_DIR, "endline_survey_top_sites_and_info/endline_survey_info_without_imputation_wave_2.csv"),
                          stringsAsFactors = FALSE)
   
   personalized_info <- rbind(wave1_info, wave2_info)
   
-  privacy_info_desc <- read.csv("data/final_extension_data/privacy_info_desc.csv", stringsAsFactors = FALSE)
+  privacy_info_desc <- read.csv(paste0(EXT_DATA_DIR, "privacy_info_desc.csv"), stringsAsFactors = FALSE)
   
   
   #Join personalized_info with privacy_info_desc to get features/fields for all 3 questions
@@ -2614,7 +1155,7 @@ get_personalized_info_long <- function() {
   privacy_info <- get_privacy_info_wide()
   
   # Privacy info to description map
- 
+  
   
   # STEP 4: Create long format - one row per TRUE website shown
   
@@ -2639,7 +1180,7 @@ get_personalized_info_long <- function() {
 }
 
 get_privacy_attribute_weights_by_individual <- function() {
-  conjoint_utilities <- read.csv("data/Conjoint/Conjoint-Finalized/tables/individual_parameters_wide_means.csv")
+  conjoint_utilities <- read.csv(paste0(CONJOINT_DIR, "Conjoint-Finalized/tables/individual_parameters_wide_means.csv"))
   
   conjoint_to_belief_id <- c(
     collection_log = "collect-log",
@@ -2665,18 +1206,14 @@ get_privacy_attribute_weights_by_individual <- function() {
     website_advertising = "website_advertising"
   )
   
-
+  
   conjoint_utilities_long <- conjoint_utilities %>%
     pivot_longer(
       cols = -c(RespondentId, category, N_id, category_name, website, category, category_name, website_cat, price_linear),
       names_to = "attribute_name",
       values_to = "beta_ij"
-  ) %>%
+    ) %>%
     select(-c(category, N_id, category_name, website, category, category_name, website_cat, price_linear))
-   # filter(str_ends(attribute_level, "_yes"))
-  
-  #conjoint_utilities_long <- conjoint_utilities_long %>%
-  #  mutate(attribute_name = str_remove(attribute_level, "_yes$"))
   
   all_utilities_processed <- conjoint_utilities_long %>%
     select(RespondentId, attribute_name, beta_ij)
@@ -2692,45 +1229,45 @@ get_privacy_attribute_weights_by_individual <- function() {
       names_prefix = "beta_"
     ) %>%
     arrange(RespondentId)
-
+  
   # baseline cleaning
-  baseline_survey <- read.csv("data/Survey/final_baseline_survey.csv")
+  baseline_survey <- read.csv(paste0(SURVEY_DIR, "final_baseline_survey.csv"))
   
   # Dedup (remove missing)
   baseline_survey <- baseline_survey %>%
-  filter(
-    sys_RespStatus == 5,                                     # Must be 'Completed'
-    !is.na(emailid) & trimws(emailid) != "",                 # Must have valid email
-    !is.na(favoritewebsite) & trimws(favoritewebsite) != "", # Must have website
-    !is.na(conjcat_conjCategory) & trimws(conjcat_conjCategory) != "", # Must have category
-    Age != 5,                                                # Remove invalid age (5)
-    !is.na(Age),                                             # Must have Age
-    !is.na(Gender),                                          # Must have Gender
-    !is.na(Education),                                       # Must have Education
-    !is.na(Income),                                          # Must have Income
-    (RaceSimple_1 == 1 | RaceSimple_2 == 1 | RaceSimple_3 == 1 | # At least one race == 1
-     RaceSimple_4 == 1 | RaceSimple_5 == 1 | RaceSimple_6 == 1)
-  )
+    filter(
+      sys_RespStatus == 5,                                     # Must be 'Completed'
+      !is.na(emailid) & trimws(emailid) != "",                 # Must have valid email
+      !is.na(favoritewebsite) & trimws(favoritewebsite) != "", # Must have website
+      !is.na(conjcat_conjCategory) & trimws(conjcat_conjCategory) != "", # Must have category
+      Age != 5,                                                # Remove invalid age (5)
+      !is.na(Age),                                             # Must have Age
+      !is.na(Gender),                                          # Must have Gender
+      !is.na(Education),                                       # Must have Education
+      !is.na(Income),                                          # Must have Income
+      (RaceSimple_1 == 1 | RaceSimple_2 == 1 | RaceSimple_3 == 1 | # At least one race == 1
+         RaceSimple_4 == 1 | RaceSimple_5 == 1 | RaceSimple_6 == 1)
+    )
   
   # Dedup (keep FIRST valid submission)
-  baseline_survey <- baseline_survey %>% 
+  baseline_survey <- baseline_survey %>%
     mutate(emailid = tolower(trimws(emailid))) %>%     # Normalize email
-    group_by(emailid) %>% 
+    group_by(emailid) %>%
     arrange(sys_EndTimeStamp) %>%                      # Sort by time (Oldest first)
     slice(1) %>%                                       # Keep the FIRST valid submission
     ungroup()
   
-  baseline_survey <- baseline_survey %>% 
-    select(sys_RespNum, emailid) %>% 
+  baseline_survey <- baseline_survey %>%
+    select(sys_RespNum, emailid) %>%
     rename(RespondentId = sys_RespNum)
- 
+  
   utilities_wide <-  utilities_wide %>% left_join(baseline_survey, by="RespondentId")
-  meta_data <- read.csv("data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
+  meta_data <- read.csv(paste0(EXT_DATA_DIR, "experiment_conditions_pilot_july_2024.csv"))
   meta_data <- meta_data %>%  mutate(email = tolower(email)) %>% group_by(email) %>% arrange(tstamp) %>% slice(1) %>% ungroup()
   meta_data <- meta_data %>% select(email, experiment_id) %>% rename(emailid = email)
   utilities_wide <-  utilities_wide %>% left_join(meta_data, by="emailid")
   return(utilities_wide)
-
+  
 }
 
 
@@ -2750,17 +1287,17 @@ get_privacy_attribute_weights_by_individual <- function() {
 get_privacy_attribute_weights_population <- function(
     average_across_categories = TRUE,
     category = NULL,
-    pop_params_path = "data/Conjoint/Conjoint-01092026/tables/population_parameters_summary.csv"
+    pop_params_path = paste0(CONJOINT_DIR, "Conjoint-01092026/tables/population_parameters_summary.csv")
 ) {
-
+  
   # Read population parameters
   pop_params <- read.csv(pop_params_path)
-
+  
   # Filter to beta_mean_cat (population means, not tau heterogeneity params)
   beta_means <- pop_params %>%
     filter(grepl("^beta_mean_cat", variable)) %>%
     select(category, feature_id, feature_name, mean)
-
+  
   # Mapping from conjoint feature names to belief IDs (same as individual function)
   conjoint_to_belief_id <- c(
     collection_log = "collect-log",
@@ -2784,14 +1321,14 @@ get_privacy_attribute_weights_population <- function(
     control_storage = "storage-storage",
     website_advertising = "website_advertising"
   )
-
+  
   # Map feature names to belief IDs
   beta_means <- beta_means %>%
     mutate(
       belief_id = conjoint_to_belief_id[feature_name]
     ) %>%
     filter(!is.na(belief_id))  # Remove features not in mapping (e.g., price_linear)
-
+  
   if (average_across_categories) {
     # Average across all 4 categories
     pop_weights <- beta_means %>%
@@ -2800,7 +1337,7 @@ get_privacy_attribute_weights_population <- function(
         beta = mean(mean, na.rm = TRUE),
         .groups = 'drop'
       )
-
+    
     # Pivot to wide format
     weights_wide <- pop_weights %>%
       select(belief_id, beta) %>%
@@ -2809,18 +1346,18 @@ get_privacy_attribute_weights_population <- function(
         values_from = beta,
         names_prefix = "beta_"
       )
-
+    
     # Add identifier
     weights_wide <- weights_wide %>%
       mutate(weight_type = "population_average") %>%
       select(weight_type, everything())
-
+    
   } else if (!is.null(category)) {
     # Use specific category
     pop_weights <- beta_means %>%
       filter(category == !!category) %>%
       select(belief_id, beta = mean)
-
+    
     # Pivot to wide format
     weights_wide <- pop_weights %>%
       pivot_wider(
@@ -2828,7 +1365,7 @@ get_privacy_attribute_weights_population <- function(
         values_from = beta,
         names_prefix = "beta_"
       )
-
+    
     # Add identifier
     weights_wide <- weights_wide %>%
       mutate(
@@ -2836,12 +1373,12 @@ get_privacy_attribute_weights_population <- function(
         category = !!category
       ) %>%
       select(weight_type, category, everything())
-
+    
   } else {
     # Return all categories separately
     pop_weights <- beta_means %>%
       select(category, belief_id, beta = mean)
-
+    
     # Pivot to wide format
     weights_wide <- pop_weights %>%
       pivot_wider(
@@ -2849,13 +1386,13 @@ get_privacy_attribute_weights_population <- function(
         values_from = beta,
         names_prefix = "beta_"
       )
-
+    
     # Add identifier
     weights_wide <- weights_wide %>%
       mutate(weight_type = "population") %>%
       select(weight_type, category, everything())
   }
-
+  
   return(weights_wide)
 }
 
@@ -2876,18 +1413,18 @@ get_privacy_attribute_weights_population <- function(
 get_privacy_attribute_weights_population_by_user <- function(
     experiment_ids = NULL,
     average_across_categories = TRUE,
-    pop_params_path = "data/Conjoint/Conjoint-01092026/tables/population_parameters_summary.csv"
+    pop_params_path = paste0(CONJOINT_DIR, "Conjoint-01092026/tables/population_parameters_summary.csv")
 ) {
-
+  
   # Get population weights (single row)
   pop_weights <- get_privacy_attribute_weights_population(
     average_across_categories = average_across_categories,
     pop_params_path = pop_params_path
   )
-
+  
   # Get experiment IDs if not provided
   if (is.null(experiment_ids)) {
-    meta_data <- read.csv("data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
+    meta_data <- read.csv(paste0(EXT_DATA_DIR, "experiment_conditions_pilot_july_2024.csv"))
     meta_data <- meta_data %>%
       mutate(email = tolower(email)) %>%
       group_by(email) %>%
@@ -2896,10 +1433,10 @@ get_privacy_attribute_weights_population_by_user <- function(
       ungroup()
     experiment_ids <- unique(meta_data$experiment_id)
   }
-
+  
   # Expand population weights to all users
   weights_by_user <- tibble(experiment_id = experiment_ids) %>%
     crossing(pop_weights %>% select(-weight_type))
-
+  
   return(weights_by_user)
 }

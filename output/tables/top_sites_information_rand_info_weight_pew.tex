@@ -1,0 +1,30 @@
+
+\begin{table}[htbp]
+   \caption{Belief Correctness on Top Sites -- Random Information}
+   \centering
+   \begin{tabular}{lccc}
+      \tabularnewline \midrule \midrule
+                            & $\lvert \text{Belief} - \text{Truth} \rvert$     & Correctness (Weak) & Correctness (Strict) \\   
+      Model:                & (1)                                              & (2)                & (3)\\  
+      \midrule
+      \emph{Variables}\\
+      Saliency Treatment    & 2.16                                             & -0.038             & -0.032\\   
+                            & (1.65)                                           & (0.026)            & (0.021)\\   
+      Information Treatment & -1.84                                            & 0.034              & 0.025\\   
+                            & (1.63)                                           & (0.024)            & (0.021)\\   
+      \midrule
+      \emph{Fixed-effects}\\
+      Website FE            & Yes                                              & Yes                & Yes\\  
+      Block FE              & Yes                                              & Yes                & Yes\\  
+      \midrule
+      \emph{Fit statistics}\\
+      Observations          & 6,551                                            & 5,229              & 6,551\\  
+      R$^2$                 & 0.26987                                          & 0.30491            & 0.25432\\  
+      Within R$^2$          & 0.00183                                          & 0.00311            & 0.00198\\  
+      \midrule \midrule
+      \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+      \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+   \end{tabular}
+\end{table}
+
+

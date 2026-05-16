@@ -2,6 +2,10 @@
 
 Code that produces the figures and tables in the paper (`writeup_v2.tex`). Non-structural results only.
 
+All scripts assume the working directory is `code_github/`. Data lives in `../data/` (sibling of `code_github/`).
+
+Authoritative paper mapping for each script is the header comment at the top of that script. This README mirrors those headers — if the two disagree, the script header wins.
+
 ---
 
 ## Style conventions
@@ -11,61 +15,115 @@ All `etable()` calls in this repo must use the following arguments to keep outpu
 - `digits = 3` — round all coefficients and SEs to 3 decimal places (etable falls back to scientific notation for values too small to display at this precision, e.g. `9.29e-5`).
 - `signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1)` — paper convention.
 - `replace = TRUE` — overwrite the existing `.tex` instead of appending (default is append, which produces duplicates on re-run).
+- `depvar = FALSE` whenever `dict` already maps the dependent variable to a friendly name or `headers` already labels each column. The default behavior repeats the raw R column name as a sub-header (e.g. "belief_distance / correct_exclude50 / correct_strict"), which is redundant when the column already has a paper-style header. Keep `depvar` on (default) only for simple single-column tables where the dependent variable name is informative.
 
-All `.tex` outputs are written to `output/tables/`; all figures are written to `output/figures/`.
+All `.tex` outputs are written to `output/tables/`; all figures are written to `output/figures/`. Plot styling is centralized in `utils/plot_rules.R`.
+
+### Survey weighting
+
+Survey-based scripts run four weight specifications via an internal dispatcher at the top of the script:
+
+- `unweighted` (default; no suffix on output filenames)
+- `weight_census` → suffix `_weight_census`
+- `weight_pew` → suffix `_weight_pew`
+- `weight_combined` → suffix `_weight_combined`
+
+Weights come from `data/Survey/individual_level_weights.csv` and are loaded by `experiment_id`. To run all four in one shot, leave `WEIGHT_SPEC <- "all"` at the top of the script. The unweighted variant is what the paper reports; the three weighted variants are robustness checks.
+
+Scripts that currently run all four specs:
+- `survey_analysis/other_survey_regressions.R`
+- `survey_analysis/top_sites_beliefs_analysis.R`
+- `information_acquisition_results/privacy_seeking_analysis.R`
 
 ---
 
-## Section 5 — Privacy Practices, Beliefs & Stated Preferences
+## Stage 2 status
 
-- `domain_scores_box_plot.pdf` (Fig 4) → `privacy_descriptives/privacy_char_summary_stats_3.R`
-- `beliefs_vs_truth.pdf` (Fig 5) → `survey_analysis/beliefs_analysis_overall.R`
-- `individual_heterogeneity_dollars_with_website_extension.pdf` (Fig 6a) → `conjoint/plot_violin.R`
-- `top2_privacy_attributes_extension.pdf` (Fig 6b) → `conjoint/plot_violin.R`
+Stage 2 = (a) paths relative to `code_github/`, (b) outputs to `output/{tables,figures}/`, (c) header comment listing every paper label + output file, (d) style conventions above, (e) dead code removed.
 
-## Section 6 — Information Acquisition & Beliefs
+| Script | Stage 2 |
+|---|---|
+| `conjoint/plot_violin.R` | done |
+| `privacy_descriptives/privacy_char_summary_stats_3.R` | done |
+| `survey_analysis/beliefs_analysis_overall.R` | done |
+| `survey_analysis/beliefs_vs_conjoint.R` | done |
+| `survey_analysis/other_survey_regressions.R` | done |
+| `survey_analysis/top_sites_beliefs_analysis.R` | done |
+| `information_acquisition_results/privacy_seeking_analysis.R` | partial (weight dispatcher only; no header / paper labels) |
+| `survey_analysis/mturk_freeform_analysis.R` | not yet (old `setwd` style) |
+| `survey_analysis/selection_into_study.R` | not yet (old `setwd` style) |
+| `time_use_analysis/time_usage_treatment_effects_SG.R` | not yet (old `setwd`, no paper-label header) |
+| `time_use_analysis/analysis_assortment_did.R` | not yet (sourced by the SG driver above; partial header) |
 
-- Table `tab:belief_correctness_top_sites` → `survey_analysis/top_sites_beliefs_analysis.R` (output: `top_sites_information.tex`)
-- `info_acq_treatment_effects_total_sites.pdf` (Fig 7a) → `information_acquisition_results/privacy_seeking_analysis.R`
-- `ever_visited_privacy_policy.pdf` (Fig 7b) → `information_acquisition_results/privacy_seeking_analysis.R`
-- `beliefs_by_info_acq.pdf` (Fig 8) → `survey_analysis/top_sites_beliefs_analysis.R`
+---
 
-## Section 7 — Effect on Website Choices
+## Paper artifacts produced
 
-These figures are produced by `time_use_analysis/analysis_assortment_did.R`, which is **not run standalone** — it is sourced by `time_use_analysis/time_usage_treatment_effects_SG.R` (the driver).
+The mapping below is copied from each script's header comment. The script is the source of truth.
 
-- `preregistered_spec_i_baseline.png` (Fig 9a) → driver: `time_usage_treatment_effects_SG.R` → `analysis_assortment_did.R`
-- `preregistered_triple_interaction_baseline.png` (Fig 9b) → driver: `time_usage_treatment_effects_SG.R` → `analysis_assortment_did.R`
-- `assortment_concentration.png` (Fig 10a) → driver: `time_usage_treatment_effects_SG.R` → `analysis_assortment_did.R`
-- `assortment_privacy.png` (Fig 10b) → driver: `time_usage_treatment_effects_SG.R` → `analysis_assortment_did.R`
+### `conjoint/plot_violin.R`
+- Main paper [fig:privacy_combined, "Privacy Valuations and Most Valued Information"]
+  - Fig 6(a) [fig:privacy_info_partworth]: `individual_heterogeneity_dollars_with_website_extension.pdf`
+  - Fig 6(b) [fig:privacy_info_top_2]: `top2_privacy_attributes_extension.pdf`
+- Appendix [fig:privacy_combined_full]
+  - Fig C.5(a) [fig:privacy_info_partworth_full]: `individual_heterogeneity_dollars_with_website_full.pdf`
+  - Fig C.5(b) [fig:privacy_info_top_2_full]: `top2_privacy_attributes_full.pdf`
+- Appendix [fig:extension_survey_conjoint_sample]
+  - Fig C.4: `individual_heterogeneity_experiment_vs_survey.pdf`
 
-## Appendix C — Additional Figures and Tables
+### `privacy_descriptives/privacy_char_summary_stats_3.R`
+- Main paper [fig:scores_by_category]
+  - Fig 4: `domain_scores_box_plot.pdf`
 
-- `age.pdf`, `education.pdf`, `gender.pdf`, `income.pdf` (Fig C.1) → `survey_analysis/selection_into_study.R`
-- `agg_selection_lots.pdf` (Fig C.4) → `survey_analysis/selection_into_study.R`
-- `pew_comparison.pdf` (Fig C.5) → `survey_analysis/selection_into_study.R`
-- Table `tab:top_websites` → `time_use_analysis/time_usage_treatment_effects_SG.R` (currently `print(xtable(...))` to console; needs to save `.tex`)
-- Table `tab:experimenter_demand` → `survey_analysis/other_survey_regressions.R` (output: `experiment_modified_behavior.tex`)
-- `individual_heterogeneity_experiment_vs_survey.pdf` → `conjoint/plot_violin.R`
-- `individual_heterogeneity_dollars_with_website_full.pdf` → `conjoint/plot_violin.R`
-- `top2_privacy_attributes_full.pdf` → `conjoint/plot_violin.R`
-- Table `tab:conjoint_vs_beliefs` → `survey_analysis/beliefs_vs_conjoint.R` (output: `misspec_pref_regression.tex`)
-- Table `tab:baseline_demo_heterogeneity` → `survey_analysis/beliefs_vs_conjoint.R` (output: `misspec_pref_demographics.tex`)
-- `heterogeneous_beliefs_site_level_by_exposure_tercile.pdf` → `survey_analysis/top_sites_beliefs_analysis.R`
-- Table `tab:belief_correctness_top_sitesrandom_info` → `survey_analysis/top_sites_beliefs_analysis.R` (output: `top_sites_information_rand_info.tex`)
-- `cumulative_belief_distance.pdf` → `survey_analysis/top_sites_beliefs_analysis.R`
-- Table `tab:cookie_banner_interactions_treatment` → `information_acquisition_results/privacy_seeking_analysis.R` (output: `cookie_banner_interactions.tex`)
-- Table `tab:treatment_effect_data_sharing` → `survey_analysis/other_survey_regressions.R` (output: `data_sharing_treatment_effects.tex`)
+### `survey_analysis/beliefs_analysis_overall.R`
+- Main paper [Section 5.1, fig:privacy_info_beliefs]
+  - Fig 5: `beliefs_vs_truth.pdf`
 
-## Appendix D — Self-Reported Changes
+### `survey_analysis/beliefs_vs_conjoint.R`
+- Main paper
+  - Table C.4 [tab:conjoint_vs_beliefs]: `misspec_pref_regression.tex`
+  - Table C.5 [tab:baseline_demo_heterogeneity]: `misspec_pref_demographics.tex`
 
-- `freeform_change_responses.pdf` → `survey_analysis/mturk_freeform_analysis.R`
+### `survey_analysis/other_survey_regressions.R`
+- Main paper
+  - Table C.3 [tab:experimenter_demand]: `experiment_modified_behavior[_suffix].tex`
+  - Table C.8 [tab:data_sharing_purpose]: `output/values/data_sharing_purpose_values.tex` (22 macros: 11 `\dataPurpose<X>N` counts + 11 `\dataPurpose<X>Pct` percents)
+  - Table C.9 [tab:treatment_effect_data_sharing]: `data_sharing_treatment_effects[_suffix].tex`
+
+`_suffix` is empty for unweighted and `_{weight_spec}` otherwise.
+
+### `survey_analysis/top_sites_beliefs_analysis.R`
+- Main paper [Section 6, tab:belief_correctness_top_sites]: `top_sites_information.tex`
+- Main paper [Section 6, Fig 8, fig:beliefs_by_search]: `beliefs_by_info_acq.pdf`
+- App C [tab:belief_correctness_top_sitesrandom_info]: `top_sites_information_rand_info.tex`
+- App C [fig:cdf_belief_correctness_top_sites]: `cumulative_belief_distance.pdf`
+- App C [fig:top_sites_heterogeneity_exposure]: `heterogeneous_beliefs_site_level_by_exposure_tercile.pdf`
+
+All five outputs also produced in 3 weighted variants.
+
+### Scripts whose paper artifacts are not yet documented in their headers
+These scripts produce output that ships in the paper, but the paper-label mapping is not in the script header yet, so it is not transcribed here. Open the script (or add a stage-2 header) to find the mapping authoritatively.
+
+- `information_acquisition_results/privacy_seeking_analysis.R`
+- `survey_analysis/mturk_freeform_analysis.R`
+- `survey_analysis/selection_into_study.R`
+- `time_use_analysis/time_usage_treatment_effects_SG.R` (drives Section 7 figures via `analysis_assortment_did.R`; also produces Appendix C `tab:top_websites` as xtable to console — needs to save to `.tex`)
+- `time_use_analysis/analysis_assortment_did.R` (sourced by the SG driver, not run standalone)
+
+---
+
+## Utils (sourced helpers)
+
+- `utils/plot_rules.R` — ggplot theme, color scales (treatment / privacy category / benchmark / binary / ordinal exposure), sizing constants. Style guide at top of file.
+- `utils/values.R` — date constants (wave start/end, treatment dates, cookie treatment dates), `BAD_USERS`, `SURVEY_WEBSITES`.
+- `utils/time_usage_helpers.R` — browser data cleaning, domain aggregation/classification, privacy info matching, privacy score computation, conjoint utility loading. 17 in-use functions, ~1442 lines.
+- `utils/info_acq_helpers.R` — privacy policy visit detection, info acquisition event aggregation. Has path constants (`DATA_DIR`, `SURVEY_DIR`, `EXT_DATA_DIR`, `PROC_DIR`) at top.
 
 ---
 
 ## TODO — Replicate from scratch
 
-These tables appear in the paper but the corresponding scripts either don't exist, only print to console, or have different column structure than the paper version. Plan: rewrite to produce `.tex` output, then verify against current paper values.
+These tables appear in the paper but the corresponding scripts either don't exist, only print to console, or have different column structure than the paper version.
 
 ### Table `tab:exp_balance_table` (Appendix C.1)
 
@@ -86,7 +144,20 @@ Replication plan: rewrite as a standalone script that pools across waves, matche
 ### Other TODOs
 
 - Table `tab:popup_did` (Section 7.3) — generating script not located.
-- Table `tab:data_sharing_purpose` (Appendix C.3) — `survey_analysis/other_survey_regressions.R` runs the regression but only prints to console; needs to add `etable(... file = ...)` to save `.tex`.
+- Table `tab:top_websites` (Appendix C) — `time_usage_treatment_effects_SG.R` currently `print(xtable(...))` to console; needs to save `.tex`.
+
+---
+
+## Paper-side TODO
+
+The paper currently hard-codes table cell values rather than `\input{output/tables/...}`. Stage 2 terminal goal is to switch every table to `\input{}` mode so re-running scripts updates the paper.
+
+Tables verified byte-for-byte against the paper (3 dp):
+- C.3 `tab:experimenter_demand`
+- C.4 `tab:conjoint_vs_beliefs`
+- C.5 `tab:baseline_demo_heterogeneity`
+- C.9 `tab:treatment_effect_data_sharing`
+- Section 6 `tab:belief_correctness_top_sites`
 
 ---
 
@@ -114,6 +185,8 @@ The original codebase generated additional outputs not used in the paper. We rem
 ### `survey_analysis/top_sites_beliefs_analysis.R`
 - `info_exposure_terciles.pdf`, `info_exposure_median.pdf` — alt exposure specs
 - `heterogeneous_beliefs_site_level_by_exposure_median.pdf` — alt of `_tercile` version
+- PEW model block (regression with `pewq1-4 + PolicyEffectiveness` covariates) — computed but never written to disk
+- Helper functions `convert_to_numeric()` and `get_internal_privacy_field()` — dead code, zero call sites
 
 ### `survey_analysis/beliefs_vs_conjoint.R`
 - `misspec_vs_pref_intensity_signed.pdf` — visual companion, replaced by table in paper
@@ -123,5 +196,13 @@ The original codebase generated additional outputs not used in the paper. We rem
 - `agg_indiv_field_belief_correctness.tex` — per-attribute belief vs truth, table version of Fig 5
 - `pew_all_effects.tex` — PEW DiD treatment effects regression table
 
-### `utils/`
+### `utils/` standalone files
 - `tracker_utils.R`, `aggregate_urls.R`, `union.R`, `union_time_period.R` — dead code, no production script sourced them
+
+### `utils/time_usage_helpers.R` — internal dead functions
+11 helper functions removed (zero call sites across all `.R` scripts in the repo, verified including `code/cookie_deletion/`):
+- `clean_urls`, `aggregate_time_data_trackers`, `standardize_ad_domains_trackers`, `high_level_aggregate_trackers`
+- `map_domain_trackers`, `map_domain`, `map_domain_improved`
+- `map_privacy_data_old`, `map_privacy_data_trackers`, `map_privacy_data_trackers_2`, `map_privacy_data_trackers_SG`
+
+File reduced from ~2900 to ~1442 lines. Path constants (`DATA_DIR`, `EXT_DATA_DIR`, `SURVEY_DIR`, `CONJOINT_DIR`) added at the top so all data reads resolve correctly when the calling script `setwd()`s to `code_github/`.
