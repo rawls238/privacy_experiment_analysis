@@ -47,6 +47,7 @@ DATA_DIR     <- "../data/"
 EXT_DATA_DIR <- "../data/final_extension_data/"
 SURVEY_DIR   <- "../data/Survey/"
 CONJOINT_DIR <- "../data/Conjoint/"
+AUX_DATA_DIR <- "../auxiliary_data/"
 
 # =============================================================================
 # Core data loading
@@ -84,18 +85,17 @@ get_clean_time_data <- function() {
   time_data_2_aggregated <- aggregate_time_data(time_data_2_dropna)
   time_data_2_aggregated_high <- high_level_aggregate(time_data_2_aggregated)
   
-  # Privacy matching
-  privacy_unique <- unique(privacy_info, by = "domain")
-  time_data_2_aggregated_high_privacy <- map_privacy_data(time_data_2_aggregated_high, privacy_unique)
-  
-  # Select final columns and map twitter to X
-  final_data <- time_data_2_aggregated_high_privacy %>%
-    select(tstamp, date, user_id, experiment_id, website, website_aggregated,
-           website_aggregated_high_level, privacy_exist, time_spent, timezone,
-           elicitation_count, visit_count, wave_id, experiment_condition) %>%
+  # BUGFIX: rename twitter -> x in ALL website columns BEFORE the privacy
+  # join. map_privacy_data() has a special case that only triggers when
+  # website_aggregated_high_level == "x" (see line ~607 in this file), and
+  # get_privacy_info_wide() already renames its slug "twitter" -> "x" (see
+  # line ~393). If we leave this rename until after the join (as the
+  # original code did), the slug is still "twitter" at merge time, the
+  # special case fails to fire, matching_key stays "twitter", and the merge
+  # against privacy domain "x" misses entirely -- producing
+  # privacy_exist = FALSE for every twitter row.
+  time_data_2_aggregated_high <- time_data_2_aggregated_high %>%
     mutate(
-      date = mdy(date),
-      # Map twitter to X in all website columns
       website = case_when(
         str_detect(tolower(website), "twitter") ~ str_replace_all(tolower(website), "twitter", "x"),
         TRUE ~ website
@@ -109,6 +109,19 @@ get_clean_time_data <- function() {
         TRUE ~ website_aggregated_high_level
       )
     )
+  
+  # Privacy matching (now sees slug "x", merges correctly against privacy
+  # domain_aggregated_high_level "x")
+  privacy_unique <- unique(privacy_info, by = "domain")
+  time_data_2_aggregated_high_privacy <- map_privacy_data(time_data_2_aggregated_high, privacy_unique)
+  
+  # Select final columns (twitter->x rename moved above, before the join)
+  final_data <- time_data_2_aggregated_high_privacy %>%
+    select(tstamp, date, user_id, experiment_id, website, website_aggregated,
+           website_aggregated_high_level, privacy_exist, time_spent, timezone,
+           elicitation_count, visit_count, wave_id, experiment_condition) %>%
+    mutate(date = mdy(date))
+  
   final_data <- final_data %>%
     mutate(
       post = case_when(
@@ -141,7 +154,7 @@ get_privacy_info_raw <- function () {
 
 
 get_domain_classification <- function() {
-  domain_classfication = rbind(read.csv("auxiliary_data/domain_classification_2.csv"), read.csv("auxiliary_data/domain_classification_extra.csv"))
+  domain_classfication = rbind(read.csv(paste0(AUX_DATA_DIR, "domain_classification_2.csv")), read.csv(paste0(AUX_DATA_DIR, "domain_classification_extra.csv")))
   twitter <- domain_classfication %>% filter(name == "twitter.com")
   twitter <- twitter %>% mutate(name = ifelse(name == "twitter.com", "x.com", name))
   domain_classfication <- rbind(domain_classfication, twitter)
@@ -726,7 +739,7 @@ aggregate_time_data <- function(df, field = "website") {
   webs5 <- gsub("l\\.facebook|lm\\.facebook|m\\.facebook\\.com", "facebook", webs5)
   webs5 <- gsub(".*cloudresearch.*", "cloudresearch", webs5)
   webs5 <- ifelse(grepl("^(www\\.)?t\\.me$", unique_vals, ignore.case = TRUE), "telegram", webs5)
-  webs5 <- gsub("^(x|twitter|t)$", "twitter", webs5)
+  webs5 <- gsub("^(x|twitter|t)$", "x", webs5)
   webs5 <- gsub("^old\\.reddit.*$", "reddit", webs5)
   webs5 <- gsub("^new\\.reddit.*$", "reddit", webs5)
   webs5 <- gsub(".*\\.(microsoftonline|microsoft365)(\\..*)?$", "microsoft", webs5, perl = TRUE)
@@ -815,8 +828,8 @@ high_level_aggregate <- function(df, field = "website_aggregated") {
   is_tld <- formatted_unique %in% KEEP_LAST_2 & grepl("\\.", webs_cleaned) & !is.na(formatted_unique)
   formatted_unique[is_tld] <- sub(".*\\.([^.]+\\.[^.]+)$", "\\1", webs_cleaned[is_tld])
   
-  # --- Step 3: x -> twitter ---
-  formatted_unique[formatted_unique == "x" & !is.na(formatted_unique)] <- "twitter"
+  # --- Step 3: twitter -> x ---
+  formatted_unique[formatted_unique == "twitter" & !is.na(formatted_unique)] <- "x"
   
   # --- Step 4: Mark junk as NA ---
   is_junk <- grepl("(com|edu):\\d+|org%3a", webs_cleaned) & !is.na(webs_cleaned)
