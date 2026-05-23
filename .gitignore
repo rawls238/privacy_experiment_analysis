@@ -16,3 +16,6 @@ __pycache__/
 *.pyc
 
 writeupv2/
+# Local AI / scratch (not in repo)
+writeupv3/
+replication_files/test.R

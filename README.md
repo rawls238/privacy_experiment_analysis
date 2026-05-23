@@ -14,7 +14,6 @@ Each script's header comment is the authoritative paper mapping. This README mir
 
 - `replication_files/` — R scripts grouped by analysis area
 - `output/{figures,tables,values}/` — script outputs (committed to git for Overleaf sync)
-- `writeupv2/writeup_v2.tex` — the current draft, frozen reference
 - `code/` — stage 1 source (kept for now; superseded by `replication_files/`)
 
 The Overleaf project `privacy_experiment_analysis` is checked out separately at `~/Dropbox/spring2025experiment/overleaf_writeup/`. It mirrors `code_github/output/` and holds `writeup_v3.tex` (the new draft being built mechanically from v2 with output paths rewired).
@@ -43,13 +42,17 @@ dict = c("experiment_id" = "Participant FE",
 - Summary-stats tables (non-regression) → `xtable::xtable(..., file = ...)` → `output/tables/*.tex`
 - Inline-referenced scalars → `savetexvalue::save_tex_value()` → `output/values/*.tex` (`\newcommand` macros). Not for whole tables.
 
+**Rule 7 — `save_tex_value()` numeric discipline:** `savetexvalue` defaults to `scales::number()`, which inserts thousands commas and a trailing `.00` on every numeric input. For integer counts pass `as.integer(x)` or `as.character(x)` so the output is bare digits (`935`, `1441`), not `935.00` / `1,441.00`. For decimal scalars set `accuracy = 0.01` explicitly. The `savetexvalue` file is append-only — wipe it (`file.remove()`) at the top of the script to avoid duplicate `\newcommand` entries on re-run.
+
 All figures go to `output/figures/` as `.pdf`. Plot styling is in `utils/plot_rules.R`.
 
 ### Survey weighting
 
 Scripts dispatch four specs via `WEIGHT_SPEC`: `unweighted` (paper) + `weight_census` / `weight_pew` / `weight_combined` (robustness). Suffix `_{spec}` on output filenames; unweighted has no suffix. Weights from `data/Survey/individual_level_weights.csv`. `join_weights()` must filter `sample == "extension"` before joining (stage 1 was missing this; row counts ~doubled in weighted regressions).
 
-Scripts running all four:
+Default is `WEIGHT_SPEC <- "unweighted"` so only paper artifacts are produced. Set to `"all"` to regenerate all four for robustness review.
+
+Scripts running all four when `WEIGHT_SPEC == "all"`:
 - `survey_analysis/other_survey_regressions.R`
 - `survey_analysis/top_sites_beliefs_analysis.R`
 - `information_acquisition_results/privacy_seeking_analysis.R`
@@ -74,6 +77,7 @@ Stage 2 = paths relative to `code_github/`, outputs to `output/`, paper-label he
 | `survey_analysis/selection_into_study.R` | done |
 | `time_use_analysis/time_usage_treatment_effects_SG.R` | done |
 | `time_use_analysis/analysis_assortment_did.R` | done |
+| `time_use_analysis/baseline_descriptive_scalars.R` | done |
 
 ---
 
@@ -122,7 +126,8 @@ Stage 2 = paths relative to `code_github/`, outputs to `output/`, paper-label he
 The driver sources the helper. Together they produce:
 - Fig 9 [fig:intensive]: `preregistered_spec_i_baseline.pdf`, `preregistered_triple_interaction_baseline.pdf`
 - Fig 10 [fig:extensive]: `assortment_concentration.pdf`, `assortment_privacy.pdf`
-- Table C [tab:top_websites]: `top_websites.tex` (xtable)
+
+Driver also rebuilds `../data/processed_data/joined_time_data.csv` when `CONSTRUCT_FROM_SCRATCH = TRUE`. The xtable for `tab:top_websites` was removed; see `baseline_descriptive_scalars.R` below.
 
 **Open questions — needs author review.** The current code reproduces the stage 1 unweighted regression coefficients byte-for-byte, but generated figures differ from the figures currently in `writeup_v2.tex`. Both stage 1 `_SG.R` and stage 2 produce the same numbers; neither matches the paper's current figures. The script that originally produced the Overleaf figures has not been located. Substantive analysis choices worth confirming:
 
@@ -132,6 +137,11 @@ The driver sources the helper. Together they produce:
 4. `log_time = log1p(total_time_spent / 60)` — unit is log(1+minutes).
 
 A `join_weights()` bug in stage 1 (~195% match rate) was fixed in stage 2; unweighted output unaffected.
+
+### `time_use_analysis/baseline_descriptive_scalars.R`
+- Table C.2 [tab:top_websites]: `output/values/top_websites_values.tex` (60 macros: `\topWeb<Rank><Field>`, Rank in `One..Fifteen`, Field in `Domain/ActiveHours/NUsers/AllHours`). The LaTeX tabular itself is hand-written in `writeup_v3.tex`.
+
+Filter rules: drop `BAD_USERS`, drop `SURVEY_WEBSITES`, keep only `privacy_exist`, restrict to baseline weeks `{-2, -1}`. No `time_spent > 30` filter. Reads cached `../data/processed_data/joined_time_data.csv` (rebuild via `time_usage_treatment_effects_SG.R` with `CONSTRUCT_FROM_SCRATCH = TRUE`).
 
 ---
 
@@ -172,7 +182,7 @@ Hand-made design documentation (treatment dialogs, study flow, consent pages). N
 
 - `utils/plot_rules.R` — ggplot theme, color scales, sizing constants.
 - `utils/values.R` — date constants, `BAD_USERS`, `SURVEY_WEBSITES`.
-- `utils/time_usage_helpers.R` — browser data cleaning, domain aggregation/classification, privacy scoring, conjoint utility loading. 17 in-use functions.
+- `utils/time_usage_helpers.R` — browser data cleaning, domain aggregation/classification, privacy scoring, conjoint utility loading. Path constants at top (`DATA_DIR`, `EXT_DATA_DIR`, `SURVEY_DIR`, `CONJOINT_DIR`, `AUX_DATA_DIR`). 17 in-use functions.
 - `utils/info_acq_helpers.R` — privacy policy visit detection, info acquisition aggregation.
 
 ---
@@ -190,7 +200,7 @@ Hand-made design documentation (treatment dialogs, study flow, consent pages). N
 
 - `time_use_analysis/analysis_assortment_did.R` — confirm with authors which figures actually went into the published Overleaf version (Open questions above), then accept current output or trace back to the missing script.
 
-- Inline scalars in Section 4 ("1.2 hours / 2.4 hours / 3.1 hours") — hard-coded. Compute in `time_usage_treatment_effects_SG.R` and expose via `savetexvalue` to `output/values/time_use_values.tex`. Deferred until paper-side `\input{}` migration starts in earnest.
+- Inline scalars in Section 4 ("1.2 hours / 2.4 hours / 3.1 hours") — hard-coded. Compute in `baseline_descriptive_scalars.R` and expose via `savetexvalue` to `output/values/`. Deferred until paper-side `\input{}` migration starts in earnest.
 
 - Cookie deletion (Appendix G) — refactor `code/cookie_deletion/...` into `replication_files/cookie_deletion/` so the 12 figures listed above are reproducible.
 
@@ -206,6 +216,8 @@ Switch every table cell and inline scalar from hard-coded to `\input{output/...}
 - Section 6 `tab:belief_correctness_top_sites`
 - App C `tab:cookie_banner_interactions_treatment`
 
+Table C.2 `tab:top_websites` now uses `\input{output/values/top_websites_values}` macros wired into a hand-written tabular in `writeup_v3.tex` (60 `\topWeb<Rank><Field>` macros).
+
 ---
 
 ## Things removed
@@ -216,7 +228,7 @@ Outputs the original codebase generated but the paper doesn't use. Generating co
 - `mturk_freeform_analysis.R` — overwritten pre-computations, redundant library loads.
 - `selection_into_study.R` — diagnostic `.tex` files, alt visual specs, Section 4 pipeline duplicated elsewhere.
 - `analysis_assortment_did.R` — `run_did_analysis`, `plot_privacy_summary`, `run_robust_did_analysis` deleted entirely, plus alt assortment specs and the unused pre-registered spec (iii) market-competition block. File ~880 → ~370 lines.
-- `time_usage_treatment_effects_SG.R` — 9 diagnostic plots (~200 lines), 4 dead panels, dead `extension_inactivity` read.
+- `time_usage_treatment_effects_SG.R` — 9 diagnostic plots (~200 lines), 4 dead panels, dead `extension_inactivity` read, xtable for `tab:top_websites` (replaced by `baseline_descriptive_scalars.R` + savetexvalue).
 - `top_sites_beliefs_analysis.R` — alt exposure specs, unused PEW model block, dead helpers.
 - `beliefs_vs_conjoint.R` — companion plot replaced by table.
 - `beliefs_analysis_overall.R` — table versions of Fig 5, PEW DiD treatment effects table.
