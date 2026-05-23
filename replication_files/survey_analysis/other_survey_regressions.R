@@ -156,7 +156,7 @@ stopifnot(!any(is.na(ordered_summary$Count)))  # guard against name mismatch
 
 # Save 11 count macros (integer, accuracy = 1).
 save_tex_value(
-  values    = ordered_summary$Count,
+  values    = as.integer(ordered_summary$Count),
   names     = paste0("dataPurpose", consequence_short_names, "N"),
   file_name = "data_sharing_purpose_values",
   path      = VALUES_DIR,

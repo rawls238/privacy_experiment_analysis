@@ -18,7 +18,10 @@
 #         output/figures/assortment_privacy[_wt].png
 #   Appendix C:
 #     Table [tab:top_websites, "Top Websites used by Participants"]:
-#       output/tables/top_websites.tex
+#       output/values/top_websites_values.tex
+#       (60 savetexvalue macros: \topWeb<Rank><Field>, Rank in
+#        One..Fifteen, Field in Domain/ActiveHours/NUsers/AllHours;
+#        the LaTeX tabular itself is hand-written in writeup_v3.tex)
 #
 #   `_wt` suffix is empty for unweighted and `_{weight_spec}` otherwise. Set
 #   WEIGHT_SPEC at the top of the script: "unweighted", "weight_census",
@@ -45,13 +48,14 @@
 #   replication_files/utils/plot_rules.R
 #   replication_files/time_use_analysis/analysis_assortment_did.R
 #     (provides run_assortment_analysis + run_preregistered_specs)
+#   savetexvalue (devtools::install_github("Ori-Shoham/savetexvalue"))
 #
 # Outputs:
 #   output/figures/preregistered_spec_i_baseline[_wt].png
 #   output/figures/preregistered_triple_interaction_baseline[_wt].png
 #   output/figures/assortment_concentration[_wt].png
 #   output/figures/assortment_privacy[_wt].png
-#   output/tables/top_websites.tex
+#   output/values/top_websites_values.tex
 #
 # Note: Previous version of this driver also produced (now removed as dead
 # code, not in paper):
@@ -78,6 +82,8 @@
 #     make_pre_decile_plot helper objects (fed only the removed plots).
 #   - Second run_preregistered_specs() call on
 #     balanced_panel_post_extensive_margin (paper only uses _baseline).
+#   - xtable construction for top_websites.tex (replaced by 60 savetexvalue
+#     calls; LaTeX tabular moved into writeup_v3.tex itself).
 # =============================================================================
 
 library(tidyverse)
@@ -87,15 +93,15 @@ library(data.table)
 library(tidyr)
 library(tibble)
 library(rlang)
-library(xtable)
 library(fixest)
+library(savetexvalue)
 
 # Set working directory to code_github root so all relative paths resolve.
 setwd("~/Dropbox/spring2025experiment/code_github")
 
 # Toggle: TRUE re-runs the full data-construction pipeline (~150 lines below);
 # FALSE reads the cached `joined_time_data.csv` produced by an earlier run.
-CONSTRUCT_FROM_SCRATCH <- FALSE
+CONSTRUCT_FROM_SCRATCH <- TRUE
 # Flag for whether to use population averages (FALSE) or individual measures
 # (TRUE) when constructing privacy scores. Consumed only inside the
 # CONSTRUCT_FROM_SCRATCH branch.
@@ -104,12 +110,13 @@ individual_weights <- FALSE
 # Output directories
 FIGURES_DIR <- "output/figures/"
 TABLES_DIR  <- "output/tables/"
+VALUES_DIR  <- "output/values/"
 
 ## [WEIGHT MODIFICATION] ======================================================
 ## Set to one of: "unweighted", "weight_census", "weight_pew",
 ## "weight_combined", "all". "all" loops over all four specs at the bottom
 ## without re-loading data.
-WEIGHT_SPEC   <- "all"
+WEIGHT_SPEC   <- "unweighted"
 OUTPUT_SUFFIX <- if (WEIGHT_SPEC == "unweighted") "" else paste0("_", WEIGHT_SPEC)
 cat("=== Weight specification:", WEIGHT_SPEC, "===\n")
 cat("=== Output suffix:",       OUTPUT_SUFFIX, "===\n\n")
@@ -473,7 +480,45 @@ full_time_dat <- full_time_dat %>%
 # =============================================================================
 # App C [tab:top_websites]: Top websites used by participants
 # =============================================================================
+# Emits 60 \newcommand macros (15 rows x 4 fields) to
+# output/values/top_websites_values.tex via savetexvalue. The paper's LaTeX
+# tabular (rlrrr / \hline / header / caption) lives in writeup_v3.tex and
+# references each cell via \topWeb<Rank><Field>:
+#   Rank  in {One, Two, ..., Fifteen}
+#   Field in {Domain, ActiveHours, NUsers, AllHours}
+# Adding a new top-15 domain: extend website_display_name() lookup below if
+# the str_to_title() fallback doesn't capitalize correctly.
 
+# --- Capitalization lookup for known domains. str_to_title() is the fallback.
+website_display_name <- function(slugs) {
+  lookup <- c(
+    youtube   = "Youtube",
+    google    = "Google",
+    facebook  = "Facebook",
+    amazon    = "Amazon",
+    reddit    = "Reddit",
+    netflix   = "Netflix",
+    chatgpt   = "Chatgpt",
+    twitch    = "Twitch",
+    x         = "X",
+    hulu      = "Hulu",
+    yahoo     = "Yahoo",
+    walmart   = "Walmart",
+    microsoft = "Microsoft",
+    ebay      = "eBay",
+    linkedin  = "LinkedIn"
+  )
+  out <- lookup[slugs]
+  fallback <- stringr::str_to_title(slugs)
+  ifelse(is.na(out), fallback, out)
+}
+
+# --- English ordinals for macro names (LaTeX command names cannot contain digits)
+rank_word <- c("One", "Two", "Three", "Four", "Five",
+               "Six", "Seven", "Eight", "Nine", "Ten",
+               "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen")
+
+# --- Compute top-15 summary on the baseline (weeks -2, -1) window.
 filtered <- full_time_dat %>%
   filter(weeks_since_intervention %in% c(-2, -1) & privacy_exist)
 
@@ -494,20 +539,60 @@ summary_table <- filtered %>%
   ) %>%
   filter(n_users >= 50) %>%
   mutate(avg_daily_hours_all_users = (avg_daily_hours_per_active_user * n_users) / users_all) %>%
-  arrange(desc(avg_daily_hours_all_users))
+  arrange(desc(avg_daily_hours_all_users)) %>%
+  slice_head(n = 15) %>%
+  mutate(
+    rank         = row_number(),
+    domain_label = website_display_name(website_aggregated_high_level)
+  )
 
-top_websites_tab <- xtable(
-  summary_table,
-  caption = "Top Websites used by Participants",
-  label   = "tab:top_websites"
+cat("Top 15 websites (baseline window, n_users >= 50):\n")
+print(summary_table)
+
+# --- savetexvalue is append-only; wipe values file before writing so reruns
+# --- do not accumulate duplicate \newcommand definitions.
+values_file <- "top_websites_values"
+values_full <- file.path(VALUES_DIR, paste0(values_file, ".tex"))
+if (file.exists(values_full)) file.remove(values_full)
+
+# --- 4 vectorized calls: one per field, each writes 15 macros at once.
+# --- Domain: string passthrough (no accuracy / percent formatting).
+save_tex_value(
+  values    = summary_table$domain_label,
+  names     = paste0("topWeb", rank_word[summary_table$rank], "Domain"),
+  file_name = values_file,
+  path      = VALUES_DIR
 )
 
-print(top_websites_tab,
-      file                   = paste0(TABLES_DIR, "top_websites.tex"),
-      include.rownames       = FALSE,
-      sanitize.text.function = identity)
+# --- Daily Hours (per Active User): 2 decimals (matches v2 formatting).
+save_tex_value(
+  values    = summary_table$avg_daily_hours_per_active_user,
+  names     = paste0("topWeb", rank_word[summary_table$rank], "ActiveHours"),
+  file_name = values_file,
+  path      = VALUES_DIR,
+  accuracy  = 0.01
+)
 
-cat("Saved: ", TABLES_DIR, "top_websites.tex\n", sep = "")
+# --- Number of Users: integer (pass as string to bypass savetexvalue's
+# --- scales::number() default, which would insert thousands commas and
+# --- a trailing ".00" — we want bare digits like "935" / "1441").
+save_tex_value(
+  values    = as.character(summary_table$n_users),
+  names     = paste0("topWeb", rank_word[summary_table$rank], "NUsers"),
+  file_name = values_file,
+  path      = VALUES_DIR
+)
+
+# --- Daily Hours (over all users): 2 decimals.
+save_tex_value(
+  values    = summary_table$avg_daily_hours_all_users,
+  names     = paste0("topWeb", rank_word[summary_table$rank], "AllHours"),
+  file_name = values_file,
+  path      = VALUES_DIR,
+  accuracy  = 0.01
+)
+
+cat("Saved:", values_full, "\n")
 
 # =============================================================================
 # Build the one panel that feeds Fig 9 + Fig 10:
