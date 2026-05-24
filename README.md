@@ -93,6 +93,7 @@ Stage 2 = paths relative to `code_github/`, outputs to `output/`, paper-label he
 
 ### `survey_analysis/beliefs_analysis_overall.R`
 - Fig 5 [fig:privacy_info_beliefs]: `beliefs_vs_truth.pdf`
+- Section 5.1 rank correlation scalars cited in Fig 5 caption / surrounding prose: `output/values/rank_correlation_beliefs_values.tex` (9 macros: `\tauBy<Category>{N,Median,P}` for `Collect`, `Use`, `Control`). Within-participant Kendall τ-b within each attribute category; extension sample only. Wilcoxon signed-rank p-values stored as `<0.001` strings since all three are below R's default `eps = 2e-16` floor.
 
 ### `survey_analysis/beliefs_vs_conjoint.R`
 - Table C.4 [tab:conjoint_vs_beliefs]: `misspec_pref_regression.tex`
@@ -252,6 +253,7 @@ Inline scalars already migrated to macros (just need `\input{}` + macro referenc
 - `\baselineDailyHoursPrivacy` / `Leisure` / `All` (`output/values/baseline_time_use_values.tex`) — Section 4 prose ("1.2 / 2.4 / 3.1 hours") still hardcoded.
 - `\topWeb<Rank><Field>` (60 macros, `output/values/top_websites_values.tex`) — `\input{}` already present in `writeup_v3.tex` preamble; tabular body uses macros.
 - `\dataPurpose<X>N` / `\dataPurpose<X>Pct` (22 macros, `output/values/data_sharing_purpose_values.tex`).
+- `\tauBy<Category>{N,Median,P}` (9 macros, `output/values/rank_correlation_beliefs_values.tex`) — new in Section 5.1 to support Guy's "miscalibrated but not pure noise" framing in the Fig 5 caption / surrounding text. Not yet referenced in `writeup_v3.tex`.
 
 ---
 
