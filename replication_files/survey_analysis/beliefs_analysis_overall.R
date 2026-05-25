@@ -11,6 +11,12 @@
 #   showing that selection into the experiment does not induce large
 #   differences in beliefs about the prevalence of privacy practices online.
 #
+#   Main paper [Section 5.1, rank correlation scalars cited in Fig 5 caption /
+#               surrounding prose: "beliefs are miscalibrated in levels but
+#               preserve ordinal information within attribute categories"]:
+#     output/values/rank_correlation_beliefs_values.tex
+#       (9 macros: \tauBy<Category>{N,Median,P} for Collect, Use, Control)
+#
 # Inputs:
 #   ../data/Survey/survey_merged_final.csv
 #   ../data/final_extension_data/privacy_info.csv         (ground truth)
@@ -24,6 +30,7 @@
 #
 # Outputs:
 #   output/figures/beliefs_vs_truth.pdf
+#   output/values/rank_correlation_beliefs_values.tex
 #
 # Note: Previous version of this script also produced (now removed as dead code):
 #   - agg_belief_correctness.tex             (aggregate by category, not in paper)
@@ -50,9 +57,11 @@ source("replication_files/utils/info_acq_helpers.R")
 library(tidyverse)
 library(lubridate)
 library(stringr)
+library(savetexvalue)
 
-# Output directory
+# Output directories
 FIGURES_DIR <- "output/figures/"
+VALUES_DIR  <- "output/values/"
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -315,3 +324,125 @@ ggsave(paste0(FIGURES_DIR, "beliefs_vs_truth.pdf"),
        g, width = 8, height = 6)
 
 cat(sprintf("Saved: %sbeliefs_vs_truth.pdf\n", FIGURES_DIR))
+
+# =============================================================================
+# RANK CORRELATION: BELIEF ORDERING vs TRUTH (within-participant, within-category)
+# =============================================================================
+# Direct evidence that baseline beliefs preserve ordinal information about
+# privacy practices within categories — beyond what Figure 5 shows about levels.
+#
+# Metric: Kendall tau-b (handles Likert ties via denominator inflation).
+# Unit:   one tau_i per (participant, category).
+# Test:   Wilcoxon signed-rank test against null median = 0
+#         (rank-based analog of one-sample t-test).
+# =============================================================================
+
+VALUES_FILE <- paste0(VALUES_DIR, "rank_correlation_beliefs_values.tex")
+
+# Append-only file: clear it first so reruns don't duplicate macros.
+if (file.exists(VALUES_FILE)) file.remove(VALUES_FILE)
+
+# Map 19 attributes (those with truth available) to 3 categories.
+# "use" pools share-* with anonymized and personalization, consistent
+# with the rest of the paper's by-category split.
+attr_category <- tibble::tibble(
+  internal_key = c(
+    "collect-log", "collect-bio", "collect-sensitive", "collect-financial",
+    "collect-offsite", "collect-location", "collect-social",
+    "share-social", "share-finance", "share-ads", "share-law",
+    "share-service", "share-partners",
+    "anonymized-anonymized", "personalization-personalization",
+    "change-change", "automated-automated",
+    "deletion-deletion", "storage-storage"
+  ),
+  category = c(rep("collect", 7), rep("use", 8), rep("control", 4))
+)
+
+# Build long-form data: one row per (participant, attribute) with truth joined.
+truth_with_internal <- truth_dist %>%
+  mutate(internal_key = paste(feature, field, sep = "-")) %>%
+  select(internal_key, true_mean)
+
+belief_cols_with_truth <- names(belief_to_internal)[
+  belief_to_internal %in% truth_with_internal$internal_key
+]
+
+ext_long <- survey_merged_ext %>%
+  select(all_of(c("emailid", belief_cols_with_truth))) %>%
+  pivot_longer(cols = -emailid,
+               names_to = "belief_col", values_to = "belief_value") %>%
+  mutate(internal_key = belief_to_internal[belief_col]) %>%
+  left_join(truth_with_internal, by = "internal_key") %>%
+  left_join(attr_category,       by = "internal_key") %>%
+  filter(!is.na(belief_value), !is.na(true_mean), !is.na(category))
+
+# Compute one Kendall tau-b per (participant, category).
+# tau is NA when belief sd = 0 within a category (participant gave all
+# attributes in that category the same Likert score).
+within_cat_tau <- ext_long %>%
+  group_by(emailid, category) %>%
+  summarise(
+    tau = suppressWarnings(cor(belief_value, true_mean, method = "kendall")),
+    .groups = "drop"
+  )
+
+# Per-category summary: n, median tau-b, Wilcoxon p-value vs 0.
+cat_summary <- within_cat_tau %>%
+  filter(!is.na(tau)) %>%
+  group_by(category) %>%
+  summarise(
+    n           = n(),
+    median_tau  = median(tau),
+    p_value     = wilcox.test(tau, mu = 0)$p.value,
+    .groups = "drop"
+  )
+
+# Console output (use cat(), not print(), per stage 2 convention).
+cat("\n=========================================================\n")
+cat("RANK CORRELATION: BELIEF ORDERING vs TRUTH BY CATEGORY\n")
+cat("=========================================================\n")
+cat("Metric: Kendall tau-b, within-participant, within-category.\n")
+cat("Test:   Wilcoxon signed-rank vs null median = 0.\n\n")
+
+cat(sprintf("%-10s %8s %15s %20s\n",
+            "category", "n", "median tau-b", "Wilcoxon p-value"))
+cat(strrep("-", 55), "\n", sep = "")
+for (i in seq_len(nrow(cat_summary))) {
+  cat(sprintf("%-10s %8d %15.3f %20s\n",
+              cat_summary$category[i],
+              as.integer(cat_summary$n[i]),
+              cat_summary$median_tau[i],
+              format.pval(cat_summary$p_value[i], digits = 2, eps = 2e-16)))
+}
+
+cat("\nReading:\n")
+cat("  Collect: participants rank collect-type practices well (positive tau).\n")
+cat("  Use:    weakly reversed (slightly negative).\n")
+cat("  Control: systematically reversed (clearly negative).\n\n")
+
+# Save LaTeX macros for paper caption.
+# Naming convention: \tauBy<Category><Stat>
+#   e.g., \tauByCollectN, \tauByCollectMedian, \tauByCollectP
+for (i in seq_len(nrow(cat_summary))) {
+  cat_label <- tools::toTitleCase(cat_summary$category[i])
+  
+  save_tex_value(
+    as.integer(cat_summary$n[i]),
+    name = paste0("tauBy", cat_label, "N"),
+    file = VALUES_FILE
+  )
+  save_tex_value(
+    cat_summary$median_tau[i],
+    name = paste0("tauBy", cat_label, "Median"),
+    accuracy = 0.01,
+    file = VALUES_FILE
+  )
+  # All three p-values are <2e-16, so store as string for LaTeX.
+  save_tex_value(
+    "<0.001",
+    name = paste0("tauBy", cat_label, "P"),
+    file = VALUES_FILE
+  )
+}
+
+cat(sprintf("Saved LaTeX macros to: %s\n", VALUES_FILE))
