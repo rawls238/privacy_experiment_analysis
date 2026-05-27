@@ -13,6 +13,7 @@ Each script's header comment is the authoritative paper mapping. This README mir
 ## Repo layout
 
 - `replication_files/` — R scripts grouped by analysis area
+- `replication_files/utils/` — shared helpers (sourced from analysis scripts)
 - `output/{figures,tables,values}/` — script outputs (committed to git for Overleaf sync)
 - `code/` — stage 1 source (kept for now; superseded by `replication_files/`)
 
@@ -22,14 +23,14 @@ The Overleaf project `privacy_experiment_analysis` is checked out separately at 
 
 ## Style conventions
 
-`etable()` arguments:
+### `etable()` arguments
 
 - `digits = 3`
 - `signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1)`
 - `replace = TRUE` (default appends, duplicating on re-run)
 - `depvar = FALSE` whenever `dict` already maps the dependent variable or `headers` already labels each column. Keep default only for single-column tables.
 
-**Rule 5 — FE row labels via `dict`:**
+FE row labels via `dict`:
 ```r
 dict = c("experiment_id" = "Participant FE",
          "block_by_wave" = "Block FE",
@@ -37,12 +38,35 @@ dict = c("experiment_id" = "Participant FE",
          "website_aggregated_high_level"       = "Website FE")
 ```
 
-**Rule 6 — output target by content type:**
+### Output target by content type
+
 - Regression tables → `fixest::etable()` → `output/tables/*.tex`
 - Summary-stats tables (non-regression) → `xtable::xtable(..., file = ...)` → `output/tables/*.tex`
 - Inline-referenced scalars → `savetexvalue::save_tex_value()` → `output/values/*.tex` (`\newcommand` macros). Not for whole tables.
+- Hand-built LaTeX tabulars (e.g. `exp_balance_table.tex`) → `writeLines()` → `output/tables/*.tex`.
 
-**Rule 7 — `save_tex_value()` numeric discipline:** `savetexvalue` defaults to `scales::number()`, which inserts thousands commas and a trailing `.00` on every numeric input. For integer counts pass `as.integer(x)` or `as.character(x)` so the output is bare digits (`935`, `1441`), not `935.00` / `1,441.00`. For decimal scalars set `accuracy = 0.01` explicitly (or `accuracy = 0.1` for one decimal). The `savetexvalue` file is append-only — wipe it (`file.remove()`) at the top of the script to avoid duplicate `\newcommand` entries on re-run. One scalar bundle per logical group, not per script. Use `cat()`, not `print()`, for any console verification output inside savetexvalue-producing scripts.
+### Number formatting (inline scalars + hand-built tables)
+
+`savetexvalue`'s default formatter is `scales::number()`. The `accuracy = 0.01` / `accuracy = 0.1` argument is **silently ignored** in our installed package version: values are written at full floating-point precision regardless of what you pass. As a workaround, every numeric value goes through `replication_files/utils/number_format_helpers.R` first and is passed to `save_tex_value()` as a pre-formatted character string. `savetexvalue` detects a string input and writes it verbatim, bypassing the broken formatter.
+
+Helpers (one per data type — see `number_format_helpers.R` for full rules):
+
+| Helper | Rule |
+|---|---|
+| `format_count(x)` | Bare integer. |
+| `format_pct(x)` | One decimal place (trailing zeros dropped). |
+| `format_share(x)` | Three decimal places (trailing zeros dropped). |
+| `format_dollar(x)` | Integer if whole, else two decimals. |
+| `format_hours(x)` | Two significant figures (handles 0.02 to 28 magnitude range). |
+| `format_age(x)` | One decimal place. |
+| `format_income(x)` | Bare integer. |
+| `format_belief(x)` | One decimal place (0-100 scale). |
+| `format_coef(x)` | Three decimal places. |
+| `format_pvalue(x)` | Three decimal places if p ≥ 0.001, scientific notation otherwise. |
+
+Adding a new data type: add a one-line alias in `number_format_helpers.R` that dispatches to `fmt()` with the appropriate mode and digit count. Do not duplicate the rounding logic in caller scripts.
+
+The `savetexvalue` file is append-only — wipe it (`file.remove()`) at the top of the script to avoid duplicate `\newcommand` entries on re-run. One scalar bundle per logical group, not per script. Use `cat()`, not `print()`, for any console verification output inside savetexvalue-producing scripts.
 
 All figures go to `output/figures/` as `.pdf`. Plot styling is in `utils/plot_rules.R`.
 
@@ -96,7 +120,7 @@ Stage 2 = paths relative to `code_github/`, outputs to `output/`, paper-label he
 
 ### `survey_analysis/beliefs_analysis_overall.R`
 - Fig 5 [fig:privacy_info_beliefs]: `beliefs_vs_truth.pdf`
-- Section 5.1 rank correlation scalars cited in Fig 5 caption / surrounding prose: `output/values/rank_correlation_beliefs_values.tex` (9 macros: `\tauBy<Category>{N,Median,P}` for `Collect`, `Use`, `Control`). Within-participant Kendall τ-b within each attribute category; extension sample only. Wilcoxon signed-rank p-values stored as `<0.001` strings since all three are below R's default `eps = 2e-16` floor.
+- Section 5.1 rank correlation scalars cited in Fig 5 caption / surrounding prose: `output/values/rank_correlation_beliefs_values.tex` (9 macros). Within-participant Kendall τ-b within each attribute category; extension sample only. Wilcoxon signed-rank p-values stored as `<0.001` strings since all three are below R's default `eps = 2e-16` floor.
 
 ### `survey_analysis/beliefs_vs_conjoint.R`
 - Table C.4 [tab:conjoint_vs_beliefs]: `misspec_pref_regression.tex`
@@ -104,7 +128,7 @@ Stage 2 = paths relative to `code_github/`, outputs to `output/`, paper-label he
 
 ### `survey_analysis/other_survey_regressions.R`
 - Table C.3 [tab:experimenter_demand]: `experiment_modified_behavior.tex`
-- Table C.8 [tab:data_sharing_purpose]: `output/values/data_sharing_purpose_values.tex` (22 macros: `\dataPurpose<X>N` / `\dataPurpose<X>Pct`). The table structure stays in the paper; only the 11 counts + 11 percents are replaced by macros.
+- Table C.8 [tab:data_sharing_purpose]: `output/values/data_sharing_purpose_values.tex` (22 macros). The table structure stays in the paper; only the counts + percents are replaced by macros.
 - Table C.9 [tab:treatment_effect_data_sharing]: `data_sharing_treatment_effects.tex`
 
 ### `survey_analysis/top_sites_beliefs_analysis.R`
@@ -150,53 +174,64 @@ Data source is `get_clean_time_data()` directly (not the cached `joined_time_dat
 
 Filter rules: drop `BAD_USERS`, baseline weeks `{-2, -1}`, no `time_spent > 30` filter. Per-scalar scope: `\baselineDailyHoursPrivacy` drops `SURVEY_WEBSITES` and keeps `privacy_exist`; `\baselineDailyHoursLeisure` drops `SURVEY_WEBSITES`; `\baselineDailyHoursAll` keeps `SURVEY_WEBSITES`. Top-table additionally requires `privacy_exist` and `n_users >= 50`.
 
-The twitter -> x slug rename in `utils/time_usage_helpers.R` now runs inside `get_clean_time_data()` *before* `map_privacy_data()` (was previously after, causing all twitter rows to receive `privacy_exist = FALSE`; fixed). All baseline privacy-info-restricted scalars in this repository reflect post-fix data and run ~0.3 hours/user higher than the corresponding values in older paper drafts.
+Number formatting: hours use `format_hours()` (two significant figures, drop trailing zeros) since values span two orders of magnitude (3.1 daily hours per active user; 0.02 daily hours averaged across all users for the smaller sites). Site user counts use `format_count()`.
+
+Numbers vs. paper: baseline scalars 1.5 / 2.4 / 3.1 (paper prose 1.2 / 2.4 / 3.1; Privacy scalar runs ~0.3 hours/user higher in current data because the twitter -> x slug rename in `utils/time_usage_helpers.R` now runs inside `get_clean_time_data()` *before* `map_privacy_data()`, was previously after, causing all twitter rows to receive `privacy_exist = FALSE`; fixed).
 
 ### `survey_analysis/survey_analysis_scalars.R`
-- Section 4 demographics + WTA inline scalars: `output/values/survey_descriptive_values.tex` (10 macros: `\surveyMeanAge` / `\surveyFemalePct` / `\surveyMalePct` / `\surveyPnaPct` / `\surveyCollegePct` for demographics, `\wtaInvitedMedian` / `\wtaInvitedMean` / `\wtaFullMedian` / `\wtaFullMean` / `\invitedSampleCoveragePct` for WTA).
+- Section 4 demographics + WTA inline scalars: `output/values/survey_descriptive_values.tex` (10 macros).
 
-Source: `survey_full_eligible.csv` for demographics (uses raw `Gender` field, not the buggy `is_male` column where PNA → 0). WTA computed from `cleaned_WTA` with `> $100` outliers trimmed (drops 7 self-reported "Other" entries above the $40 BDM cap). Invited sample coverage (94.5%) reflects the fraction of the full survey population whose WTA falls at or below the $40 maximum offer.
+Sample: baseline completers, defined as users with non-NA `cleaned_WTA` in `survey_full_eligible.csv` (8168 of 8187 rows). The 19 dropped rows are mid-survey dropouts who finished demographics + conjoint but did not finish the WTA module. This sample matches `\baselineSurveyN` from `survey_flow_scalars.R`. Invited sample for WTA invited stats is the 2874 eligible users (offer ≥ cutoff, exclude testing), not the smaller installed / randomized / finished sub-samples.
 
-Numbers vs. paper line 413 (writeup_v3.tex):
-- Mean age 39.4 ✓
-- Female 59.9% ✓
-- Male 38.8% (paper does not report explicitly)
-- College 58.6% ✓
-- WTA invited median $20 ✓
-- WTA invited mean $19 ✓
-- WTA full median $25 ✓
-- WTA full mean $28 (paper says $52 — paper reflects untrimmed; we trim > $100 outliers)
-- Coverage 94.5% (paper says 89% — paper used different definition; we report fraction at or below $40 cap)
+Demographics use the raw `Gender` field (not the buggy `is_male` column where PNA → 0).
+
+WTA cleaning per Guy 2026-05-25: censor `cleaned_WTA > $1000` to NA for the mean / median (52 trimmed from full sample, 19 from invited). The raw `cleaned_WTA` column accepts "Other" free-text responses parsed numerically and contains protest values up to 1e23; the $1000 threshold removes protest entries while preserving informative high-WTA responses ($100, $500, $1000). Coverage (the `\invitedSampleCoveragePct` macro) is computed on the **untrimmed** `cleaned_WTA` per Guy's guidance — users with WTA > $1000 represent the most privacy-sensitive tail and trimming them would understate the selection problem the macro characterizes.
+
+Numbers vs. paper (writeup_v3.tex Section 4.5 + 4.6):
+- `\surveyMeanAge` 39.4 ✓ (paper 39.4)
+- `\surveyFemalePct` 59.9 ✓ (paper 59.9)
+- `\surveyMalePct` 38.8 (paper does not report explicitly)
+- `\surveyPnaPct` 1.3 (paper does not report explicitly)
+- `\surveyCollegePct` 58.5 (paper 58.6, banker's rounding on 58.55)
+- `\wtaInvitedMedian` 20 ✓ (paper 20)
+- `\wtaInvitedMean` 19.97 (paper 19; raw mean is $19.97, paper rounds to integer)
+- `\wtaFullMedian` 25 ✓ (paper 25)
+- `\wtaFullMean` 41.44 (paper 52 — paper's $52 cannot be reproduced from any committed code; with Guy's $1000 censor rule applied here the mean is $41.44)
+- `\invitedSampleCoveragePct` 90.8 (paper 89 — paper's 89% cannot be reproduced by any denominator we tried; computed as fraction of `cleaned_WTA <= 40` over baseline completers with valid WTA = 7419 / 8168)
 
 ### `survey_analysis/survey_flow_scalars.R`
 - Section 4 Figure 2 funnel + per-treatment end-of-extension N + endline N + differential attrition p-values: `output/values/participant_flow_values.tex` (20 macros).
 
-Funnel (5 + 4 percentages):
+Number formatting: counts use `format_count()`, percentages use `format_pct()` (one decimal, drop trailing zeros), attrition p-values use `format_pvalue()` (three decimals).
+
+Numbers vs. paper (writeup_v3.tex Section 4 + Figure 2):
+
+Funnel:
 - `\fullCohortN` 13382 (hardcoded; screener-stage log not in repo)
 - `\baselineSurveyN` 8168 (`nrow(survey_merged_final.csv)`; paper 8169, off by 1)
-- `\eligibleN` 2874 (offer ≥ cutoff, exclude testing/grounding) ✓ exact
-- `\installedN` 1717 (in_experiment in {true, uninstall, inactivity, technical_issue, request_deletion, Removed due to grounding}) ✓ exact
-- `\remainedN` 1597 (experiment_condition != "") ✓ exact
-- `\baselineCompletionPct` / `\eligiblePct` / `\installedPctOfEligible` / `\remainedPct` ✓ match paper 61/35/60/93
+- `\eligibleN` 2874 ✓
+- `\installedN` 1717 ✓
+- `\remainedN` 1597 ✓
+- `\baselineCompletionPct` 61 / `\eligiblePct` 35.2 / `\installedPctOfEligible` 59.7 / `\remainedPct` 93 ✓ match paper 61 / 35 / 60 / 93
 
-Per-treatment N (9):
+Per-treatment N:
 - `\extensionInfoStartN` 533 (paper line 396 says 532; paper prose is wrong, data says 533)
 - `\extensionInfoFinalN` 501 ✓
 - `\extensionSaliencyStartN` 532 (paper line 396 says 533; paper prose is wrong, data says 532)
 - `\extensionSaliencyFinalN` 500 ✓
-- `\extensionControlStartN` 532 / `\extensionControlFinalN` 509 ✓
+- `\extensionControlStartN` 532 ✓ / `\extensionControlFinalN` 509 ✓
 - `\endlineInfoN` 479 (paper 480, off by 1)
 - `\endlineSaliencyN` 472 ✓
 - `\endlineControlN` 475 (paper 474, off by 1)
 
-Attrition (2):
-- `\attritionExtensionPvalue` 0.38 ✓ (paper 0.37, matches within rounding)
-- `\attritionEndlinePvalue` 0.83 (paper 0.96; paper's 0.96 cannot be reproduced by any standard contingency test; we report chi-square + startN denominator for consistency with extension test)
+Attrition:
+- `\attritionExtensionPvalue` 0.376 ✓ (paper 0.37, matches within rounding)
+- `\attritionEndlinePvalue` 0.833 (paper 0.96 — paper's 0.96 cannot be reproduced by any standard contingency test; we report chi-square + startN denominator for consistency with extension test; qualitative conclusion unchanged)
 
 Figure 2 PDF (`./manual_figures/design/subject_flow.pdf`) has been redrawn to match these numbers; in particular the info / saliency start N labels are swapped relative to the original draft.
 
 ### `balance_table/exp_balance_table.R`
-- Appendix C Table [tab:exp_balance_table]: `output/tables/exp_balance_table.tex` — 21 rows × 5 columns (Control / Saliency / Info means + p(S-C) + p(I-C)), full LaTeX tabular with `\hline` rules.
+- Appendix C [tab:exp_balance_table]: `output/tables/exp_balance_table.tex` — 21 rows × 5 columns (Control / Saliency / Info means + p(S-C) + p(I-C)), full LaTeX tabular with `\hline` rules.
 
 R port of `assign_groups_wave_two.py`'s `check_balance()` / `compare_means_and_generate_latex()`. We read the existing treatment assignments from `experiment_conditions_pilot_july_2024.csv` (do NOT redo randomization) and produce just the balance check. Sample: 1596 treatment-assigned participants (532 control + 532 info + 532 saliency); paper reports 1597 — the off-by-one is the single info-arm "Removed due to grounding" row.
 
@@ -206,12 +241,15 @@ ANOVA p-values via `oneway.test(y ~ group, var.equal = TRUE)`, numerically equiv
 
 Bugs preserved from Python for replication: `is_male` PNA → 0 (counts as not-male); `cleaned_WTA` not trimmed for outliers.
 
-`avg_daily_time` formula deviates from Python: Python uses `(today - first_active + 1)` as the denominator (depends on script run date — not reproducible), we use the fixed 14-day baseline window. This makes our Daily Hours row read 1.279 / 1.268 / 1.293 instead of paper 1.150 / 1.148 / 1.155; the 11% gap is entirely the today() bug.
+`avg_daily_time` formula deviates from Python: Python uses `(today - first_active + 1)` as the denominator (depends on script run date — not reproducible), we use the fixed 14-day baseline window. This changes the Daily Hours row relative to paper.
+
+Per-row cell formatting via `fmt_cell()` dispatching to `number_format_helpers.R` based on row type: hours rows → `format_hours()`, Age → `format_age()`, Income → `format_income()`, WTA → `format_dollar()`, Mean Beliefs → `format_belief()`, default (shares) → `format_share()`, p-value columns → `format_pvalue()`.
 
 Numbers vs. paper Appendix C:
 - 14 of 21 rows exact match (≤ 0.001 difference); 6 rows differ by ≤ 0.02 due to the 1-participant info-arm sample difference.
-- Daily Hours on Sites with Privacy Info: 1.279 / 1.268 / 1.293 (paper 1.150 / 1.148 / 1.155 — Python today() bug).
-- Conjoint Social p(S-C): 1.000 (paper "nan" — Python f_oneway returns NaN when between-group variance is 0; R oneway.test correctly returns p = 1.0).
+- Daily Hours on Sites with Privacy Info row: now 1.3 / 1.3 / 1.3 (formatted as 2 sig figs from raw 1.279 / 1.268 / 1.293; paper 1.150 / 1.148 / 1.155 — Python today() bug).
+- WTA row: 19 / 19.2 / 19.05 under the new `format_dollar` rule (integer if whole, else 2 decimals); paper formatted these as 3-decimal across the board (19.000 / 19.200 / 19.050).
+- Conjoint Social p(S-C): 1 (paper "nan" — Python f_oneway returns NaN when between-group variance is 0; R oneway.test correctly returns p = 1.0).
 
 ---
 
@@ -254,12 +292,11 @@ Hand-made design documentation (treatment dialogs, study flow, consent pages). N
 - `utils/values.R` — date constants, `BAD_USERS`, `SURVEY_WEBSITES`, `AUX_DATA_DIR`.
 - `utils/time_usage_helpers.R` — browser data cleaning, domain aggregation/classification, privacy scoring, conjoint utility loading. Path constants at top (`DATA_DIR`, `EXT_DATA_DIR`, `SURVEY_DIR`, `CONJOINT_DIR`, `AUX_DATA_DIR`). 17 in-use functions. The twitter -> x slug rename runs inside `get_clean_time_data()` before `map_privacy_data()` (fixed; see baseline scalars note above).
 - `utils/info_acq_helpers.R` — privacy policy visit detection, info acquisition aggregation.
+- `utils/number_format_helpers.R` — number-formatting helpers for paper outputs (`format_pct`, `format_share`, `format_dollar`, `format_hours`, `format_age`, `format_income`, `format_belief`, `format_coef`, `format_pvalue`, `format_count`). Single source of truth for per-data-type accuracy rules; also a workaround for savetexvalue's broken `accuracy` parameter. See `Style conventions` above and the file header for full rules.
 
 ---
 
 ## TODO
-
-The savetexvalue refactor is organized by tier so that twitter -> x affected outputs and the largest table rebuild come first.
 
 ### Tier 1 — descriptive scalars (one new script or one savetexvalue patch per row)
 
@@ -275,7 +312,7 @@ The savetexvalue refactor is organized by tier so that twitter -> x affected out
 
 - **Group G**: Add `save_tex_value()` calls to `information_acquisition_results/privacy_seeking_analysis.R` for line 521 (0.8 / 0.1-0.25 privacy policy visits) and the 17× ratio + observed control/saliency search rates (2.3% / 1.6% / 15.9% / 15.9%) referenced in the conclusion and model fit appendix.
 
-### Tier 2 — regression-derived inline scalars (possibly twitter -> x affected)
+### Tier 2 — regression-derived inline scalars
 
 - **Group I**: Add `save_tex_value()` calls to `time_use_analysis/analysis_assortment_did.R` for line 643 (p = 0.063 HHI, p = 0.065 top-2 share).
 
@@ -314,13 +351,13 @@ Switch every table cell and inline scalar from hard-coded to `\input{output/...}
 - App C `tab:cookie_banner_interactions_treatment`
 - App C `tab:exp_balance_table` (new in stage 2; replaces the hand-written tabular currently in `\begin{comment}`)
 
-Inline scalars already migrated to macros (just need `\input{}` + macro reference in `writeup_v3.tex`):
-- `\baselineDailyHoursPrivacy` / `Leisure` / `All` (`output/values/baseline_time_use_values.tex`) — Section 4 prose ("1.2 / 2.4 / 3.1 hours") still hardcoded.
-- `\topWeb<Rank><Field>` (60 macros, `output/values/top_websites_values.tex`) — `\input{}` already present in `writeup_v3.tex` preamble; tabular body uses macros.
-- `\dataPurpose<X>N` / `\dataPurpose<X>Pct` (22 macros, `output/values/data_sharing_purpose_values.tex`).
-- `\tauBy<Category>{N,Median,P}` (9 macros, `output/values/rank_correlation_beliefs_values.tex`) — new in Section 5.1 to support Guy's "miscalibrated but not pure noise" framing in the Fig 5 caption / surrounding text. Not yet referenced in `writeup_v3.tex`.
-- `\surveyMeanAge` / `\surveyFemalePct` / `\surveyMalePct` / `\surveyPnaPct` / `\surveyCollegePct` / `\wtaInvitedMedian` / `\wtaInvitedMean` / `\wtaFullMedian` / `\wtaFullMean` / `\invitedSampleCoveragePct` (10 macros, `output/values/survey_descriptive_values.tex`) — Section 4 demographics + WTA.
-- `\fullCohortN` / `\baselineSurveyN` / `\eligibleN` / `\installedN` / `\remainedN` + 4 funnel percentages + 6 per-treatment extension N + 3 endline N + 2 attrition p-values (20 macros, `output/values/participant_flow_values.tex`) — Section 4 Figure 2 funnel + line 396-400 attrition prose.
+Inline-scalar macro files ready for `\input{}` in `writeup_v3.tex`:
+- `output/values/baseline_time_use_values.tex` (3 macros) — Section 4 baseline daily hours.
+- `output/values/top_websites_values.tex` (60 macros) — Table C.2 top websites; `\input{}` already present in preamble.
+- `output/values/data_sharing_purpose_values.tex` (22 macros) — Table C.8.
+- `output/values/rank_correlation_beliefs_values.tex` (9 macros) — Section 5.1 / Fig 5 caption. Not yet referenced in `writeup_v3.tex`.
+- `output/values/survey_descriptive_values.tex` (10 macros) — Section 4 demographics + WTA. Note `\wtaFullMean` and `\invitedSampleCoveragePct` differ substantially from paper text — paper prose must be updated.
+- `output/values/participant_flow_values.tex` (20 macros) — Section 4 Figure 2 funnel + line 396-400 attrition prose. Note `\attritionEndlinePvalue` 0.833 differs from paper 0.96 — paper number not reproducible.
 
 ---
 
@@ -343,3 +380,8 @@ Outputs the original codebase generated but the paper doesn't use. Generating co
   - `map_privacy_data_old`, `map_privacy_data_trackers`, `map_privacy_data_trackers_2`, `map_privacy_data_trackers_SG`
 
   File ~2900 → ~1442 lines.
+
+### Stage 2 refactor — scalar formatting (May 2026)
+
+- `Rule 7` of Style conventions (savetexvalue numeric discipline) was rewritten. The old rule recommended `accuracy = 0.01` / `accuracy = 0.1` arguments to `save_tex_value()`. These are silently ignored by our installed package version; output is always full-precision. Replaced by `replication_files/utils/number_format_helpers.R` + per-data-type semantic helpers.
+- Per-script local `format_2sig` helpers (previously duplicated in `time_use_baseline_scalars.R` and `exp_balance_table.R`) removed in favor of `format_hours()` from the shared utility.
