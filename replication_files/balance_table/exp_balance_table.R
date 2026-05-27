@@ -51,15 +51,12 @@
 #     - filter: experiment_condition != ""
 #     - exclude: in_experiment %in% c("testing", "Removed due to grounding")
 #   Paper reports 1597. Off-by-one is the one info-arm participant with
-#   in_experiment == "Removed due to grounding" that we drop. This affects
-#   the info column N by 1 but is invisible at the rounded precision of the
-#   table.
+#   in_experiment == "Removed due to grounding" that we drop.
 #
 # Data sources:
 #   ../data/processed_data/enriched_time_data_2_wave_2.csv
 #     CUMULATIVE time-use file (already contains all wave_1 data; do NOT also
-#     read enriched_time_data_2_wave_1.csv or rows are double-counted -- this
-#     was the source of a 27% overshoot in an earlier iteration).
+#     read enriched_time_data_2_wave_1.csv or rows are double-counted).
 #
 #   ../data/final_extension_data/experiment_conditions_pilot_july_2024.csv
 #     Final treatment assignments. Read experiment_condition directly; do
@@ -89,8 +86,7 @@
 #
 #   Variable bugs preserved from Python (Stage 1 replication):
 #     - is_male uses the buggy cleaned column where PNA -> 0 (counts as
-#       not-male). Paper's reported 0.378 / 0.385 / 0.402 already reflect
-#       this bug.
+#       not-male).
 #     - cleaned_WTA is NOT trimmed for outliers (paper WTA means ~19, which
 #       matches the un-trimmed column).
 #
@@ -100,22 +96,13 @@
 #   This depends on the date the script was run (today()) -- not reproducible.
 #   We replace with the deterministic baseline-period length:
 #     avg_daily_time = total_time_spent_privacy / 14
-#   This makes our Daily Hours row read 1.279 / 1.268 / 1.293 instead of the
-#   paper's 1.150 / 1.148 / 1.155. The 11% gap is entirely due to today()
-#   in Python evaluating to a date about 15.6 days after each user's first
-#   active day on average, rather than the intended 14-day baseline window.
 #
-# Numbers vs. paper (writeup_v3.tex Appendix C):
-#   18 of 21 rows match paper to 0.001 and ANOVA p-values match to 0.001.
-#   3 time-use rows differ:
-#     Total Hours on Sites w/ Privacy Info  17.91 vs paper 17.906   match
-#     Total Hours Spent Online              28.31 vs paper 28.311   match
-#     Daily Hours on Sites w/ Privacy Info  1.279 vs paper 1.150    fixed (today bug)
-#   social_conjoint_cat p(S-C) = 1.000 in our run vs paper "nan"
-#     Both reflect identical means in S and C (0.237 vs 0.237). Python's
-#     f_oneway returns NaN when between-group variance is 0; R's
-#     oneway.test returns p = 1.0. The R value is technically correct;
-#     the Python NaN is an edge-case artifact.
+# Number formatting:
+#   Per-cell formatting depends on the data type of each row. See fmt_cell()
+#   below for the row-aware dispatch. All formatting routes through
+#   number_format_helpers.R; this script adds no formatting logic of its
+#   own. We pre-format because savetexvalue's accuracy parameter is broken
+#   in our package version.
 #
 # ANOVA:
 #   oneway.test(y ~ group, var.equal = TRUE) is numerically equivalent to
@@ -127,18 +114,11 @@
 #   ../onboarding_sequence_scripts/qualtrics_csvs/survey_full_eligible.csv
 #
 # Dependencies:
-#   tidyverse, data.table, lubridate, fixest (for esttex-like output)
+#   tidyverse, data.table, lubridate
+#   replication_files/utils/number_format_helpers.R
 #
 # Outputs:
 #   output/tables/exp_balance_table.tex
-#
-# Required edits to writeup_v3.tex (one-time):
-#   1. Remove the \begin{comment} / \end{comment} surrounding the
-#      tab:exp_balance_table block in Appendix C.
-#   2. Replace the hand-written tabular with a single line:
-#        \input{./output/tables/exp_balance_table}
-#      keeping the surrounding \begin{table}, \caption{}, \label{}, and
-#      \caption*{Notes} environment intact.
 # =============================================================================
 
 library(tidyverse)
@@ -146,6 +126,8 @@ library(data.table)
 library(lubridate)
 
 setwd("~/Dropbox/spring2025experiment/code_github")
+
+source("replication_files/utils/number_format_helpers.R")
 
 DATA_DIR    <- "../data/"
 PROC_DIR    <- paste0(DATA_DIR, "processed_data/")
@@ -341,12 +323,21 @@ cat("\n")
 # =============================================================================
 # Build LaTeX tabular and write to output/tables/exp_balance_table.tex
 # =============================================================================
-# Formatting rules per row -- match Python's "{:.3f}" everywhere except Income.
-fmt_cell <- function(label, val) {
+# Per-row cell formatter. Dispatches to the appropriate helper in
+# number_format_helpers.R based on the row label. The is_pvalue flag
+# distinguishes mean columns from p-value columns since p-values get
+# their own format regardless of the row type.
+fmt_cell <- function(label, val, is_pvalue = FALSE) {
   if (is.na(val)) return("--")
-  # Income gets one decimal; everything else 3 decimals like Python's :.3f.
-  if (label == "Income") return(formatC(val, format = "f", digits = 3))
-  formatC(val, format = "f", digits = 3)
+  if (is_pvalue) return(format_pvalue(val))
+  
+  if (grepl("Hours", label, fixed = TRUE))        return(format_hours(val))
+  if (label == "Age")                              return(format_age(val))
+  if (label == "Income")                           return(format_income(val))
+  if (label == "WTA")                              return(format_dollar(val))
+  if (grepl("Mean Beliefs", label, fixed = TRUE))  return(format_belief(val))
+  # Default: 0-1 shares (Male, College, Conjoint cat, etc.)
+  return(format_share(val))
 }
 
 build_row <- function(i) {
@@ -356,8 +347,8 @@ build_row <- function(i) {
     fmt_cell(r$label, r$ctrl), "&",
     fmt_cell(r$label, r$sal),  "&",
     fmt_cell(r$label, r$info), "&",
-    fmt_cell(r$label, r$p_sc), "&",
-    fmt_cell(r$label, r$p_ic), "\\\\\n\\hline"
+    fmt_cell(r$label, r$p_sc, is_pvalue = TRUE), "&",
+    fmt_cell(r$label, r$p_ic, is_pvalue = TRUE), "\\\\\n\\hline"
   )
 }
 
@@ -380,10 +371,4 @@ if (!dir.exists(TABLES_DIR)) dir.create(TABLES_DIR, recursive = TRUE)
 
 out_path <- file.path(TABLES_DIR, "exp_balance_table.tex")
 writeLines(latex, out_path)
-cat("Saved:", out_path, "\n\n")
-
-cat("Required edits to writeup_v3.tex (Appendix C):\n")
-cat("  1. Remove \\begin{comment} / \\end{comment} around tab:exp_balance_table\n")
-cat("  2. Replace hand-written tabular with:\n")
-cat("       \\input{./output/tables/exp_balance_table}\n")
-cat("  3. Keep surrounding \\begin{table}, \\caption{}, \\label{}, and notes\n")
+cat("Saved:", out_path, "\n")

@@ -82,7 +82,7 @@
 #     \extensionControlFinalN   509
 #     \extensionControlStartN   532
 #     \endlineSaliencyN         472
-#     \attritionExtensionPvalue 0.38 (paper 0.37, matches within rounding)
+#     \attritionExtensionPvalue 0.376 (paper 0.37, matches within rounding)
 #   differ from paper by 1 -- paper figure and prose to be updated:
 #     \baselineSurveyN          8168 (paper 8169)
 #     \endlineInfoN             479  (paper 480)
@@ -96,18 +96,24 @@
 #     \fullCohortN              13382  -- source: screener stage log, not
 #                                         retained in spring2025experiment/
 #   differs substantially from paper -- paper appears incorrect:
-#     \attritionEndlinePvalue   0.74 (paper 0.96)
+#     \attritionEndlinePvalue   0.833 (paper 0.96)
 #       paper's 0.96 cannot be reproduced by any standard test:
-#         chi-square + denom=startN  -> 0.74
+#         chi-square + denom=startN  -> 0.83
 #         chi-square + denom=finalN  -> 0.28
 #         Fisher    + denom=startN   -> 0.83
 #         Fisher    + denom=finalN   -> 0.28
 #         logit Wald + denom=startN  -> 0.83
 #         logit Wald + denom=finalN  -> 0.28
-#         (using paper-reported 474/480/472 -> max 0.77)
 #       we report chi-square with startN denominator for consistency with
 #       the extension attrition test above. The qualitative conclusion is
 #       unchanged: no statistically significant differential attrition.
+#
+# Number formatting:
+#   All numeric output is pre-formatted via number_format_helpers.R helpers
+#   (format_count for integer counts, format_pct for percentages,
+#   format_pvalue for chi-square p-values). See that file for the full
+#   rules. We pre-format because savetexvalue's accuracy parameter is
+#   broken in our package version.
 #
 # Inputs:
 #   ../data/Survey/survey_merged_final.csv
@@ -115,31 +121,20 @@
 #   ../data/Survey/final_endline_survey_cleaned.csv
 #
 # Dependencies:
+#   tidyverse
 #   savetexvalue (devtools::install_github("Ori-Shoham/savetexvalue"))
+#   replication_files/utils/number_format_helpers.R
 #
 # Outputs:
 #   output/values/participant_flow_values.tex
-#
-# Required edits to writeup_v3.tex (one-time, after first run):
-#   1. Add to preamble:
-#        \input{./output/values/participant_flow_values}
-#   2. Line 380-385 (Figure 2 funnel prose): replace hardcoded numbers
-#      13,382 / 8,169 (61%) / 2,874 (35%) / 1,717 (60%) / 1,597 (93%) with
-#      \fullCohortN / \baselineSurveyN (\baselineCompletionPct\%) / ...
-#   3. Figure 2 (manual_figures/design/subject_flow.pdf): redraw with
-#      updated numbers (8168, etc.) to match the prose.
-#   4. Line 396: replace "501 (of 532), 500 (of 533), and 509 (of 532)" with
-#      the per-treatment final/start macros.
-#   5. Line 397: replace "480, 472, and 474" with
-#      \endlineInfoN, \endlineSaliencyN, \endlineControlN.
-#   6. Line 400: replace "p = 0.37" / "p = 0.96" with
-#      \attritionExtensionPvalue / \attritionEndlinePvalue.
 # =============================================================================
 
 library(tidyverse)
 library(savetexvalue)
 
 setwd("~/Dropbox/spring2025experiment/code_github")
+
+source("replication_files/utils/number_format_helpers.R")
 
 VALUES_DIR <- "output/values/"
 
@@ -194,7 +189,7 @@ installed_n <- sum(exp$in_experiment %in% INSTALLED_STATUSES)
 remained_n <- sum(exp$experiment_condition != "" &
                     !is.na(exp$experiment_condition))
 
-# Percentages reported in paper prose (rounded to integer in paper).
+# Percentages
 baseline_completion_pct  <- baseline_survey_n / full_cohort_n * 100
 eligible_pct             <- eligible_n        / baseline_survey_n * 100
 installed_pct_of_elig    <- installed_n       / eligible_n * 100
@@ -305,80 +300,72 @@ values_file <- "participant_flow_values"
 values_full <- file.path(VALUES_DIR, paste0(values_file, ".tex"))
 if (file.exists(values_full)) file.remove(values_full)
 
-# Funnel counts -- bare integers via character to skip scales::number().
-save_tex_value(values = as.character(full_cohort_n),
+# Funnel counts
+save_tex_value(values = format_count(full_cohort_n),
                names = "fullCohortN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(baseline_survey_n),
+save_tex_value(values = format_count(baseline_survey_n),
                names = "baselineSurveyN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(eligible_n),
+save_tex_value(values = format_count(eligible_n),
                names = "eligibleN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(installed_n),
+save_tex_value(values = format_count(installed_n),
                names = "installedN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(remained_n),
+save_tex_value(values = format_count(remained_n),
                names = "remainedN",
                file_name = values_file, path = VALUES_DIR)
 
-# Funnel percentages -- integer pct (matches paper's 61% / 35% / 60% / 93%).
-save_tex_value(values = baseline_completion_pct,
+# Funnel percentages
+save_tex_value(values = format_pct(baseline_completion_pct),
                names = "baselineCompletionPct",
-               file_name = values_file, path = VALUES_DIR, accuracy = 1)
-save_tex_value(values = eligible_pct,
+               file_name = values_file, path = VALUES_DIR)
+save_tex_value(values = format_pct(eligible_pct),
                names = "eligiblePct",
-               file_name = values_file, path = VALUES_DIR, accuracy = 1)
-save_tex_value(values = installed_pct_of_elig,
+               file_name = values_file, path = VALUES_DIR)
+save_tex_value(values = format_pct(installed_pct_of_elig),
                names = "installedPctOfEligible",
-               file_name = values_file, path = VALUES_DIR, accuracy = 1)
-save_tex_value(values = remained_pct,
+               file_name = values_file, path = VALUES_DIR)
+save_tex_value(values = format_pct(remained_pct),
                names = "remainedPct",
-               file_name = values_file, path = VALUES_DIR, accuracy = 1)
+               file_name = values_file, path = VALUES_DIR)
 
-# Per-treatment counts.
-save_tex_value(values = as.character(extension_info_start),
+# Per-treatment counts
+save_tex_value(values = format_count(extension_info_start),
                names = "extensionInfoStartN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(extension_info_final),
+save_tex_value(values = format_count(extension_info_final),
                names = "extensionInfoFinalN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(extension_saliency_start),
+save_tex_value(values = format_count(extension_saliency_start),
                names = "extensionSaliencyStartN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(extension_saliency_final),
+save_tex_value(values = format_count(extension_saliency_final),
                names = "extensionSaliencyFinalN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(extension_control_start),
+save_tex_value(values = format_count(extension_control_start),
                names = "extensionControlStartN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(extension_control_final),
+save_tex_value(values = format_count(extension_control_final),
                names = "extensionControlFinalN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(endline_info),
+save_tex_value(values = format_count(endline_info),
                names = "endlineInfoN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(endline_saliency),
+save_tex_value(values = format_count(endline_saliency),
                names = "endlineSaliencyN",
                file_name = values_file, path = VALUES_DIR)
-save_tex_value(values = as.character(endline_control),
+save_tex_value(values = format_count(endline_control),
                names = "endlineControlN",
                file_name = values_file, path = VALUES_DIR)
 
-# Attrition p-values.
-save_tex_value(values = attrition_ext_p,
+# Attrition p-values
+save_tex_value(values = format_pvalue(attrition_ext_p),
                names = "attritionExtensionPvalue",
-               file_name = values_file, path = VALUES_DIR, accuracy = 0.01)
-save_tex_value(values = attrition_endline_p,
+               file_name = values_file, path = VALUES_DIR)
+save_tex_value(values = format_pvalue(attrition_endline_p),
                names = "attritionEndlinePvalue",
-               file_name = values_file, path = VALUES_DIR, accuracy = 0.01)
+               file_name = values_file, path = VALUES_DIR)
 
-cat("Saved:", values_full, "\n\n")
-
-cat("Paper edits required in writeup_v3.tex:\n")
-cat("  Preamble: add \\input{./output/values/participant_flow_values}\n")
-cat("  Line 380-385 (Figure 2 funnel): replace hardcoded N and percentages\n")
-cat("  Line 396: replace per-treatment start/final N\n")
-cat("  Line 397: replace endline N per treatment\n")
-cat("  Line 400: replace chi-square p-values\n")
-cat("  Figure 2 PDF: redraw with updated numbers\n")
+cat("Saved:", values_full, "\n")

@@ -53,12 +53,21 @@
 #                     sum(time_spent on that day) / 3600
 #   Scalar = mean(daily_hours_u) across users.
 #
+# Number formatting:
+#   All hours values are pre-formatted via format_hours() from
+#   number_format_helpers.R (two significant figures, drop trailing zeros).
+#   Top-site user counts go through format_count(). Domain names pass
+#   through as strings. See number_format_helpers.R for the full rules. We
+#   pre-format because savetexvalue's accuracy parameter is broken in our
+#   package version.
+#
 # Inputs:
 #   Inputs of get_clean_time_data() (see utils/time_usage_helpers.R header).
 #
 # Dependencies:
-#   replication_files/utils/values.R              (BAD_USERS, SURVEY_WEBSITES)
-#   replication_files/utils/time_usage_helpers.R  (get_clean_time_data)
+#   replication_files/utils/values.R                  (BAD_USERS, SURVEY_WEBSITES)
+#   replication_files/utils/time_usage_helpers.R      (get_clean_time_data)
+#   replication_files/utils/number_format_helpers.R   (format_*)
 #   savetexvalue (devtools::install_github("Ori-Shoham/savetexvalue"))
 #
 # Outputs:
@@ -73,6 +82,7 @@ setwd("~/Dropbox/spring2025experiment/code_github")
 
 source("replication_files/utils/values.R")
 source("replication_files/utils/time_usage_helpers.R")
+source("replication_files/utils/number_format_helpers.R")
 
 VALUES_DIR <- "output/values/"
 
@@ -126,27 +136,15 @@ hours_values_file <- "baseline_time_use_values"
 hours_values_full <- file.path(VALUES_DIR, paste0(hours_values_file, ".tex"))
 if (file.exists(hours_values_full)) file.remove(hours_values_full)
 
-save_tex_value(
-  values    = baseline_hours_privacy,
-  names     = "baselineDailyHoursPrivacy",
-  file_name = hours_values_file,
-  path      = VALUES_DIR,
-  accuracy  = 0.1
-)
-save_tex_value(
-  values    = baseline_hours_leisure,
-  names     = "baselineDailyHoursLeisure",
-  file_name = hours_values_file,
-  path      = VALUES_DIR,
-  accuracy  = 0.1
-)
-save_tex_value(
-  values    = baseline_hours_all,
-  names     = "baselineDailyHoursAll",
-  file_name = hours_values_file,
-  path      = VALUES_DIR,
-  accuracy  = 0.1
-)
+save_tex_value(values = format_hours(baseline_hours_privacy),
+               names = "baselineDailyHoursPrivacy",
+               file_name = hours_values_file, path = VALUES_DIR)
+save_tex_value(values = format_hours(baseline_hours_leisure),
+               names = "baselineDailyHoursLeisure",
+               file_name = hours_values_file, path = VALUES_DIR)
+save_tex_value(values = format_hours(baseline_hours_all),
+               names = "baselineDailyHoursAll",
+               file_name = hours_values_file, path = VALUES_DIR)
 cat("Saved:", hours_values_full, "\n\n")
 
 # =============================================================================
@@ -224,38 +222,23 @@ topweb_values_full <- file.path(VALUES_DIR, paste0(topweb_values_file, ".tex"))
 if (file.exists(topweb_values_full)) file.remove(topweb_values_full)
 
 # Field 1: Domain (string passthrough).
-save_tex_value(
-  values    = summary_table$domain_label,
-  names     = paste0("topWeb", rank_word[summary_table$rank], "Domain"),
-  file_name = topweb_values_file,
-  path      = VALUES_DIR
-)
+save_tex_value(values = summary_table$domain_label,
+               names = paste0("topWeb", rank_word[summary_table$rank], "Domain"),
+               file_name = topweb_values_file, path = VALUES_DIR)
 
-# Field 2: Daily Hours (per Active User) - 2 decimals.
-save_tex_value(
-  values    = summary_table$avg_daily_hours_per_active_user,
-  names     = paste0("topWeb", rank_word[summary_table$rank], "ActiveHours"),
-  file_name = topweb_values_file,
-  path      = VALUES_DIR,
-  accuracy  = 0.01
-)
+# Field 2: Daily Hours (per Active User).
+save_tex_value(values = format_hours(summary_table$avg_daily_hours_per_active_user),
+               names = paste0("topWeb", rank_word[summary_table$rank], "ActiveHours"),
+               file_name = topweb_values_file, path = VALUES_DIR)
 
-# Field 3: Number of Users - bare integer (pass as character so
-# savetexvalue's scales::number() does not insert thousands commas / .00).
-save_tex_value(
-  values    = as.character(summary_table$n_users),
-  names     = paste0("topWeb", rank_word[summary_table$rank], "NUsers"),
-  file_name = topweb_values_file,
-  path      = VALUES_DIR
-)
+# Field 3: Number of Users.
+save_tex_value(values = format_count(summary_table$n_users),
+               names = paste0("topWeb", rank_word[summary_table$rank], "NUsers"),
+               file_name = topweb_values_file, path = VALUES_DIR)
 
-# Field 4: Daily Hours (over all users) - 2 decimals.
-save_tex_value(
-  values    = summary_table$avg_daily_hours_all_users,
-  names     = paste0("topWeb", rank_word[summary_table$rank], "AllHours"),
-  file_name = topweb_values_file,
-  path      = VALUES_DIR,
-  accuracy  = 0.01
-)
+# Field 4: Daily Hours (over all users).
+save_tex_value(values = format_hours(summary_table$avg_daily_hours_all_users),
+               names = paste0("topWeb", rank_word[summary_table$rank], "AllHours"),
+               file_name = topweb_values_file, path = VALUES_DIR)
 
 cat("Saved:", topweb_values_full, "\n")
