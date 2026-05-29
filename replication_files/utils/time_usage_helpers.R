@@ -149,6 +149,33 @@ get_privacy_info_raw <- function () {
   privacy_info$domain <- gsub("betterhealth.vic.gov.au", "betterhealth.vic.gov", privacy_info$domain) # gov.au -> gov
   privacy_info$domain <- sub("\\.co\\.uk$", ".co", privacy_info$domain) # co.uk -> .co
   privacy_info <- high_level_aggregate(aggregate_time_data(privacy_info, field="domain"), field="domain_aggregated")
+  
+  # BUGFIX (v2->v3): collapse sub-domains that map to the same
+  # domain_aggregated_high_level into a single ground-truth row per
+  # (high_level, feature, field, html_key). The aggregation above only ADDS
+  # the high-level name column; it does NOT merge the per-sub-domain ratings,
+  # so this function used to return one row PER SUB-DOMAIN (e.g. aol.com and
+  # mail.aol.com both -> "aol"). The downstream left_join in
+  # top_sites_beliefs_analysis.R then matched one belief response to multiple
+  # ground-truth rows (many-to-many), silently inflating the regression
+  # sample. get_privacy_info_wide() already performs the analogous collapse
+  # via group_by(domain_aggregated_high_level) %>% slice(1); this is the
+  # missing long/raw counterpart.
+  #
+  # Tie-break for sub-domains that disagree: majority vote on numeric_rating.
+  # A 0.5 tie means the ground truth is itself ambiguous, so it is dropped
+  # (NA -> filtered), mirroring how the paper's correct_exclude50 measure
+  # treats a 50% belief response as uninformative rather than forcing Yes/No.
+  privacy_info <- privacy_info %>%
+    group_by(domain_aggregated_high_level, feature, field, html_key) %>%
+    summarise(numeric_rating = mean(numeric_rating, na.rm = TRUE), .groups = "drop") %>%
+    mutate(rating = case_when(
+      numeric_rating > 0.5 ~ "Yes",
+      numeric_rating < 0.5 ~ "No",
+      TRUE ~ NA_character_
+    )) %>%
+    filter(!is.na(rating))
+  
   return(privacy_info)
 }
 

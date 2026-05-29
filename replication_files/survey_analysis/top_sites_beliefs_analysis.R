@@ -56,7 +56,7 @@
 # ----------------------------------------------------------------------------
 # Options: "unweighted", "weight_census", "weight_pew", "weight_combined", "all"
 if (!exists("._WEIGHT_LOCK")) {
-  WEIGHT_SPEC <- "all"
+  WEIGHT_SPEC <- "unweighted"
 }
 
 if (WEIGHT_SPEC == "all") {
@@ -147,8 +147,8 @@ survey_merged <- survey_merged %>% filter(attentioncheck1 == 3)
 survey_merged <- survey_merged %>% filter(attentioncheck  == 2)
 
 # Remove inappropriate time spent
-survey_merged <- survey_merged %>% filter(sys_ElapsedTime < 8393)
-survey_merged <- survey_merged %>% filter(sys_ElapsedTime > 421)
+survey_merged <- survey_merged %>% filter(sys_ElapsedTime < 6000)
+survey_merged <- survey_merged %>% filter(sys_ElapsedTime > 600)
 
 privacy_info_desc <- read.csv("../data/final_extension_data/privacy_info_desc.csv")
 meta_data         <- read.csv("../data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
