@@ -11,11 +11,15 @@
 #   showing that selection into the experiment does not induce large
 #   differences in beliefs about the prevalence of privacy practices online.
 #
-#   Main paper [Section 5.1, rank correlation scalars cited in Fig 5 caption /
-#               surrounding prose: "beliefs are miscalibrated in levels but
-#               preserve ordinal information within attribute categories"]:
+#   Main paper [Section 5.1, rank correlation scalars cited in Fig 5 caption]:
 #     output/values/rank_correlation_beliefs_values.tex
 #       (9 macros: \tauBy<Category>{N,Median,P} for Collect, Use, Control)
+#
+#   Within-participant, within-category Kendall tau-b rank correlations between
+#   elicited beliefs and true prevalence. Requested by Guy (Slack) to show that
+#   participants hold systematic beliefs about the relative ordering of
+#   practices rather than guessing at random: the correlations are significant
+#   across all three categories. Cited in the Fig 5 caption.
 #
 # Inputs:
 #   ../data/Survey/survey_merged_final.csv
@@ -27,6 +31,7 @@
 #   replication_files/utils/values.R           (BAD_USERS)
 #   replication_files/utils/time_usage_helpers.R
 #   replication_files/utils/info_acq_helpers.R
+#   replication_files/utils/number_format_helpers.R
 #
 # Outputs:
 #   output/figures/beliefs_vs_truth.pdf
@@ -52,6 +57,7 @@ setwd("~/Dropbox/spring2025experiment/code_github")
 source("replication_files/utils/values.R")
 source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
+source("replication_files/utils/number_format_helpers.R")
 
 # Load required libraries
 library(tidyverse)
@@ -328,8 +334,10 @@ cat(sprintf("Saved: %sbeliefs_vs_truth.pdf\n", FIGURES_DIR))
 # =============================================================================
 # RANK CORRELATION: BELIEF ORDERING vs TRUTH (within-participant, within-category)
 # =============================================================================
-# Direct evidence that baseline beliefs preserve ordinal information about
-# privacy practices within categories — beyond what Figure 5 shows about levels.
+# Requested by Guy (Slack): show that participants hold systematic beliefs
+# about the relative ordering of practices within categories rather than
+# guessing at random. The correlations are significant across all categories.
+# Cited in the Fig 5 caption via the \tauBy<Category>{N,Median,P} macros.
 #
 # Metric: Kendall tau-b (handles Likert ties via denominator inflation).
 # Unit:   one tau_i per (participant, category).
@@ -416,28 +424,30 @@ for (i in seq_len(nrow(cat_summary))) {
 }
 
 cat("\nReading:\n")
-cat("  Collect: participants rank collect-type practices well (positive tau).\n")
-cat("  Use:    weakly reversed (slightly negative).\n")
-cat("  Control: systematically reversed (clearly negative).\n\n")
+cat("  Correlations are significant across all categories, indicating\n")
+cat("  systematic (non-random) beliefs about the ordering of practices.\n\n")
 
-# Save LaTeX macros for paper caption.
+# Save LaTeX macros for the Fig 5 caption.
 # Naming convention: \tauBy<Category><Stat>
 #   e.g., \tauByCollectN, \tauByCollectMedian, \tauByCollectP
+# Counts -> format_count() (bare integer); median tau-b -> format_coef()
+# (three decimals); p-values are all far below the floating-point floor, so
+# they are stored as the literal string "<0.001".
 for (i in seq_len(nrow(cat_summary))) {
   cat_label <- tools::toTitleCase(cat_summary$category[i])
   
   save_tex_value(
-    as.integer(cat_summary$n[i]),
+    format_count(cat_summary$n[i]),
     name = paste0("tauBy", cat_label, "N"),
     file = VALUES_FILE
   )
   save_tex_value(
-    cat_summary$median_tau[i],
+    format_coef(cat_summary$median_tau[i]),
     name = paste0("tauBy", cat_label, "Median"),
-    accuracy = 0.01,
     file = VALUES_FILE
   )
-  # All three p-values are <2e-16, so store as string for LaTeX.
+  # All three p-values are below R's floating-point floor (<2e-16), so store
+  # the literal string used in the caption.
   save_tex_value(
     "<0.001",
     name = paste0("tauBy", cat_label, "P"),
