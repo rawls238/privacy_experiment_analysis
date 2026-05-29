@@ -27,6 +27,7 @@
 #   replication_files/utils/values.R
 #   replication_files/utils/time_usage_helpers.R
 #   replication_files/utils/info_acq_helpers.R
+#   replication_files/utils/number_format_helpers.R
 #
 # Outputs:
 #   output/tables/data_sharing_treatment_effects[_suffix].tex
@@ -52,6 +53,7 @@ setwd("~/Dropbox/spring2025experiment/code_github")
 source("replication_files/utils/values.R")
 source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
+source("replication_files/utils/number_format_helpers.R")
 
 # Load required libraries
 library(tidyverse)
@@ -63,6 +65,10 @@ library(savetexvalue)
 # Output directories
 TABLES_DIR <- "output/tables/"
 VALUES_DIR <- "output/values/"
+
+# savetexvalue files are append-only: wipe the bundle at the top so re-runs do
+# not accumulate duplicate \newcommand entries (LaTeX errors on redefinition).
+suppressWarnings(file.remove(file.path(VALUES_DIR, "data_sharing_purpose_values.tex")))
 
 # =============================================================================
 # Table C.8 [tab:data_sharing_purpose]: DATA SHARING PURPOSES (savetexvalue)
@@ -97,6 +103,10 @@ cat(sprintf("  Sample size: %d respondents\n", n_resp))
 # Build the per-row Category (Positive / Negative) label used in the paper's
 # Table C.8 fourth column. The aggregate summary by category has been removed
 # (see header note), but the per-row label is still required.
+#
+# Percentage is kept at full precision here (no round). All rounding for the
+# paper happens in format_pct() at the save_tex_value() call below, so we never
+# round twice.
 consequence_summary <- consequences_processed %>%
   summarise(
     `More interesting ads` = sum(cons_interesting_ads),
@@ -113,7 +123,7 @@ consequence_summary <- consequences_processed %>%
   ) %>%
   pivot_longer(everything(), names_to = "Consequence", values_to = "Count") %>%
   mutate(
-    Percentage = round(100 * Count / n_resp, 2),
+    Percentage = 100 * Count / n_resp,
     Category = case_when(
       Consequence %in% c("More annoying ads", "Loss of data control",
                          "Hacking", "Identity theft", "Cyberstalking") ~ "Negative",
@@ -154,26 +164,23 @@ ordered_summary <- consequence_summary[match(consequence_long_names,
                                              consequence_summary$Consequence), ]
 stopifnot(!any(is.na(ordered_summary$Count)))  # guard against name mismatch
 
-# Save 11 count macros (integer, accuracy = 1).
+# Save 11 count macros. Route through format_count() (bare integer) instead of
+# the broken savetexvalue accuracy parameter, which writes "713.00" otherwise.
 save_tex_value(
-  values    = as.integer(ordered_summary$Count),
+  values    = format_count(ordered_summary$Count),
   names     = paste0("dataPurpose", consequence_short_names, "N"),
   file_name = "data_sharing_purpose_values",
-  path      = VALUES_DIR,
-  accuracy  = 1
+  path      = VALUES_DIR
 )
 
-# Save 11 percentage macros. percent = FALSE because the paper's Table C.8
-# column header is "Percentage" -- the unit is implied, and the original
-# hard-coded cells were bare numbers like "62.20" without `\%`. accuracy =
-# 0.01 reproduces the existing two-decimal format.
+# Save 11 percentage macros. Route through format_pct() (one decimal, drop
+# trailing zeros) instead of the broken accuracy parameter, which writes
+# "49.93" otherwise. format_pct() consumes the full-precision percentage.
 save_tex_value(
-  values    = ordered_summary$Percentage,
+  values    = format_pct(ordered_summary$Percentage),
   names     = paste0("dataPurpose", consequence_short_names, "Pct"),
   file_name = "data_sharing_purpose_values",
-  path      = VALUES_DIR,
-  percent   = FALSE,
-  accuracy  = 0.01
+  path      = VALUES_DIR
 )
 
 cat(sprintf("Saved 22 macros to %sdata_sharing_purpose_values.tex\n", VALUES_DIR))
@@ -183,7 +190,7 @@ cat(sprintf("Saved 22 macros to %sdata_sharing_purpose_values.tex\n", VALUES_DIR
 # =============================================================================
 ## [WEIGHT MODIFICATION] ======================================================
 ## Options: "unweighted", "weight_census", "weight_pew", "weight_combined", "all"
-WEIGHT_SPEC <- "all"
+WEIGHT_SPEC <- "unweighted"
 
 .ALL_SPECS <- c("unweighted", "weight_census", "weight_pew", "weight_combined")
 if (WEIGHT_SPEC == "all") {
