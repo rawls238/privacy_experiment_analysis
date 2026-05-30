@@ -9,6 +9,13 @@
 #         output/figures/info_acq_treatment_effects_total_sites[_suffix].pdf
 #       Fig 7(b) [fig:info_acq_privacy_policy]:
 #         output/figures/ever_visited_privacy_policy[_suffix].pdf
+#     Section 6 search-behavior scalars cited in prose:
+#       output/values/privacy_seeking_values.tex
+#         (4 macros:
+#           \policyVisitControlPct    pct of control ever visiting a policy
+#           \policyVisitSaliencyPct   pct of saliency ever visiting a policy
+#           \policyVisitInfoPct       pct of info ever visiting a policy
+#           \policyVisitSaliencyFold  saliency-to-control ratio ("factor of N"))
 #   Appendix C:
 #     Table [tab:cookie_banner_interactions_treatment,
 #            "Treatment Effect on Cookie Banner Interactions"]:
@@ -16,7 +23,8 @@
 #
 #   `_suffix` is empty for unweighted and `_{weight_spec}` otherwise. Set
 #   WEIGHT_SPEC at the top of the script: "unweighted", "weight_census",
-#   "weight_pew", "weight_combined", or "all" to run all four.
+#   "weight_pew", "weight_combined", or "all" to run all four. The savetexvalue
+#   macros are written for the unweighted spec only.
 #
 # Inputs:
 #   ../data/final_extension_data/experiment_conditions_pilot_july_2024.csv
@@ -29,10 +37,12 @@
 #   replication_files/utils/time_usage_helpers.R
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/plot_rules.R
+#   replication_files/utils/number_format_helpers.R
 #
 # Outputs:
 #   output/figures/info_acq_treatment_effects_total_sites[_suffix].pdf
 #   output/figures/ever_visited_privacy_policy[_suffix].pdf
+#   output/values/privacy_seeking_values.tex
 #   output/tables/cookie_banner_interactions_treatment[_suffix].tex
 #
 # Note: Previous version of this script also produced (now removed as dead code,
@@ -63,7 +73,7 @@ setwd("~/Dropbox/spring2025experiment/code_github")
 ## Flag to control weighting scheme
 ## Options: "unweighted", "weight_census", "weight_pew", "weight_combined", "all"
 if (!exists("._WEIGHT_LOCK")) {
-  WEIGHT_SPEC <- "all" # change the flag here
+  WEIGHT_SPEC <- "unweighted" # change the flag here
 }
 
 if (WEIGHT_SPEC == "all") {
@@ -85,16 +95,19 @@ source("replication_files/utils/values.R")
 source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
 source("replication_files/utils/plot_rules.R")
+source("replication_files/utils/number_format_helpers.R")
 
 # Load required libraries
 library(tidyverse)
 library(lubridate)
 library(stringr)
 library(fixest)
+library(savetexvalue)
 
 # Output directories
 FIGURES_DIR <- "output/figures/"
 TABLES_DIR  <- "output/tables/"
+VALUES_DIR  <- "output/values/"
 
 ## [WEIGHT MODIFICATION] ======================================================
 OUTPUT_SUFFIX <- if (WEIGHT_SPEC == "unweighted") "" else paste0("_", WEIGHT_SPEC)
@@ -213,6 +226,37 @@ visited_privacy_policy_full <- user_grid %>%
             by = c("experiment_id", "experiment_condition", "weeks_since_intervention")) %>%
   mutate(number_of_visits = replace_na(number_of_visits, 0),
          distinct_domains = replace_na(distinct_domains, 0))
+
+# --- Scalar macros (unweighted only): per-condition ever-visit fractions and
+# --- the saliency-to-control "factor of N" cited in Section 6 prose. Computed
+# --- on raw condition names before the plot relabels them.
+if (WEIGHT_SPEC == "unweighted") {
+  policy_ever_by_user <- visited_privacy_policy_full %>%
+    filter(weeks_since_intervention >= 0) %>%
+    group_by(experiment_id, experiment_condition) %>%
+    summarise(total_visits = sum(number_of_visits, na.rm = TRUE), .groups = "drop") %>%
+    mutate(ever_visited_policy = total_visits > 0)
+  policy_frac <- policy_ever_by_user %>%
+    group_by(experiment_condition) %>%
+    summarise(frac = mean(ever_visited_policy, na.rm = TRUE), .groups = "drop")
+  get_frac <- function(cond) policy_frac$frac[policy_frac$experiment_condition == cond]
+  frac_control  <- get_frac("control")
+  frac_saliency <- get_frac("saliency")
+  frac_info     <- get_frac("info")
+  cat(sprintf("\nEver-visited-policy fractions: control=%.4f saliency=%.4f info=%.4f\n",
+              frac_control, frac_saliency, frac_info))
+  cat(sprintf("Saliency-to-control fold: %.2f\n", frac_saliency / frac_control))
+  suppressWarnings(file.remove(file.path(VALUES_DIR, "privacy_seeking_values.tex")))
+  save_tex_value(format_pct(100 * frac_control),  name = "policyVisitControlPct",
+                 file = file.path(VALUES_DIR, "privacy_seeking_values.tex"))
+  save_tex_value(format_pct(100 * frac_saliency), name = "policyVisitSaliencyPct",
+                 file = file.path(VALUES_DIR, "privacy_seeking_values.tex"))
+  save_tex_value(format_pct(100 * frac_info),     name = "policyVisitInfoPct",
+                 file = file.path(VALUES_DIR, "privacy_seeking_values.tex"))
+  save_tex_value(format_pct(frac_saliency / frac_control), name = "policyVisitSaliencyFold",
+                 file = file.path(VALUES_DIR, "privacy_seeking_values.tex"))
+  cat(sprintf("Saved 4 macros to %sprivacy_seeking_values.tex\n", VALUES_DIR))
+}
 
 # Fig 7(b): fraction of participants who ever visited a privacy policy in the
 # post-intervention period, by treatment group.

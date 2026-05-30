@@ -10,6 +10,12 @@
 #     Table C.5 [tab:baseline_demo_heterogeneity,
 #                "Demographic Heterogeneity in Belief Misspecification and Preferences"]:
 #       output/tables/misspec_pref_demographics.tex
+#     Section 4 belief-misspecification scalars cited in prose:
+#       output/values/beliefs_vs_conjoint_values.tex
+#         (3 macros:
+#           \misspecUnderPartworth  underestimate-bin part-worth gap (raw)
+#           \misspecUnderSD         same gap expressed in SD of part-worth
+#           \misspecLinearSD        1 SD misspec -> SD of pref (linear, Col 2))
 #
 # Inputs:
 #   ../data/Survey/survey_merged_final.csv
@@ -21,10 +27,12 @@
 #   replication_files/utils/values.R
 #   replication_files/utils/time_usage_helpers.R
 #   replication_files/utils/info_acq_helpers.R
+#   replication_files/utils/number_format_helpers.R
 #
 # Outputs:
 #   output/tables/misspec_pref_regression.tex
 #   output/tables/misspec_pref_demographics.tex
+#   output/values/beliefs_vs_conjoint_values.tex
 #
 # Note: Previous version of this script also produced (now removed as dead code):
 #   - misspec_vs_pref_intensity_signed.pdf
@@ -42,13 +50,16 @@ setwd("~/Dropbox/spring2025experiment/code_github")
 source("replication_files/utils/values.R")
 source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
+source("replication_files/utils/number_format_helpers.R")
 
 # Load required libraries
 library(tidyverse)
 library(fixest)
+library(savetexvalue)
 
-# Output directory
+# Output directories
 TABLES_DIR <- "output/tables/"
+VALUES_DIR <- "output/values/"
 
 # =============================================================================
 # 1) Load and prepare data
@@ -353,6 +364,35 @@ cat(sprintf("Underestimate vs Correct (bin): %.4f SD of pref\n",
             b_under_bin / sd_pref))
 cat(sprintf("Overestimate vs Correct (bin): %.4f SD of pref\n",
             b_over_bin / sd_pref))
+
+# ---------------------------------------------------------------------------
+# Scalar macros: belief-misspecification effect sizes cited in Section 4 prose
+# (Table C.4 discussion). All pulled from the fitted models / sds above.
+#   \misspecUnderPartworth  raw underestimate-bin part-worth gap ("0.016 higher")
+#   \misspecUnderSD         same gap in SD units ("0.04 SD")
+#   \misspecLinearSD        |1 SD misspec -> SD of pref| from the linear spec
+#                           ("0.01 SD decrease", Column 2)
+# The part-worth gap is a raw coefficient (3 decimals via format_coef). The two
+# SD-unit figures are reported to two decimals to match the paper's "0.04 SD" /
+# "0.01 SD" phrasing (no two-decimal helper exists, so sprintf is used).
+# ---------------------------------------------------------------------------
+suppressWarnings(file.remove(file.path(VALUES_DIR, "beliefs_vs_conjoint_values.tex")))
+
+under_partworth <- unname(b_under_bin)
+under_sd        <- unname(b_under_bin / sd_pref)
+linear_sd       <- unname(abs(b_linear * sd_misspec / sd_pref))
+
+save_tex_value(format_coef(under_partworth),
+               name = "misspecUnderPartworth",
+               file = file.path(VALUES_DIR, "beliefs_vs_conjoint_values.tex"))
+save_tex_value(sprintf("%.2f", under_sd),
+               name = "misspecUnderSD",
+               file = file.path(VALUES_DIR, "beliefs_vs_conjoint_values.tex"))
+save_tex_value(sprintf("%.2f", linear_sd),
+               name = "misspecLinearSD",
+               file = file.path(VALUES_DIR, "beliefs_vs_conjoint_values.tex"))
+
+cat(sprintf("\nSaved 3 macros to %sbeliefs_vs_conjoint_values.tex\n", VALUES_DIR))
 
 # =============================================================================
 # 9) Demographic analysis

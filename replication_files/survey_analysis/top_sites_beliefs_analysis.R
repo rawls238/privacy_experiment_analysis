@@ -7,6 +7,15 @@
 #               "Belief Correctness on Top Sites -- Provided Information"]:
 #     output/tables/top_sites_information.tex
 #
+#   Main paper [Section 6 + intro, belief-correctness scalars cited in prose]:
+#     output/values/top_sites_beliefs_values.tex
+#       (5 macros:
+#         \beliefDistanceInfoPP        col1 |Belief-Truth|, info vs control
+#         \beliefCorrectWeakInfoPP     col2 weak correctness, info vs control
+#         \beliefCorrectStrictInfoPP   col3 strict correctness, info vs control
+#         \beliefCorrectInfoVsRestPP   strict correctness, info vs (control+saliency)
+#         \beliefErrorMedianBaseline   median belief error, control+saliency)
+#
 #   Main paper [Section 6, Fig 8, fig:beliefs_by_search,
 #               "Beliefs by Search Behavior"]:
 #     output/figures/beliefs_by_info_acq.pdf
@@ -24,6 +33,7 @@
 #
 # Weight specs: when WEIGHT_SPEC == "all", produces unweighted + 3 weighted
 #   variants of every output (suffix _weight_census, _weight_pew, _weight_combined).
+#   The savetexvalue macros are written for the unweighted spec only.
 #
 # Inputs:
 #   ../data/Survey/survey_merged_final.csv
@@ -35,6 +45,7 @@
 #   replication_files/utils/time_usage_helpers.R
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/plot_rules.R
+#   replication_files/utils/number_format_helpers.R
 #
 # Note: Previous version of this script also produced (now removed as dead code):
 #   - info_exposure_terciles.pdf                              (exploratory, not in paper)
@@ -80,16 +91,19 @@ setwd("~/Dropbox/spring2025experiment/code_github")
 source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
 source("replication_files/utils/plot_rules.R")
+source("replication_files/utils/number_format_helpers.R")
 
 # Libraries
 library(tidyverse)
 library(lubridate)
 library(stringr)
 library(fixest)
+library(savetexvalue)
 
 # Output directories
 FIGURES_DIR <- "output/figures/"
 TABLES_DIR  <- "output/tables/"
+VALUES_DIR  <- "output/values/"
 
 OUTPUT_SUFFIX <- if (WEIGHT_SPEC == "unweighted") "" else paste0("_", WEIGHT_SPEC)
 
@@ -146,7 +160,7 @@ cat(sprintf("Loaded survey_merged: %d rows, %d columns\n",
 survey_merged <- survey_merged %>% filter(attentioncheck1 == 3)
 survey_merged <- survey_merged %>% filter(attentioncheck  == 2)
 
-# Remove inappropriate time spent
+# Remove inappropriate time spent (aligned to other belief scripts: 600 < t < 6000)
 survey_merged <- survey_merged %>% filter(sys_ElapsedTime < 6000)
 survey_merged <- survey_merged %>% filter(sys_ElapsedTime > 600)
 
@@ -449,6 +463,85 @@ etable(model$web_html,
        title       = "Belief Correctness on Top Sites -- Provided Information",
        file        = paste0(TABLES_DIR, "top_sites_information",
                             OUTPUT_SUFFIX, ".tex"))
+
+# =============================================================================
+# SCALAR MACROS — belief-correctness numbers cited in Section 6 + intro prose
+# =============================================================================
+# Only written for the unweighted spec (the spec the paper reports). All values
+# are pulled from the fitted models / data above, never hard-coded, so a re-run
+# keeps the prose in sync with the table.
+#
+# Mapping to v2 prose:
+#   \beliefDistanceInfoPP       Section 6 "5.0 percentage points closer"  (col 1)
+#   \beliefCorrectWeakInfoPP    Section 6 "6.7 ... percentage points"      (col 2)
+#   \beliefCorrectStrictInfoPP  Section 6 "... 7.2 percentage points"      (col 3)
+#   \beliefCorrectInfoVsRestPP  intro "7.1 pp more likely ... than both    (strict,
+#                               the saliency and control groups"            merged baseline)
+#   \beliefErrorMedianBaseline  Section 6 "median ... belief error of 50"
+#
+# The intro number uses a MERGED baseline (info vs control+saliency pooled),
+# which differs from the table's per-condition contrasts (info vs control).
+# It is computed here from a dedicated regression. v2 used the strict measure
+# for this number (v2 strict info-vs-control = 7.15 -> "7.1"); the weak and
+# inclusive measures do not match v2's 7.1, so strict is the correct measure.
+if (WEIGHT_SPEC == "unweighted") {
+  
+  suppressWarnings(file.remove(file.path(VALUES_DIR, "top_sites_beliefs_values.tex")))
+  
+  beliefs_no_rand <- df.site_belief_change %>% filter(question_type != "qrand")
+  
+  # --- info vs control coefficients (from the table models) ---
+  coef_distance <- coef(model$web_html$belief_distance)["experiment_conditioninfo"]
+  coef_weak     <- coef(model$web_html$correct_exclude50)["experiment_conditioninfo"]
+  coef_strict   <- coef(model$web_html$correct_strict)["experiment_conditioninfo"]
+  
+  # --- info vs (control + saliency) merged-baseline strict regression (intro 7.1) ---
+  beliefs_no_rand <- beliefs_no_rand %>%
+    mutate(info_vs_rest = as.integer(as.character(experiment_condition) == "info"))
+  model_info_vs_rest <- run_weighted_feols(
+    correct_strict ~ info_vs_rest | website_high_level + block_by_wave,
+    cluster = "experiment_id",
+    data    = beliefs_no_rand
+  )
+  coef_info_vs_rest <- coef(model_info_vs_rest)["info_vs_rest"]
+  
+  # --- median belief error for the pooled control + saliency baseline ---
+  median_baseline <- beliefs_no_rand %>%
+    filter(experiment_condition %in% c("control", "saliency")) %>%
+    summarise(m = median(belief_distance, na.rm = TRUE)) %>%
+    pull(m)
+  
+  # Distance coef is on the 0-100 scale already (pp); take absolute value since
+  # the prose says "closer to the truth". Correctness coefs are on the 0-1
+  # probability scale, so multiply by 100 to express in percentage points.
+  save_tex_value(
+    format_pct(abs(coef_distance)),
+    name = "beliefDistanceInfoPP",
+    file = file.path(VALUES_DIR, "top_sites_beliefs_values.tex")
+  )
+  save_tex_value(
+    format_pct(100 * coef_weak),
+    name = "beliefCorrectWeakInfoPP",
+    file = file.path(VALUES_DIR, "top_sites_beliefs_values.tex")
+  )
+  save_tex_value(
+    format_pct(100 * coef_strict),
+    name = "beliefCorrectStrictInfoPP",
+    file = file.path(VALUES_DIR, "top_sites_beliefs_values.tex")
+  )
+  save_tex_value(
+    format_pct(100 * coef_info_vs_rest),
+    name = "beliefCorrectInfoVsRestPP",
+    file = file.path(VALUES_DIR, "top_sites_beliefs_values.tex")
+  )
+  save_tex_value(
+    format_pct(median_baseline),
+    name = "beliefErrorMedianBaseline",
+    file = file.path(VALUES_DIR, "top_sites_beliefs_values.tex")
+  )
+  
+  cat(sprintf("\nSaved 5 macros to %stop_sites_beliefs_values.tex\n", VALUES_DIR))
+}
 
 # =============================================================================
 # REGRESSIONS — RANDOM INFO ROBUSTNESS (qrand)

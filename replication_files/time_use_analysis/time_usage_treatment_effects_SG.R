@@ -16,6 +16,10 @@
 #         output/figures/assortment_concentration[_wt].png
 #       Fig 10(b) [fig:extensive_b]:
 #         output/figures/assortment_privacy[_wt].png
+#     Section 7 extensive-margin scalars cited in prose (v2 lines 652/654):
+#       output/values/assortment_did_values.tex
+#       (4 macros: \extensiveHHIPvalue, \extensiveTopSharePvalue,
+#        \privacyDifferentialPctSD, \portfolioPrivacyPctSD)
 #   Appendix C:
 #     Table [tab:top_websites, "Top Websites used by Participants"]:
 #       output/values/top_websites_values.tex
@@ -27,7 +31,8 @@
 #   WEIGHT_SPEC at the top of the script: "unweighted", "weight_census",
 #   "weight_pew", "weight_combined", or "all" to loop over all four. Paper
 #   figures are unweighted; the weighted variants are robustness checks (no
-#   paper artifact).
+#   paper artifact). The savetexvalue macros are written for the unweighted
+#   spec only.
 #
 # Inputs:
 #   ../data/processed_data/joined_time_data.csv   (cached; default path)
@@ -46,6 +51,7 @@
 #                                                  high_level_aggregate, etc.)
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/plot_rules.R
+#   replication_files/utils/number_format_helpers.R
 #   replication_files/time_use_analysis/analysis_assortment_did.R
 #     (provides run_assortment_analysis + run_preregistered_specs)
 #   savetexvalue (devtools::install_github("Ori-Shoham/savetexvalue"))
@@ -56,6 +62,7 @@
 #   output/figures/assortment_concentration[_wt].png
 #   output/figures/assortment_privacy[_wt].png
 #   output/values/top_websites_values.tex
+#   output/values/assortment_did_values.tex
 #
 # Note: Previous version of this driver also produced (now removed as dead
 # code, not in paper):
@@ -126,6 +133,7 @@ cat("=== Output suffix:",       OUTPUT_SUFFIX, "===\n\n")
 source("replication_files/utils/values.R")
 source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
+source("replication_files/utils/number_format_helpers.R")
 
 # =============================================================================
 # Survey-weighting helpers (consumed by run_assortment_analysis and
@@ -236,7 +244,15 @@ get_balanced_panel <- function(dat,
         "q1_realized_privacy", "q2_realized_privacy"),
       names(dat)
     )) %>%
-    distinct()
+    distinct() %>%
+    # Collapse to one row per (user, site). A few user-site pairs (the "x" /
+    # twitter alias) carry both an NA and a non-NA privacy_for_requested_attribute
+    # row, which makes the downstream left_join many-to-many. Keep the non-NA
+    # privacy row so the join stays 1:1.
+    group_by(experiment_id, website_aggregated_high_level) %>%
+    arrange(is.na(privacy_for_requested_attribute), .by_group = TRUE) %>%
+    slice(1) %>%
+    ungroup()
   
   balanced_panel <- first_period_websites %>%
     expand_grid(!!idx := all_values) %>%
@@ -659,6 +675,45 @@ for (.ws in .specs_to_run) {
     wt_spec     = .ws,
     wt_suffix   = .wt_suffix
   )
+  
+  # -------------------------------------------------------------------------
+  # Scalar macros: extensive-margin numbers cited in Section 7 prose
+  # (v2 lines 652/654). Unweighted spec only; all values pulled from the
+  # assortment models / data above, never hard-coded.
+  #   \extensiveHHIPvalue        info-vs-control p-value, HHI change      (v2 0.063)
+  #   \extensiveTopSharePvalue   info-vs-control p-value, top-1 share chg (v2 0.065,
+  #                              referred to as "top-2 share" in the prose)
+  #   \privacyDifferentialPctSD  info coef / SD, privacy differential     (v2 11%)
+  #   \portfolioPrivacyPctSD     info coef / SD, portfolio privacy change (v2 3%)
+  # -------------------------------------------------------------------------
+  if (.ws == "unweighted") {
+    p_hhi  <- extensive$model_hhi$coeftable["experiment_conditioninfo",  "Pr(>|t|)"]
+    p_top1 <- extensive$model_top1$coeftable["experiment_conditioninfo", "Pr(>|t|)"]
+    
+    sd_diff <- sd(extensive$user_entry_exit$privacy_differential, na.rm = TRUE)
+    sd_pc   <- sd(extensive$concentration_wide$privacy_change,    na.rm = TRUE)
+    b_diff  <- extensive$model_differential$coeftable["experiment_conditioninfo",   "Estimate"]
+    b_pc    <- extensive$model_privacy_change$coeftable["experiment_conditioninfo", "Estimate"]
+    
+    assortment_values_file <- "assortment_did_values"
+    assortment_values_full <- file.path(VALUES_DIR, paste0(assortment_values_file, ".tex"))
+    if (file.exists(assortment_values_full)) file.remove(assortment_values_full)
+    
+    save_tex_value(values = format_pvalue(p_hhi),
+                   names = "extensiveHHIPvalue",
+                   file_name = assortment_values_file, path = VALUES_DIR)
+    save_tex_value(values = format_pvalue(p_top1),
+                   names = "extensiveTopSharePvalue",
+                   file_name = assortment_values_file, path = VALUES_DIR)
+    save_tex_value(values = format_pct(100 * b_diff / sd_diff),
+                   names = "privacyDifferentialPctSD",
+                   file_name = assortment_values_file, path = VALUES_DIR)
+    save_tex_value(values = format_pct(100 * b_pc / sd_pc),
+                   names = "portfolioPrivacyPctSD",
+                   file_name = assortment_values_file, path = VALUES_DIR)
+    
+    cat(sprintf("\nSaved 4 macros to %s%s.tex\n", VALUES_DIR, assortment_values_file))
+  }
   
   # Fig 9: pre-registered intensive-margin specs on the baseline panel.
   preregistered_balanced <- run_preregistered_specs(
