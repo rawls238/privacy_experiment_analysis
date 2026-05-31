@@ -2,37 +2,65 @@
 # PLOT VIOLIN: Privacy Valuations and Most Valued Information
 # ============================================================================
 #
-# This script generates all panels of the privacy WTP figures:
+# Produces:
+#   Fig 6(a) [fig:privacy_info_partworth]:
+#     individual_heterogeneity_dollars_with_website_extension.pdf
+#   Fig 6(b) [fig:privacy_info_top_2]:
+#     top2_privacy_attributes_extension.pdf
+#   Fig C.5(a): individual_heterogeneity_dollars_with_website_full.pdf
+#   Fig C.5(b): top2_privacy_attributes_full.pdf
+#   Fig C.4:    individual_heterogeneity_experiment_vs_survey.pdf
+#   WTP scalars (prose): output/values/conjoint_wtp_values.tex
+#     \wtpCollectFinancial  mean WTP, collect financial data (v2 line 466)
+#     \wtpShareFinancial    mean WTP, share financial data   (v2 line 466)
+#     \wtpTopThreeMean      mean WTP, each person's top-3 most-valued attrs
+#                           (v2 line 580)
 #
-#   Main paper [fig:privacy_combined, "Privacy Valuations and Most Valued Information"]:
-#     Fig 6(a) [fig:privacy_info_partworth, "WTP for Privacy Attributes"]:
-#       individual_heterogeneity_dollars_with_website_extension.pdf
-#     Fig 6(b) [fig:privacy_info_top_2, "Most Valued Information"]:
-#       top2_privacy_attributes_extension.pdf
+# WTP CONVENTION (full swing): privacy attributes are effects-coded
+# {invasive = -1, protective = +1}. The 0 point is only an estimation
+# reference (identification) and has no economic meaning -- a website either
+# does or does not engage in a practice, there is no "half" state. The
+# economically meaningful WTP is therefore the full invasive -> protective
+# swing, spanning 2 coded units, so WTP = (part-worth / price coef) * 2.
+# We aggregate with the sample mean over the (untrimmed) individual WTPs.
+# This 2x convention is applied uniformly to BOTH the figures and the scalar
+# macros so prose and plots are on the same scale.
 #
-#   Appendix [fig:privacy_combined_full, "Privacy Valuations and Most Valued Information (Full Sample)"]:
-#     Fig C.5(a) [fig:privacy_info_partworth_full]:
-#       individual_heterogeneity_dollars_with_website_full.pdf
-#     Fig C.5(b) [fig:privacy_info_top_2_full]:
-#       top2_privacy_attributes_full.pdf
+# NUMBER SHIFT vs v2: v2 was internally inconsistent on the WTP scale (line
+# 466 cited financial "$6-8/month", line 580 cited top-3 "$3/month"). Under
+# the uniform full-swing-mean convention here, financial is ~$5/$4 and top-3
+# is ~$14. v3 prose should be updated to these values.
 #
-#   Appendix [fig:extension_survey_conjoint_sample, "Privacy Valuations between Extension and Survey Sample"]:
-#     Fig C.4: individual_heterogeneity_experiment_vs_survey.pdf
+# Dependencies:
+#   replication_files/utils/plot_rules.R
+#   replication_files/utils/number_format_helpers.R
 #
-# Dependencies: ../utils/plot_rules.R
-# Outputs to: ../../output/figures/
+# Inputs (relative to code_github/; data in sibling ../data, ../results):
+#   ../data/Survey/final_baseline_survey.csv
+#   ../data/final_extension_data/experiment_conditions_pilot_july_2024.csv
+#   ../results/Conjoint_result/conjoint_with_website/tables/individual_parameters_summary.csv
+#   ../data/Conjoint/Conjoint-Finalized/tables/individual_parameters_wide_means.csv
+#   ../data/Survey/survey_merged_final.csv
+#
+# Outputs to: output/figures/ and output/values/
 # ============================================================================
 
 library(tidyverse)
+library(savetexvalue)
 
-# Source unified style rules
-source("../utils/plot_rules.R")
+# Set working directory to code_github root so all relative paths resolve.
+setwd("~/Dropbox/spring2025experiment/code_github")
 
-# ============================================================================
-# BAD USERS — define or load externally
-# ============================================================================
-# TODO: source from a shared config if BAD_USERS is defined elsewhere
-# BAD_USERS <- c(...)
+source("replication_files/utils/plot_rules.R")
+source("replication_files/utils/number_format_helpers.R")
+
+FIGURES_DIR <- "output/figures/"
+VALUES_DIR  <- "output/values/"
+
+# Full-swing multiplier: invasive (-1) -> protective (+1) = 2 coded units.
+SWING <- 2
+
+# BAD_USERS: source from shared config if defined elsewhere.
 if (!exists("BAD_USERS")) BAD_USERS <- c()
 
 # ============================================================================
@@ -40,18 +68,16 @@ if (!exists("BAD_USERS")) BAD_USERS <- c()
 # ============================================================================
 
 cat(strrep("=", 80), "\n")
-cat("CONVERTING BETA PARAMETERS TO RAW DOLLAR VALUES\n")
+cat("CONVERTING BETA PARAMETERS TO DOLLAR VALUES (full-swing)\n")
 cat(strrep("=", 80), "\n")
 
-# Survey baseline (for joining sys_RespNum to experiment users)
-survey_intro_0703 <- read_csv("data/Survey/final_baseline_survey.csv",
+survey_intro_0703 <- read_csv("../data/Survey/final_baseline_survey.csv",
                               show_col_types = FALSE)
 survey_intro_0703 <- survey_intro_0703 %>%
   select(sys_RespNum, emailid) %>%
   mutate(email = tolower(emailid))
 
-# Experiment metadata
-meta_data <- read.csv("data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
+meta_data <- read.csv("../data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
 meta_data <- meta_data %>%
   mutate(wave_id     = ifelse(wave_id == 3, 2, wave_id),
          block_by_wave = paste(wave_id, block_idx, sep = "_"))
@@ -62,9 +88,8 @@ experiment_users <- meta_data %>%
   rename(sys_respnum = sys_RespNum) %>%
   select(sys_respnum, experiment_condition, experiment_id)
 
-# Individual-level conjoint estimates
 with_website_indiv <- read_csv(
-  "results/Conjoint_result/conjoint_with_website/tables/individual_parameters_summary.csv",
+  "../results/Conjoint_result/conjoint_with_website/tables/individual_parameters_summary.csv",
   show_col_types = FALSE
 )
 with_website_indiv <- with_website_indiv %>%
@@ -121,7 +146,9 @@ get_feature_category <- function(feature_name) {
 
 
 # ============================================================================
-# CONVERSION: Beta → Dollar Value (WTP = β_feature / β_price)
+# CONVERSION: Beta -> Dollar Value (full swing)
+#   WTP_i = (part-worth_i / price_coef_i) * SWING
+# Used by both the violin plots and the scalar macros.
 # ============================================================================
 
 convert_to_dollars <- function(indiv_data, model_name) {
@@ -139,7 +166,7 @@ convert_to_dollars <- function(indiv_data, model_name) {
   privacy_data <- indiv_data %>%
     filter(feature_name %in% privacy_features) %>%
     inner_join(price_data, by = "respondent_N_id") %>%
-    mutate(dollar_value = mean / price_coef) %>%
+    mutate(dollar_value = (mean / price_coef) * SWING) %>%
     filter(!is.na(dollar_value), !is.infinite(dollar_value)) %>%
     mutate(
       feature_type  = get_feature_category(feature_name),
@@ -154,11 +181,57 @@ with_web_dollars <- convert_to_dollars(with_website_indiv, "With Website Model")
 
 
 # ============================================================================
-# SUMMARY STATISTICS
+# WTP scalar macros (full-swing mean). Collect/use dollar_values are negative
+# (consumers must be compensated to accept the practice), so abs() gives the
+# WTP to avoid it. v2 line 466 (financial) + line 580 (top-3).
+# ============================================================================
+
+ext_dollars <- with_web_dollars %>% filter(sample_group == "Extension")
+
+# --- Financial attributes (v2 line 466) ---
+fin_wtp <- ext_dollars %>%
+  filter(feature_name %in% c("collection_financial", "use_financial")) %>%
+  group_by(feature_name) %>%
+  summarise(mean_wtp = mean(dollar_value), .groups = "drop")
+
+wtp_collect_financial <- abs(fin_wtp$mean_wtp[fin_wtp$feature_name == "collection_financial"])
+wtp_share_financial   <- abs(fin_wtp$mean_wtp[fin_wtp$feature_name == "use_financial"])
+
+# --- Top-3 most-valued attributes per person (v2 line 580) ---
+# Each person's 3 largest part-worths (most disliked practices), summed, then
+# already in dollars (and full-swing) via dollar_value; aggregate by mean.
+top3_per_person <- ext_dollars %>%
+  group_by(respondent_N_id) %>%
+  slice_max(mean, n = 3, with_ties = FALSE) %>%   # 3 largest part-worths
+  summarise(wtp_top3 = sum(dollar_value), .groups = "drop")
+
+wtp_top_three_mean <- abs(mean(top3_per_person$wtp_top3))
+
+cat(sprintf("\nWTP (extension, full-swing mean |.|):\n"))
+cat(sprintf("  collect financial = %.2f\n", wtp_collect_financial))
+cat(sprintf("  share   financial = %.2f\n", wtp_share_financial))
+cat(sprintf("  top-3 most valued = %.2f\n", wtp_top_three_mean))
+
+conjoint_wtp_file <- "conjoint_wtp_values"
+suppressWarnings(file.remove(file.path(VALUES_DIR, paste0(conjoint_wtp_file, ".tex"))))
+save_tex_value(sprintf("%.2f", wtp_collect_financial),
+               name = "wtpCollectFinancial",
+               file = file.path(VALUES_DIR, paste0(conjoint_wtp_file, ".tex")))
+save_tex_value(sprintf("%.2f", wtp_share_financial),
+               name = "wtpShareFinancial",
+               file = file.path(VALUES_DIR, paste0(conjoint_wtp_file, ".tex")))
+save_tex_value(sprintf("%.2f", wtp_top_three_mean),
+               name = "wtpTopThreeMean",
+               file = file.path(VALUES_DIR, paste0(conjoint_wtp_file, ".tex")))
+cat(sprintf("Saved 3 macros to %s%s.tex\n", VALUES_DIR, conjoint_wtp_file))
+
+
+# ============================================================================
+# SUMMARY STATISTICS (console only)
 # ============================================================================
 
 cat("\n", strrep("=", 80), "\n")
-cat("DOLLAR VALUE SUMMARY STATISTICS\n")
+cat("DOLLAR VALUE SUMMARY STATISTICS (full-swing)\n")
 cat(strrep("=", 80), "\n")
 
 for (group in c("Extension", "Survey")) {
@@ -176,21 +249,17 @@ for (group in c("Extension", "Survey")) {
 
 
 # ============================================================================
-# PLOT CONSTANTS
+# PLOT CONSTANTS (full-swing scale: 2x the original per-unit ranges)
 # ============================================================================
 
-SCALE_MIN <- -8
-SCALE_MAX <-  8
-DATA_MIN  <- -30
-DATA_MAX  <-  30
+SCALE_MIN <- -16
+SCALE_MAX <-  16
+DATA_MIN  <- -60
+DATA_MAX  <-  60
 
 
 # ============================================================================
 # Fig 6(a): SINGLE-GROUP VIOLIN PLOT
-# ============================================================================
-# Kernel density computed on data clipped to [DATA_MIN, DATA_MAX],
-# then coord_cartesian zooms display to [SCALE_MIN, SCALE_MAX] without
-# dropping data — matching the Python pipeline behavior.
 # ============================================================================
 
 make_dollar_plot <- function(df, output_file) {
@@ -222,7 +291,7 @@ make_dollar_plot <- function(df, output_file) {
                linewidth = 0.5, alpha = ZERO_LINE_ALPHA) +
     scale_fill_privacy_category() +
     scale_x_continuous(
-      breaks = seq(-8, 8, by = 2),
+      breaks = seq(SCALE_MIN, SCALE_MAX, by = 4),
       labels = scales::dollar_format(prefix = "$", accuracy = 1)
     ) +
     coord_cartesian(xlim = c(SCALE_MIN, SCALE_MAX)) +
@@ -255,13 +324,11 @@ make_comparison_plot <- function(df, output_file) {
       sample_group   = factor(sample_group, levels = c("Survey", "Extension"))
     )
   
-  # Median per feature x group
   medians_df <- plot_df %>%
     group_by(feature_label, sample_group) %>%
     summarise(med_dollar = median(dollar_value, na.rm = TRUE), .groups = "drop") %>%
     mutate(med_clipped = pmin(pmax(med_dollar, SCALE_MIN), SCALE_MAX))
   
-  # Use BENCHMARK_COLORS from plot_rules.R
   sample_fills  <- c("Survey" = BENCHMARK_COLORS[["Survey"]], "Extension" = BENCHMARK_COLORS[["Extension"]])
   sample_colors <- sample_fills
   
@@ -293,7 +360,7 @@ make_comparison_plot <- function(df, output_file) {
     scale_color_manual(values = sample_colors, name = "Sample",
                        breaks = c("Survey", "Extension")) +
     scale_x_continuous(
-      breaks = seq(-8, 8, by = 2),
+      breaks = seq(SCALE_MIN, SCALE_MAX, by = 4),
       labels = scales::dollar_format(prefix = "$", accuracy = 1)
     ) +
     coord_cartesian(xlim = c(SCALE_MIN, SCALE_MAX)) +
@@ -309,51 +376,32 @@ make_comparison_plot <- function(df, output_file) {
 
 # ============================================================================
 # Fig 6(b): MOST VALUED INFORMATION — Top-2 Personalized Attributes
-# ============================================================================
-# Per Equation (3) in the paper, for each respondent i and attribute j:
-#   IV_ij = p_ij * (1 - p_ij) * |beta_ij|
-# where p_ij is the respondent's belief about attribute prevalence and
-# beta_ij is the conjoint part-worth. Each respondent's top-2 attributes
-# by IV are selected, then we count how often each attribute appears.
-#
-# Parameters:
-#   use_full_sample:
-#     FALSE (default) = extension sample only (in_experiment == "true")
-#     TRUE = all conjoint respondents
-#
-# Input:
-#   - data/Conjoint/Conjoint-Finalized/tables/individual_parameters_wide_means.csv
-#   - data/Survey/survey_merged_final.csv (baseline beliefs)
-#   - data/final_extension_data/experiment_conditions_pilot_july_2024.csv
+# IV_ij = p_ij * (1 - p_ij) * |beta_ij|; top-2 per respondent, then counted.
+# (Information value, not dollars -- unaffected by the full-swing convention.)
 # ============================================================================
 
 make_top2_info_plot <- function(use_full_sample = FALSE) {
   
-  # --- Load conjoint betas (one row per respondent) ---
   utils <- read.csv(
-    "data/Conjoint/Conjoint-Finalized/tables/individual_parameters_wide_means.csv",
+    "../data/Conjoint/Conjoint-Finalized/tables/individual_parameters_wide_means.csv",
     stringsAsFactors = FALSE
   )
   
-  # --- Load survey beliefs ---
-  survey_beliefs <- read.csv("data/Survey/survey_merged_final.csv",
+  survey_beliefs <- read.csv("../data/Survey/survey_merged_final.csv",
                              stringsAsFactors = FALSE)
   if ("sys_RespNum" %in% names(survey_beliefs)) {
     survey_beliefs <- survey_beliefs %>% rename(RespondentId = sys_RespNum)
   }
   
-  # --- Determine sample ---
   if (use_full_sample) {
-    # All respondents with both conjoint betas and survey beliefs
     valid_respondents <- intersect(
       unique(utils$RespondentId),
       unique(survey_beliefs$RespondentId)
     )
     cat(sprintf("  Full conjoint sample: %d respondents\n", length(valid_respondents)))
   } else {
-    # Extension sample only: in_experiment == "true", all waves
     meta <- read.csv(
-      "data/final_extension_data/experiment_conditions_pilot_july_2024.csv",
+      "../data/final_extension_data/experiment_conditions_pilot_july_2024.csv",
       stringsAsFactors = FALSE
     )
     exp_emails <- meta %>%
@@ -373,7 +421,6 @@ make_top2_info_plot <- function(use_full_sample = FALSE) {
     cat(sprintf("  Extension sample: %d respondents\n", length(valid_respondents)))
   }
   
-  # --- Belief column -> conjoint attribute name ---
   belief_to_attr <- c(
     beliefscollection_r1 = "collection_log",
     beliefscollection_r2 = "collection_bio",
@@ -396,7 +443,6 @@ make_top2_info_plot <- function(use_full_sample = FALSE) {
     beliefscontrol_r4    = "control_storage"
   )
   
-  # --- Beliefs: wide -> long, map 1-5 scale -> probability ---
   beliefs_long <- survey_beliefs %>%
     filter(RespondentId %in% valid_respondents) %>%
     select(RespondentId, all_of(names(belief_to_attr))) %>%
@@ -415,13 +461,11 @@ make_top2_info_plot <- function(use_full_sample = FALSE) {
     select(RespondentId, attribute, p_ij) %>%
     filter(!is.na(p_ij))
   
-  # --- Utilities: wide -> long (privacy attributes only) ---
   utils_long <- utils %>%
     filter(RespondentId %in% valid_respondents) %>%
     select(RespondentId, all_of(unname(belief_to_attr))) %>%
     pivot_longer(-RespondentId, names_to = "attribute", values_to = "beta_ij")
   
-  # --- Information value: IV = p(1-p)|beta| ---
   iv_df <- inner_join(utils_long, beliefs_long,
                       by = c("RespondentId", "attribute")) %>%
     mutate(information_value = p_ij * (1 - p_ij) * abs(beta_ij))
@@ -429,13 +473,11 @@ make_top2_info_plot <- function(use_full_sample = FALSE) {
   cat(sprintf("  IV computed: %d respondents, %d rows\n",
               n_distinct(iv_df$RespondentId), nrow(iv_df)))
   
-  # --- Top 2 per respondent ---
   top2 <- iv_df %>%
     group_by(RespondentId) %>%
     slice_max(information_value, n = 2) %>%
     ungroup()
   
-  # --- Count frequency and build plot data ---
   cat_cap <- c(control = "Control", use = "Use", collect = "Collect")
   
   top2_counts <- top2 %>%
@@ -455,7 +497,6 @@ make_top2_info_plot <- function(use_full_sample = FALSE) {
     "Collect" = unname(PRIVACY_CATEGORY_COLORS["collect"])
   )
   
-  # --- Plot ---
   g <- ggplot(top2_counts, aes(x = label, y = n_users, fill = category_cap)) +
     geom_col(width = 0.75) +
     geom_text(aes(label = n_users), hjust = -0.15, size = 3.2, color = TEXT_COLOR) +
@@ -480,9 +521,6 @@ cat("\n", strrep("=", 80), "\n")
 cat("CREATING PLOTS\n")
 cat(strrep("=", 80), "\n\n")
 
-FIGURES_DIR <- "../../output/figures/"
-
-# --- Main paper: Extension sample ---
 cat("=== Main Paper (Extension Sample) ===\n\n")
 
 cat("--- Fig 6(a): WTP Violin (extension) ---\n")
@@ -497,7 +535,6 @@ ggsave(paste0(FIGURES_DIR, "top2_privacy_attributes_extension.pdf"),
        g_ext, width = 10, height = 8)
 cat("Saved: top2_privacy_attributes_extension.pdf\n")
 
-# --- Appendix: Full conjoint sample ---
 cat("\n=== Appendix (Full Conjoint Sample) ===\n\n")
 
 cat("--- Fig C.5(a): WTP Violin (full) ---\n")
@@ -512,7 +549,6 @@ ggsave(paste0(FIGURES_DIR, "top2_privacy_attributes_full.pdf"),
        g_full, width = 10, height = 8)
 cat("Saved: top2_privacy_attributes_full.pdf\n")
 
-# --- Appendix C.4: Extension vs Survey comparison ---
 cat("\n=== Appendix C.4: Extension vs Survey Comparison ===\n\n")
 make_comparison_plot(
   with_web_dollars,
