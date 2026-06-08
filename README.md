@@ -129,7 +129,7 @@ Sample: baseline completers (non-NA `cleaned_WTA`, 8168 of 8187). WTA censor
 - Figure 2 funnel + per-treatment N + attrition p-values: `output/values/participant_flow_values.tex` (20 macros).
 
 ### `balance_table/exp_balance_table.R`
-- Appendix C [tab:exp_balance_table]: `output/tables/exp_balance_table.tex` (21 rows x 5 cols, full LaTeX tabular). R port of `assign_groups_wave_two.py` `check_balance()`; reads existing treatment assignments (no re-randomization). ANOVA via `oneway.test(var.equal=TRUE)`.
+- Appendix C [tab:exp_balance_table]: `output/tables/exp_balance_table.tex` (21 rows x 5 cols, LaTeX tabular only — no `\scalebox` wrapper; the paper wraps it in `\scalebox{0.8}{\input{...}}`). R port of `assign_groups_wave_two.py` `check_balance()`; reads existing treatment assignments (no re-randomization). ANOVA via `oneway.test(var.equal=TRUE)`.
 
 ---
 
@@ -163,16 +163,46 @@ Confirmed correct (do NOT change): `\wtaFullMean` 41.44 and
 `\invitedSampleCoveragePct` 90.8 are the right values under the agreed cleaning
 rules; v2's 52 / 89 are simply not reproducible.
 
+**Not from this session's tabular refactor.** The tabular-only refactor (see
+Bug fixes) touched only how tables are written to disk, not how any number is
+computed, so it introduced no new entries in this table. One difference noticed
+during review but NOT caused by the refactor: `exp_balance_table` info-arm
+Income reads ~81011 vs v2's 80932.89. This predates the refactor — it is an
+artifact of the R port of `check_balance()` (R port + fixed 14-day window vs
+v2's hand-copied Python value), confirmed by `git diff` showing the refactor
+changed only the `\scalebox` wrapper and a comment. Left for author review
+(likely tied to the dropped "Removed due to grounding" info user, N 1597->1596);
+not yet root-caused.
+
 ---
 
 ## Bug fixes
 
-This session:
+This session (tabular-only refactor for clean Overleaf `\input`):
+- All `etable(tex=TRUE)` tables and the hand-built `exp_balance_table` now save
+  ONLY the `\begin{tabular}...\end{tabular}` block. `etable` wraps output in
+  `\begingroup\centering ... \par\endgroup`, whose `\par` breaks
+  `\scalebox{}{\input{...}}` in the manuscript ("There's no line here to end").
+  Fix: capture the `etable` string (drop `file=`/`replace=`) and pass it through
+  `write_tabular_only()` in `utils/tex_helpers.R`, which slices out the tabular
+  environment. `exp_balance_table.R` instead drops the `\scalebox{0.8}{...}`
+  it used to bake into the string. Scaling/caption/notes now live in the
+  manuscript float wrapper. Verified by full-content review of all 8 regenerated
+  tables. Touched scripts: `other_survey_regressions.R` (2 tables),
+  `top_sites_beliefs_analysis.R` (2), `beliefs_vs_conjoint.R` (2 file-writing
+  etables; the 2 console-only diagnostic etables left as-is),
+  `privacy_seeking_analysis.R` (1), `exp_balance_table.R` (1).
+- `data_sharing_treatment_effects` was missing `depvar = FALSE`, so it printed
+  the raw `data_sharing_*_binary` dependent-variable row above the headers
+  (absent in v2). Added `depvar = FALSE`. Also added `"block_by_wave" = "Block FE"`
+  to its `dict` so the FE row label matches the other tables. No number change.
+
+Prior session:
 - `get_privacy_info_raw()` sub-domain many-to-many — inflated belief sample, shifted top_sites coefficients.
 - `get_balanced_panel()` twitter/x alias many-to-many — 7 (user, site) pairs with dup NA/non-NA privacy rows; affected Fig 9.
 - `plot_violin.R` relative paths — could not run from `code_github/`; fixed `source()` + `../data` / `../results` prefixes.
 
-Prior:
+Earlier:
 - `join_weights()` missing `sample == "extension"` filter — weighted-regression row counts ~doubled.
 - twitter -> x slug rename ran after `map_privacy_data()` — all twitter rows got `privacy_exist = FALSE`; moved before.
 - `exp_balance_table` Python `today()` denominator (run-date dependent, not reproducible) — replaced with fixed 14-day baseline window.
@@ -196,15 +226,23 @@ for these; document why and leave them hardcoded (or for the co-author).
 ### `etable()` arguments
 - `digits = 3`
 - `signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1)`
-- `replace = TRUE` (default appends, duplicating on re-run)
 - `depvar = FALSE` when `dict` maps the dependent variable or `headers` labels each column; keep default only for single-column tables.
+- Do NOT pass `file=` / `replace=` to `etable`. Capture the returned string and
+  write it with `write_tabular_only()` (see Output target below), so the saved
+  `.tex` is a bare tabular with no `\begingroup\centering ... \par\endgroup`
+  wrapper. `replace` is meaningless once `etable` no longer writes the file.
 - FE row labels via `dict` (e.g. `"experiment_id" = "Participant FE"`, `"block_by_wave" = "Block FE"`, `"as.factor(weeks_since_intervention)" = "Weeks FE"`, `"website_aggregated_high_level" = "Website FE"`).
 
 ### Output target by content type
-- Regression tables -> `fixest::etable()` -> `output/tables/*.tex`
+- Regression tables -> `fixest::etable(tex=TRUE)` (no `file=`) -> `write_tabular_only()` -> `output/tables/*.tex`
 - Summary-stats tables -> `xtable::xtable()` -> `output/tables/*.tex`
+- Hand-built tabulars -> `writeLines()` of the bare `\begin{tabular}...\end{tabular}` (no `\scalebox`) -> `output/tables/*.tex`
 - Inline scalars -> `savetexvalue::save_tex_value()` -> `output/values/*.tex` (`\newcommand` macros)
-- Hand-built tabulars -> `writeLines()` -> `output/tables/*.tex`
+
+All `output/tables/*.tex` are bare tabular environments. Scaling, `\caption`,
+`\label`, and notes live in the manuscript float wrapper (e.g.
+`\scalebox{0.8}{\input{...}}`), not in the saved file. This keeps every table
+file usable under `\scalebox{}{\input{}}` without LaTeX errors.
 
 ### Number formatting (the savetexvalue trap)
 `savetexvalue`'s default formatter is `scales::number()`, and its `accuracy`
@@ -256,6 +294,7 @@ Figures go to `output/figures/` as `.pdf`; styling in `utils/plot_rules.R`.
 - `time_usage_helpers.R` — browser-data cleaning, domain aggregation/classification, privacy scoring, conjoint utility loading. The twitter -> x slug rename runs inside `get_clean_time_data()` before `map_privacy_data()`.
 - `info_acq_helpers.R` — privacy-policy visit detection, info-acquisition aggregation.
 - `number_format_helpers.R` — per-data-type formatting helpers (see Style conventions); single source of truth for accuracy rules and the savetexvalue workaround.
+- `tex_helpers.R` — LaTeX output post-processing. `write_tabular_only()` extracts the bare `\begin{tabular}...\end{tabular}` from `etable(tex=TRUE)` output, dropping the `\begingroup\centering ... \par\endgroup` wrapper so the saved file is safe under `\scalebox{}{\input{}}`.
 
 ---
 
