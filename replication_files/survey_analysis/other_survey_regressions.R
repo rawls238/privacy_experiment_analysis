@@ -28,6 +28,7 @@
 #   replication_files/utils/time_usage_helpers.R
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/number_format_helpers.R
+#   replication_files/utils/tex_helpers.R
 #
 # Outputs:
 #   output/tables/data_sharing_treatment_effects[_suffix].tex
@@ -54,6 +55,7 @@ source("replication_files/utils/values.R")
 source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
 source("replication_files/utils/number_format_helpers.R")
+source("replication_files/utils/tex_helpers.R")
 
 # Load required libraries
 library(tidyverse)
@@ -314,20 +316,22 @@ for (WEIGHT_SPEC in .specs_to_run) {
     "experiment_conditioninfo"     = "Information Treatment",
     "experiment_conditionsaliency" = "Saliency Treatment",
     "(Intercept)" = "Constant",
-    "Intercept"   = "Constant"
+    "Intercept"   = "Constant",
+    "block_by_wave" = "Block FE"
   )
   
-  etable(model_share1, model_share2, model_share3, model_share4,
-         headers = c("Deleted Cookies", "Opted out",
-                     "Withheld data", "Changed privacy settings"),
-         dict   = dict,
-         tex    = TRUE,
-         replace = TRUE,                                          
-         title  = "Treatment Effect on Self-Reported Data Sharing Behavior",
-         signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-         digits = 3,
-         file   = paste0(TABLES_DIR, "data_sharing_treatment_effects",
-                         OUTPUT_SUFFIX, ".tex"))
+  ds_tex <- etable(model_share1, model_share2, model_share3, model_share4,
+                   headers = c("Deleted Cookies", "Opted out",
+                               "Withheld data", "Changed privacy settings"),
+                   dict   = dict,
+                   tex    = TRUE,
+                   depvar = FALSE,
+                   title  = "Treatment Effect on Self-Reported Data Sharing Behavior",
+                   signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+                   digits = 3)
+  write_tabular_only(ds_tex,
+                     file = paste0(TABLES_DIR, "data_sharing_treatment_effects",
+                                   OUTPUT_SUFFIX, ".tex"))
   
   # ===========================================================================
   # Table C.3 [tab:experimenter_demand]
@@ -373,15 +377,15 @@ for (WEIGHT_SPEC in .specs_to_run) {
     "(Intercept)" = "Constant"
   )
   
-  etable(t1, t2,
-         headers = c("Disrupted Browsing", "Evaded Extension/Chrome"),
-         dict    = dict,
-         tex     = TRUE,
-         replace = TRUE,
-         depvar  = FALSE,
-         signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-         digits = 3,
-         file    = paste0(TABLES_DIR, "experiment_modified_behavior",
-                          OUTPUT_SUFFIX, ".tex"))
+  ed_tex <- etable(t1, t2,
+                   headers = c("Disrupted Browsing", "Evaded Extension/Chrome"),
+                   dict    = dict,
+                   tex     = TRUE,
+                   depvar  = FALSE,
+                   signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+                   digits = 3)
+  write_tabular_only(ed_tex,
+                     file = paste0(TABLES_DIR, "experiment_modified_behavior",
+                                   OUTPUT_SUFFIX, ".tex"))
   
 } # end weight spec loop

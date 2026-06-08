@@ -7,7 +7,9 @@
 #     output/tables/exp_balance_table.tex
 #       Full 5-column latex tabular (Control mean / Saliency mean / Info mean
 #       / p(S vs C) / p(I vs C)) for 21 baseline characteristics. Paper
-#       loads this directly via \input{./output/tables/exp_balance_table}.
+#       loads this via \scalebox{0.8}{\input{...}} in a float wrapper, so this
+#       file saves ONLY the \begin{tabular}...\end{tabular} block (the scaling
+#       and caption live in the manuscript, matching the etable-generated tables).
 #
 # Scope:
 #   R port of the balance check from
@@ -355,15 +357,16 @@ build_row <- function(i) {
 body_rows <- sapply(seq_len(nrow(results_df)), build_row)
 body <- paste(body_rows, collapse = "\n")
 
+# Save ONLY the \begin{tabular}...\end{tabular} block. The \scalebox{0.8}{...}
+# scaling now lives in the manuscript float wrapper (matching the etable tables
+# written via write_tabular_only), so it is no longer baked into this file.
 latex <- paste0(
-  "\\scalebox{0.8}{\n",
   "\\begin{tabular}{|l|c|c|c|c|c|}\n",
   "\\hline\n",
   " & Control Mean & Saliency Mean & Information Mean & p (S vs C) & p (I vs C) \\\\\n",
   "\\hline\n",
   body, "\n",
-  "\\end{tabular}\n",
-  "}\n"
+  "\\end{tabular}\n"
 )
 
 # Make sure tables/ exists

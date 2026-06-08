@@ -46,6 +46,7 @@
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/plot_rules.R
 #   replication_files/utils/number_format_helpers.R
+#   replication_files/utils/tex_helpers.R
 #
 # Note: Previous version of this script also produced (now removed as dead code):
 #   - info_exposure_terciles.pdf                              (exploratory, not in paper)
@@ -92,6 +93,7 @@ source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
 source("replication_files/utils/plot_rules.R")
 source("replication_files/utils/number_format_helpers.R")
+source("replication_files/utils/tex_helpers.R")
 
 # Libraries
 library(tidyverse)
@@ -451,18 +453,18 @@ dict <- c(
   "block_by_wave"                = "Block FE"
 )
 
-etable(model$web_html,
-       headers     = c("$\\lvert \\text{Belief} - \\text{Truth} \\rvert$",
-                       "Correctness (Weak)", "Correctness (Strict)"),
-       dict        = dict,
-       tex         = TRUE,
-       replace     = TRUE,
-       digits      = 3,
-       depvar      = FALSE, 
-       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-       title       = "Belief Correctness on Top Sites -- Provided Information",
-       file        = paste0(TABLES_DIR, "top_sites_information",
-                            OUTPUT_SUFFIX, ".tex"))
+top_sites_tex <- etable(model$web_html,
+                        headers     = c("$\\lvert \\text{Belief} - \\text{Truth} \\rvert$",
+                                        "Correctness (Weak)", "Correctness (Strict)"),
+                        dict        = dict,
+                        tex         = TRUE,
+                        digits      = 3,
+                        depvar      = FALSE, 
+                        signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+                        title       = "Belief Correctness on Top Sites -- Provided Information")
+write_tabular_only(top_sites_tex,
+                   file = paste0(TABLES_DIR, "top_sites_information",
+                                 OUTPUT_SUFFIX, ".tex"))
 
 # =============================================================================
 # SCALAR MACROS — belief-correctness numbers cited in Section 6 + intro prose
@@ -557,18 +559,18 @@ for (fe in names(fixed.effects)) {
   }
 }
 
-etable(model$web_html,
-       headers     = c("$\\lvert \\text{Belief} - \\text{Truth} \\rvert$",
-                       "Correctness (Weak)", "Correctness (Strict)"),
-       dict        = dict,
-       tex         = TRUE,
-       replace     = TRUE,
-       digits      = 3,
-       depvar      = FALSE, 
-       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-       title       = "Belief Correctness on Top Sites -- Random Information",
-       file        = paste0(TABLES_DIR, "top_sites_information_rand_info",
-                            OUTPUT_SUFFIX, ".tex"))
+top_sites_rand_tex <- etable(model$web_html,
+                             headers     = c("$\\lvert \\text{Belief} - \\text{Truth} \\rvert$",
+                                             "Correctness (Weak)", "Correctness (Strict)"),
+                             dict        = dict,
+                             tex         = TRUE,
+                             digits      = 3,
+                             depvar      = FALSE, 
+                             signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+                             title       = "Belief Correctness on Top Sites -- Random Information")
+write_tabular_only(top_sites_rand_tex,
+                   file = paste0(TABLES_DIR, "top_sites_information_rand_info",
+                                 OUTPUT_SUFFIX, ".tex"))
 
 # =============================================================================
 # FIG cdf_belief_correctness_top_sites: weighted CDF across treatment groups

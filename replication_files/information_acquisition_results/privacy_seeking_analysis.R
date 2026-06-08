@@ -38,6 +38,7 @@
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/plot_rules.R
 #   replication_files/utils/number_format_helpers.R
+#   replication_files/utils/tex_helpers.R
 #
 # Outputs:
 #   output/figures/info_acq_treatment_effects_total_sites[_suffix].pdf
@@ -96,6 +97,7 @@ source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
 source("replication_files/utils/plot_rules.R")
 source("replication_files/utils/number_format_helpers.R")
+source("replication_files/utils/tex_helpers.R")
 
 # Load required libraries
 library(tidyverse)
@@ -456,16 +458,18 @@ dict <- c(
   "as.factor(weeks_since_intervention)"           = "Weeks FE"
 )
 
-etable(
+cookie_banner_tex <- etable(
   t_total, t_distinct,
   headers     = c("Cookie Banner Total Interactions", "Cookie Banner Distinct Domains"),
   dict        = dict,
   tex         = TRUE,
-  replace     = TRUE,
   depvar      = FALSE,
   title       = "Treatment Effect on Cookie Banner Interactions",
   signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-  digits      = 3,
-  file        = paste0(TABLES_DIR, "cookie_banner_interactions_treatment",
-                       OUTPUT_SUFFIX, ".tex")
+  digits      = 3
+)
+write_tabular_only(
+  cookie_banner_tex,
+  file = paste0(TABLES_DIR, "cookie_banner_interactions_treatment",
+                OUTPUT_SUFFIX, ".tex")
 )

@@ -28,6 +28,7 @@
 #   replication_files/utils/time_usage_helpers.R
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/number_format_helpers.R
+#   replication_files/utils/tex_helpers.R
 #
 # Outputs:
 #   output/tables/misspec_pref_regression.tex
@@ -51,6 +52,7 @@ source("replication_files/utils/values.R")
 source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
 source("replication_files/utils/number_format_helpers.R")
+source("replication_files/utils/tex_helpers.R")
 
 # Load required libraries
 library(tidyverse)
@@ -460,20 +462,22 @@ dict_demog <- c(
   "abs_misspec"           = "|Misspecification| (pp)"
 )
 
-etable(reg_bins, reg_linear_rounded, reg_split,
-       headers = c("Discrete", "Linear", "Over/Under"),
-       dict    = dict_main, tex = TRUE, replace = TRUE,
-       title   = "Belief Misspecification and Privacy Preference Intensity",
-       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-       digits = 3,
-       file    = paste0(TABLES_DIR, "misspec_pref_regression.tex"))
+misspec_reg_tex <- etable(reg_bins, reg_linear_rounded, reg_split,
+                          headers = c("Discrete", "Linear", "Over/Under"),
+                          dict    = dict_main, tex = TRUE,
+                          title   = "Belief Misspecification and Privacy Preference Intensity",
+                          signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+                          digits = 3)
+write_tabular_only(misspec_reg_tex,
+                   file = paste0(TABLES_DIR, "misspec_pref_regression.tex"))
 
-etable(reg_misspec_demog, reg_pref_demog,
-       headers = c("", "Preferences"),
-       dict    = dict_demog, tex = TRUE, replace = TRUE,
-       title   = "Demographic Heterogeneity in Belief Misspecification and Preferences",
-       signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
-       digits = 3,
-       file    = paste0(TABLES_DIR, "misspec_pref_demographics.tex"))
+misspec_demo_tex <- etable(reg_misspec_demog, reg_pref_demog,
+                           headers = c("", "Preferences"),
+                           dict    = dict_demog, tex = TRUE,
+                           title   = "Demographic Heterogeneity in Belief Misspecification and Preferences",
+                           signif.code = c("***" = 0.01, "**" = 0.05, "*" = 0.1),
+                           digits = 3)
+write_tabular_only(misspec_demo_tex,
+                   file = paste0(TABLES_DIR, "misspec_pref_demographics.tex"))
 
 cat("\nDone.\n")
