@@ -25,7 +25,10 @@
 #         \extensionControlFinalN  / \extensionControlStartN
 #
 #       Endline survey completion by treatment (writeup_v3.tex line 397):
-#         \endlineInfoN / \endlineSaliencyN / \endlineControlN
+#         \surveyEndlineInfoN / \surveyEndlineSaliencyN / \surveyEndlineControlN
+#         (NOTE: macro names must NOT start with "end" -- LaTeX's \newcommand
+#          via \@ifdefinable refuses any name beginning with "end" to avoid
+#          \end<environment> clashes. Hence the "survey" prefix.)
 #
 #       Differential attrition chi-square tests (writeup_v3.tex line 400):
 #         \attritionExtensionPvalue
@@ -81,12 +84,12 @@
 #     \extensionSaliencyFinalN  500
 #     \extensionControlFinalN   509
 #     \extensionControlStartN   532
-#     \endlineSaliencyN         472
+#     \surveyEndlineSaliencyN   472
 #     \attritionExtensionPvalue 0.376 (paper 0.37, matches within rounding)
 #   differ from paper by 1 -- paper figure and prose to be updated:
 #     \baselineSurveyN          8168 (paper 8169)
-#     \endlineInfoN             479  (paper 480)
-#     \endlineControlN          475  (paper 474)
+#     \surveyEndlineInfoN       479  (paper 480)
+#     \surveyEndlineControlN    475  (paper 474)
 #   info / saliency Start N swapped relative to paper line 396 -- the data
 #   say 533 info / 532 saliency, paper prose says 532 info / 533 saliency.
 #   Paper prose is wrong; figure has been updated to match the data:
@@ -350,14 +353,20 @@ save_tex_value(values = format_count(extension_control_start),
 save_tex_value(values = format_count(extension_control_final),
                names = "extensionControlFinalN",
                file_name = values_file, path = VALUES_DIR)
+
+# Endline counts. Macro names use a "survey" prefix because LaTeX's
+# \newcommand (via \@ifdefinable) refuses any command name starting with
+# "end" (to avoid \end<environment> clashes). Names like \endlineInfoN
+# silently fail to define and then throw "Undefined control sequence" at
+# every use site, so they must NOT begin with "end".
 save_tex_value(values = format_count(endline_info),
-               names = "endlineInfoN",
+               names = "surveyEndlineInfoN",
                file_name = values_file, path = VALUES_DIR)
 save_tex_value(values = format_count(endline_saliency),
-               names = "endlineSaliencyN",
+               names = "surveyEndlineSaliencyN",
                file_name = values_file, path = VALUES_DIR)
 save_tex_value(values = format_count(endline_control),
-               names = "endlineControlN",
+               names = "surveyEndlineControlN",
                file_name = values_file, path = VALUES_DIR)
 
 # Attrition p-values
