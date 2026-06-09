@@ -13,8 +13,9 @@
 #   WTP scalars (prose): output/values/conjoint_wtp_values.tex
 #     \wtpCollectFinancial  mean WTP, collect financial data (v2 line 466)
 #     \wtpShareFinancial    mean WTP, share financial data   (v2 line 466)
-#     \wtpTopThreeMean      mean WTP, each person's top-3 most-valued attrs
-#                           (v2 line 580)
+#     \wtpTopThreeMedian    median WTP, each person's top-3 most-valued attrs
+#                           (v2 line 580; prose says "at the median", so this
+#                            is the median across people, not the mean)
 #
 # WTP CONVENTION (full swing): privacy attributes are effects-coded
 # {invasive = -1, protective = +1}. The 0 point is only an estimation
@@ -22,14 +23,16 @@
 # does or does not engage in a practice, there is no "half" state. The
 # economically meaningful WTP is therefore the full invasive -> protective
 # swing, spanning 2 coded units, so WTP = (part-worth / price coef) * 2.
-# We aggregate with the sample mean over the (untrimmed) individual WTPs.
+# We aggregate with the sample mean over the (untrimmed) individual WTPs for
+# the per-attribute financial macros; the top-3 macro is aggregated by the
+# sample MEDIAN to match the paper prose ("at the median").
 # This 2x convention is applied uniformly to BOTH the figures and the scalar
 # macros so prose and plots are on the same scale.
 #
 # NUMBER SHIFT vs v2: v2 was internally inconsistent on the WTP scale (line
 # 466 cited financial "$6-8/month", line 580 cited top-3 "$3/month"). Under
-# the uniform full-swing-mean convention here, financial is ~$5/$4 and top-3
-# is ~$14. v3 prose should be updated to these values.
+# the uniform full-swing convention here, financial is ~$5/$4 and top-3
+# (median) is reported below. v3 prose should be updated to these values.
 #
 # Dependencies:
 #   replication_files/utils/plot_rules.R
@@ -181,9 +184,12 @@ with_web_dollars <- convert_to_dollars(with_website_indiv, "With Website Model")
 
 
 # ============================================================================
-# WTP scalar macros (full-swing mean). Collect/use dollar_values are negative
+# WTP scalar macros (full-swing). Collect/use dollar_values are negative
 # (consumers must be compensated to accept the practice), so abs() gives the
 # WTP to avoid it. v2 line 466 (financial) + line 580 (top-3).
+#   - Financial attributes are aggregated by the sample MEAN.
+#   - Top-3 most-valued attributes are aggregated by the sample MEDIAN, to
+#     match the paper prose ("worth approximately ... at the median").
 # ============================================================================
 
 ext_dollars <- with_web_dollars %>% filter(sample_group == "Extension")
@@ -199,18 +205,19 @@ wtp_share_financial   <- abs(fin_wtp$mean_wtp[fin_wtp$feature_name == "use_finan
 
 # --- Top-3 most-valued attributes per person (v2 line 580) ---
 # Each person's 3 largest part-worths (most disliked practices), summed, then
-# already in dollars (and full-swing) via dollar_value; aggregate by mean.
+# already in dollars (and full-swing) via dollar_value; aggregate by MEDIAN
+# across people to match the paper prose ("at the median").
 top3_per_person <- ext_dollars %>%
   group_by(respondent_N_id) %>%
   slice_max(mean, n = 3, with_ties = FALSE) %>%   # 3 largest part-worths
   summarise(wtp_top3 = sum(dollar_value), .groups = "drop")
 
-wtp_top_three_mean <- abs(mean(top3_per_person$wtp_top3))
+wtp_top_three_median <- abs(median(top3_per_person$wtp_top3))
 
-cat(sprintf("\nWTP (extension, full-swing mean |.|):\n"))
-cat(sprintf("  collect financial = %.2f\n", wtp_collect_financial))
-cat(sprintf("  share   financial = %.2f\n", wtp_share_financial))
-cat(sprintf("  top-3 most valued = %.2f\n", wtp_top_three_mean))
+cat(sprintf("\nWTP (extension, full-swing):\n"))
+cat(sprintf("  collect financial (mean) = %.2f\n", wtp_collect_financial))
+cat(sprintf("  share   financial (mean) = %.2f\n", wtp_share_financial))
+cat(sprintf("  top-3 most valued (median) = %.2f\n", wtp_top_three_median))
 
 conjoint_wtp_file <- "conjoint_wtp_values"
 suppressWarnings(file.remove(file.path(VALUES_DIR, paste0(conjoint_wtp_file, ".tex"))))
@@ -220,8 +227,8 @@ save_tex_value(sprintf("%.2f", wtp_collect_financial),
 save_tex_value(sprintf("%.2f", wtp_share_financial),
                name = "wtpShareFinancial",
                file = file.path(VALUES_DIR, paste0(conjoint_wtp_file, ".tex")))
-save_tex_value(sprintf("%.2f", wtp_top_three_mean),
-               name = "wtpTopThreeMean",
+save_tex_value(sprintf("%.2f", wtp_top_three_median),
+               name = "wtpTopThreeMedian",
                file = file.path(VALUES_DIR, paste0(conjoint_wtp_file, ".tex")))
 cat(sprintf("Saved 3 macros to %s%s.tex\n", VALUES_DIR, conjoint_wtp_file))
 
