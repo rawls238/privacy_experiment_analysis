@@ -1,7 +1,7 @@
 # Replication Files
 
 R code that produces the figures, tables, and inline scalar macros for the
-paper (`writeup_v3.tex`). Non-structural results only; the structural-model
+paper (`writeup_v4.tex`). Non-structural results only; the structural-model
 artifacts are produced separately by a co-author.
 
 **Working directory**: all scripts assume `code_github/`. Data lives in
@@ -29,7 +29,7 @@ this README and a script header disagree, the header wins.
 
 The Overleaf project is checked out separately at
 `~/Dropbox/spring2025experiment/overleaf_writeup/`. It mirrors
-`code_github/output/` and holds `writeup_v3.tex`. Sync is one-way:
+`code_github/output/` and holds `writeup_v4.tex`. Sync is one-way:
 `rsync code_github/output/ -> overleaf_writeup/output/`, then commit/push both
 repos.
 
@@ -43,15 +43,17 @@ Paper locations are given by LaTeX label (stable across edits), not line number.
 - Fig 6 [fig:privacy_combined]: `individual_heterogeneity_dollars_with_website_extension.pdf` (6a), `top2_privacy_attributes_extension.pdf` (6b)
 - Fig C.4 [fig:extension_survey_conjoint_sample]: `individual_heterogeneity_experiment_vs_survey.pdf`
 - Fig C.5 [fig:privacy_combined_full]: `individual_heterogeneity_dollars_with_website_full.pdf`, `top2_privacy_attributes_full.pdf`
-- WTP scalars: `output/values/conjoint_wtp_values.tex` (3 macros) — `\wtpCollectFinancial`, `\wtpShareFinancial` (financial-data attributes), `\wtpTopThreeMean` (each person's top-3 most-valued attributes). Extension sample.
+- WTP scalars: `output/values/conjoint_wtp_values.tex` (3 macros) — `\wtpCollectFinancial`, `\wtpShareFinancial` (financial-data attributes, sample mean), `\wtpTopThreeMedian` (each person's top-3 most-valued attributes, sample median). Extension sample.
 
 WTP convention (**full swing, 2-beta**): privacy attributes are effects-coded
 {invasive = -1, protective = +1}. The 0 point is only an estimation reference
 and has no economic meaning — a site either does or does not engage in a
 practice, there is no "half" state. The economically meaningful WTP is the full
 invasive -> protective swing (2 coded units), so
-WTP = (part-worth / price coef) * 2, aggregated by sample mean over untrimmed
-individual WTPs. Applied uniformly to the figures and the macros so prose and
+WTP = (part-worth / price coef) * 2. Aggregation across individuals (untrimmed):
+the financial macros use the sample mean; `\wtpTopThreeMedian` uses the sample
+median to match the §6 prose ("worth approximately ... at the median"). The
+full-swing scale is applied uniformly to the figures and the macros so prose and
 plots share one scale. Figure x-axis runs to +/-16 (was +/-8 per-unit).
 
 Paths: data in `../data/` and `../results/` (script reads with `../` prefixes;
@@ -101,14 +103,14 @@ The driver sources the helper. Together:
 - Fig 9 [fig:intensive]: `preregistered_spec_i_baseline.pdf`, `preregistered_triple_interaction_baseline.pdf`
 - Fig 10 [fig:extensive]: `assortment_concentration.pdf`, `assortment_privacy.pdf`
 - Extensive-margin scalars: `output/values/assortment_did_values.tex` (4 macros) — `\extensiveHHIPvalue` (0.069), `\extensiveTopSharePvalue` (0.058, v2 "top-2 share"), `\privacyDifferentialPctSD` (10.2), `\portfolioPrivacyPctSD` (4.4).
-- Table C.2 [tab:top_websites]: `output/values/top_websites_values.tex` (60 macros, `\topWeb<Rank><Field>`; tabular hand-written in `writeup_v3.tex`).
+- Table C.2 [tab:top_websites]: `output/values/top_websites_values.tex` (60 macros, `\topWeb<Rank><Field>`; tabular hand-written in `writeup_v4.tex`). Two of these are also reused inline in §6 prose: the active-hours range "between ... and ... hours" uses `\topWebFourActiveHours` (lower, Amazon at rank 4) and `\topWebOneActiveHours` (upper, YouTube at rank 1). NB: these are rank-indexed, so a rank reshuffle on rerun would silently change the §6 range — re-check that sentence if the top-website ordering moves.
 
 Driver rebuilds `../data/processed_data/joined_time_data.csv` when
 `CONSTRUCT_FROM_SCRATCH = TRUE`.
 
 **Open question (needs author review):** current code reproduces the stage-1
 unweighted coefficients byte-for-byte, but the generated Fig 9/10 differ from
-the figures currently in `writeup_v3.tex`, and the script that produced the
+the figures currently in `writeup_v4.tex`, and the script that produced the
 original Overleaf figures has not been located. Undocumented analysis choices:
 `time_spent > 30` filter (drops ~40% of session rows); `lower_pct=0.05` /
 `upper_pct=0.95` winsorization; `values_to_include=c(0)` (pre-period as one
@@ -152,7 +154,7 @@ more correct), convention changes (deliberate), and non-reproducible v2 numbers
 | `\portfolioPrivacyPctSD` | 3 | 4.4 | rebuild diff |
 | `\wtpCollectFinancial` (line 466 "$6-8") | 6-8 | 5.22 | full-swing 2-beta mean; v2 contradicted its own Fig 6a |
 | `\wtpShareFinancial` (line 466 "$6-8") | 6-8 | 4.21 | full-swing 2-beta mean |
-| `\wtpTopThreeMean` (line 580 "$3") | 3 | ~14 | full-swing 2-beta mean (v2's $3 was per-unit) |
+| `\wtpTopThreeMedian` (line 580 "$3") | 3 | 7.03 | full-swing 2-beta; switched from sample mean (~14) to median to match prose "at the median" (v2's $3 was per-unit) |
 | `\wtaFullMean` | 52 | 41.44 | v2 not reproducible; $1000 censor applied |
 | `\invitedSampleCoveragePct` | 89 | 90.8 | v2 not reproducible |
 | `\attritionEndlinePvalue` | 0.96 | 0.833 | v2 not reproducible (no standard test gives 0.96) |
@@ -301,7 +303,7 @@ Figures go to `output/figures/` as `.pdf`; styling in `utils/plot_rules.R`.
 ## Paper figures referenced but NOT produced here
 
 For these, comment out the `\begin{figure}/\end{figure}` block in
-`writeup_v3.tex` and add a `% TODO:` line so compile passes and the gap is
+`writeup_v4.tex` and add a `% TODO:` line so compile passes and the gap is
 visible.
 
 - **Cookie deletion / CPV (Appendix G)** — generated by `code/cookie_deletion/...`, not yet refactored into `replication_files/`. ~18 `cpv_*` / `time_*` figures.
