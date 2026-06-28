@@ -47,20 +47,6 @@
 #   replication_files/utils/plot_rules.R
 #   replication_files/utils/number_format_helpers.R
 #   replication_files/utils/tex_helpers.R
-#
-# Note: Previous version of this script also produced (now removed as dead code):
-#   - info_exposure_terciles.pdf                              (exploratory, not in paper)
-#   - info_exposure_median.pdf                                (exploratory, not in paper)
-#   - heterogeneous_beliefs_site_level_by_exposure_median.pdf (alt of tercile, not in paper)
-#   - PEW regression block                                    (console-only, no file output)
-# Removed dead library() calls:
-#   - library(quantreg)  (zero rq() call)
-#   - library(stargazer) (zero stargazer() call)
-#   - library(xtable)    (zero xtable() call)
-#   - library(acs)       (zero acs()/geocode() call)
-# Removed dead helpers:
-#   - convert_to_numeric()         (zero call sites)
-#   - get_internal_privacy_field() (zero call sites)
 # =============================================================================
 
 # ----------------------------------------------------------------------------
@@ -108,6 +94,11 @@ TABLES_DIR  <- "output/tables/"
 VALUES_DIR  <- "output/values/"
 
 OUTPUT_SUFFIX <- if (WEIGHT_SPEC == "unweighted") "" else paste0("_", WEIGHT_SPEC)
+
+# Greyscale ramp for the ordered exposure terciles (Low -> High = light -> dark),
+# replacing the blue-green ordinal palette so the figure has no color. Ordered
+# so darker = higher exposure (preserves the ordinal reading).
+EXPOSURE_GREY_3 <- c("grey70", "grey45", "grey15")
 
 # =============================================================================
 # HELPER FUNCTIONS
@@ -469,23 +460,6 @@ write_tabular_only(top_sites_tex,
 # =============================================================================
 # SCALAR MACROS — belief-correctness numbers cited in Section 6 + intro prose
 # =============================================================================
-# Only written for the unweighted spec (the spec the paper reports). All values
-# are pulled from the fitted models / data above, never hard-coded, so a re-run
-# keeps the prose in sync with the table.
-#
-# Mapping to v2 prose:
-#   \beliefDistanceInfoPP       Section 6 "5.0 percentage points closer"  (col 1)
-#   \beliefCorrectWeakInfoPP    Section 6 "6.7 ... percentage points"      (col 2)
-#   \beliefCorrectStrictInfoPP  Section 6 "... 7.2 percentage points"      (col 3)
-#   \beliefCorrectInfoVsRestPP  intro "7.1 pp more likely ... than both    (strict,
-#                               the saliency and control groups"            merged baseline)
-#   \beliefErrorMedianBaseline  Section 6 "median ... belief error of 50"
-#
-# The intro number uses a MERGED baseline (info vs control+saliency pooled),
-# which differs from the table's per-condition contrasts (info vs control).
-# It is computed here from a dedicated regression. v2 used the strict measure
-# for this number (v2 strict info-vs-control = 7.15 -> "7.1"); the weak and
-# inclusive measures do not match v2's 7.1, so strict is the correct measure.
 if (WEIGHT_SPEC == "unweighted") {
   
   suppressWarnings(file.remove(file.path(VALUES_DIR, "top_sites_beliefs_values.tex")))
@@ -513,9 +487,6 @@ if (WEIGHT_SPEC == "unweighted") {
     summarise(m = median(belief_distance, na.rm = TRUE)) %>%
     pull(m)
   
-  # Distance coef is on the 0-100 scale already (pp); take absolute value since
-  # the prose says "closer to the truth". Correctness coefs are on the 0-1
-  # probability scale, so multiply by 100 to express in percentage points.
   save_tex_value(
     format_pct(abs(coef_distance)),
     name = "beliefDistanceInfoPP",
@@ -574,6 +545,8 @@ write_tabular_only(top_sites_rand_tex,
 
 # =============================================================================
 # FIG cdf_belief_correctness_top_sites: weighted CDF across treatment groups
+#   Uses scale_color_treatment() -- color HERE correctly encodes treatment
+#   (Control/Saliency/Information), so it stays as-is.
 # =============================================================================
 
 avg_correctness <- df.site_belief_change %>%
@@ -603,6 +576,9 @@ ggsave(paste0(FIGURES_DIR, "cumulative_belief_distance", OUTPUT_SUFFIX, ".pdf"),
 
 # =============================================================================
 # FIG top_sites_heterogeneity_exposure: tercile split by baseline exposure
+#   Greyscale ramp (Low -> High = light -> dark) instead of the blue-green
+#   ordinal palette, so the figure has no color while keeping the ordinal
+#   reading (darker = higher exposure).
 # =============================================================================
 
 exposed_websites <- get_aggregated_time_data_with_privacy_info()
@@ -662,7 +638,8 @@ p_tercile <- ggplot(impact_tercile,
   geom_errorbar(aes(ymin = ymin, ymax = ymax),
                 position = position_dodge(width = DODGE_WIDTH_3),
                 width = ERRORBAR_WIDTH, linewidth = LINE_WIDTH) +
-  scale_color_ordinal_3() +
+  scale_color_manual(values = setNames(EXPOSURE_GREY_3,
+                                       c("Low Exposure", "Medium Exposure", "High Exposure"))) +
   theme_privacy_experiment() +
   labs(x = NULL, y = "| Belief - Truth |", color = NULL)
 
@@ -672,6 +649,10 @@ ggsave(paste0(FIGURES_DIR, "heterogeneous_beliefs_site_level_by_exposure_tercile
 
 # =============================================================================
 # FIG 8 (beliefs_by_search): treatment x information acquisition behavior
+#   x-axis = treatment (Control/Saliency/Information), distinguished by POSITION.
+#   info_acq (Did / Didn't acquire information) distinguished by SHAPE, not color
+#   (Sam: avoid reusing the red/blue treatment palette). Points + error bars use
+#   a single neutral grey; circle vs triangle encode info_acq.
 # =============================================================================
 
 info_acq <- get_experiment_info_acq()
@@ -720,14 +701,19 @@ sum_df <- dat %>%
   )
 
 g <- ggplot(sum_df, aes(x = experiment_condition, y = mean,
-                        color = info_acq, group = info_acq)) +
-  geom_point(position = position_dodge(width = DODGE_WIDTH_2), size = POINT_SIZE) +
+                        shape = info_acq, group = info_acq)) +
+  geom_point(position = position_dodge(width = DODGE_WIDTH_2),
+             size = POINT_SIZE, color = "grey30") +
   geom_errorbar(aes(ymin = ymin, ymax = ymax),
                 width = ERRORBAR_WIDTH, linewidth = LINE_WIDTH,
+                color = "grey30",
                 position = position_dodge(width = DODGE_WIDTH_2)) +
-  scale_color_binary() +
+  scale_shape_manual(values = c(
+    "Did Acquire Information"    = 16,  # filled circle
+    "Didn't Acquire Information" = 18   # filled triangle
+  )) +
   theme_privacy_experiment() +
-  labs(x = NULL, y = "| Belief - Truth |", color = NULL)
+  labs(x = NULL, y = "| Belief - Truth |", shape = NULL)
 
 ggsave(paste0(FIGURES_DIR, "beliefs_by_info_acq", OUTPUT_SUFFIX, ".pdf"),
        g, width = 8, height = 6)

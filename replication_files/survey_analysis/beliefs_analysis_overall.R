@@ -15,17 +15,14 @@
 #     output/values/rank_correlation_beliefs_values.tex
 #       (9 macros: \tauBy<Category>{N,Median,P} for Collect, Use, Control)
 #
-#   Within-participant, within-category Kendall tau-b rank correlations between
-#   elicited beliefs and true prevalence. Requested by Guy (Slack) to show that
-#   participants hold systematic beliefs about the relative ordering of
-#   practices rather than guessing at random: the correlations are significant
-#   across all three categories. Cited in the Fig 5 caption.
+# Style: uses shared PRIVACY_ATTR_MASTER labels/order + theme_privacy_experiment
+# (same settings as the WTP figure) so panels (a) and (b) match. Shapes only,
+# no color; legend bottom; horizontal grid on; 8x6 (matches WTP figure).
 #
 # Inputs:
 #   ../data/Survey/survey_merged_final.csv
 #   ../data/final_extension_data/privacy_info.csv         (ground truth)
 #   ../data/final_extension_data/experiment_conditions_pilot_july_2024.csv
-#     (extension sample identification)
 #
 # Dependencies:
 #   replication_files/utils/values.R           (BAD_USERS, PRIVACY_ATTR_MASTER,
@@ -33,6 +30,7 @@
 #   replication_files/utils/time_usage_helpers.R
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/number_format_helpers.R
+#   replication_files/utils/plot_rules.R       (theme_privacy_experiment)
 #
 # Outputs:
 #   output/figures/beliefs_vs_truth.pdf
@@ -47,6 +45,7 @@ source("replication_files/utils/values.R")
 source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/info_acq_helpers.R")
 source("replication_files/utils/number_format_helpers.R")
+source("replication_files/utils/plot_rules.R")
 
 # Load required libraries
 library(tidyverse)
@@ -241,8 +240,7 @@ beliefs_ext <- beliefs_ext %>%
   select(name, belief_mean_experiment)
 
 # Order attributes by ground-truth prevalence using the shared helper, so the
-# y-axis matches the WTP figure exactly. Join the master label order onto the
-# belief table via the canonical label (name).
+# y-axis matches the WTP figure exactly.
 attr_order <- get_privacy_attr_order()   # ascending true_mean, 19 attrs, no sell
 label_levels <- attr_order$label
 
@@ -252,7 +250,9 @@ beliefs_combined <- beliefs_full %>%
 
 # =============================================================================
 # Fig 5: BELIEFS VS GROUND TRUTH (3 series: Survey / Experiment / True Mean)
-#   Shapes only (no color), legend at bottom. (Sam request.)
+#   Shapes only (no color), legend bottom, horizontal grid on. Shared
+#   theme_privacy_experiment with the same settings as the WTP figure so the
+#   two panels match in font, color, margins, and grid. 8x6.
 # =============================================================================
 
 plot_df <- beliefs_combined %>%
@@ -270,7 +270,7 @@ plot_df <- beliefs_combined %>%
 
 g <- ggplot(plot_df,
             aes(x = name, y = Value, shape = Measure)) +
-  geom_point(size = 3, color = "black", fill = "black") +
+  geom_point(size = 3, color = "grey30", fill = NA, stroke = 0.8) +
   coord_flip() +
   scale_shape_manual(values = c(
     "Mean Beliefs (Survey)"     = 22,  # square
@@ -282,11 +282,8 @@ g <- ggplot(plot_df,
     x     = "Privacy Attribute",
     shape = NULL
   ) +
-  theme_minimal(base_size = 13) +
-  theme(
-    panel.grid.minor = element_blank(),
-    legend.position  = "bottom"
-  )
+  theme_privacy_experiment(show_grid_y = TRUE) +
+  theme(legend.position = "bottom")
 
 ggsave(paste0(FIGURES_DIR, "beliefs_vs_truth.pdf"),
        g, width = 8, height = 6)
@@ -303,8 +300,7 @@ cat(sprintf("Saved: %sbeliefs_vs_truth.pdf\n", FIGURES_DIR))
 #
 # Metric: Kendall tau-b (handles Likert ties via denominator inflation).
 # Unit:   one tau_i per (participant, category).
-# Test:   Wilcoxon signed-rank test against null median = 0
-#         (rank-based analog of one-sample t-test).
+# Test:   Wilcoxon signed-rank test against null median = 0.
 # =============================================================================
 
 VALUES_FILE <- paste0(VALUES_DIR, "rank_correlation_beliefs_values.tex")
@@ -313,8 +309,6 @@ VALUES_FILE <- paste0(VALUES_DIR, "rank_correlation_beliefs_values.tex")
 if (file.exists(VALUES_FILE)) file.remove(VALUES_FILE)
 
 # Map 19 attributes (those with truth available) to 3 categories.
-# "use" pools share-* with anonymized and personalization, consistent
-# with the rest of the paper's by-category split.
 attr_category <- tibble::tibble(
   internal_key = c(
     "collect-log", "collect-bio", "collect-sensitive", "collect-financial",
@@ -392,9 +386,6 @@ cat("  systematic (non-random) beliefs about the ordering of practices.\n\n")
 # Save LaTeX macros for the Fig 5 caption.
 # Naming convention: \tauBy<Category><Stat>
 #   e.g., \tauByCollectN, \tauByCollectMedian, \tauByCollectP
-# Counts -> format_count() (bare integer); median tau-b -> format_coef()
-# (three decimals); p-values are all far below the floating-point floor, so
-# they are stored as the literal string "<0.001".
 for (i in seq_len(nrow(cat_summary))) {
   cat_label <- tools::toTitleCase(cat_summary$category[i])
   

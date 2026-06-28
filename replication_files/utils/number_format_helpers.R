@@ -26,8 +26,12 @@
 #
 #   Data type               Rule
 #   ---------               ----
-#   Integer counts (N)      Bare integer. Output "8168", not "8,168" or
-#                           "8168.00".
+#   Integer counts (N)      Thousands-separated integer. Output "8{,}168",
+#                           not "8168" or "8168.00". The separator is written
+#                           as "{,}" (comma wrapped in braces) so it renders
+#                           correctly both in plain text and inside math mode
+#                           ($...$), where a bare comma would be typeset as a
+#                           punctuation mark with trailing space ("8, 168").
 #
 #   Percentages             One decimal place. 61.04 -> "61", 35.19 -> "35.2",
 #                           59.95 -> "60". Trailing zeros dropped.
@@ -67,10 +71,12 @@
 #
 #   Age                     One decimal place.
 #
-#   Income                  Bare integer. Income values are large (5-figure
-#                           and up) and reported on census-bracket midpoints
-#                           which are already whole numbers, so the integer
-#                           rule is always exact and never loses information.
+#   Income                  Thousands-separated integer. Income values are
+#                           large (5-figure and up) and reported on
+#                           census-bracket midpoints which are already whole
+#                           numbers, so the integer rule is always exact and
+#                           never loses information. Same "{,}" separator as
+#                           counts.
 #
 #   Regression coefficients Three decimal places. Inline use only; etable()
 #                           output is not routed through this file.
@@ -129,7 +135,8 @@
 #   mode = "sig"        Round to n significant figures, drop trailing zeros.
 #                       trimws() strips leading space from formatC output.
 #   mode = "decimal"    Round to n decimal places, drop trailing zeros.
-#   mode = "int"        Round to integer; n is ignored.
+#   mode = "int"        Round to integer, thousands-separated with "{,}".
+#                       n is ignored.
 #   mode = "dollar"     Integer if whole, otherwise n decimal places.
 #   mode = "pvalue"     If x >= 0.001, n decimal places; if x < 0.001,
 #                       scientific notation with 1 significant figure.
@@ -145,7 +152,9 @@ fmt <- function(x, mode = "decimal", n = 1) {
     return(as.character(round(x, n)))
   }
   if (mode == "int") {
-    return(as.character(round(x)))
+    # Thousands separator written as "{,}" so it is safe in math mode:
+    # a bare "," in $...$ is punctuation and gets trailing space ("8, 168").
+    return(gsub(",", "{,}", formatC(round(x), format = "d", big.mark = ",")))
   }
   if (mode == "dollar") {
     return(ifelse(x == round(x),
@@ -189,7 +198,7 @@ format_age <- function(x) fmt(x, "decimal", 1)
 # is added in paper LaTeX, not here, so output is "20" / "19.97".
 format_dollar <- function(x) fmt(x, "dollar", 2)
 
-# Household income. Bare integer.
+# Household income. Bare integer, thousands-separated.
 format_income <- function(x) fmt(x, "int")
 
 # Belief responses, scaled 0-100. Same rule as percentages.
