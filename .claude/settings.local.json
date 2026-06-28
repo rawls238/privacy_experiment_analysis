@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pdflatex -interaction=nonstopmode -output-directory=/tmp/30min_out presentations/30min_062026.tex)",
+      "Bash(echo \"exit: $?\")",
+      "Read(//tmp/30min_out/**)",
+      "Read(//private/tmp/**)",
+      "Bash(pdflatex -interaction=nonstopmode -draftmode -output-directory=/tmp/30min_out presentations/30min_062026.tex)",
+      "Bash(sed 's/\\\\\\\\documentclass{beamer}/\\\\\\\\documentclass[handout]{beamer}/' presentations/30min_062026.tex)",
+      "Bash(pdflatex -interaction=nonstopmode -output-directory=/tmp/30min_out _tmp_handout.tex)",
+      "Read(//tmp/**)",
+      "Bash(pdftoppm -png -r 70 -f 1 -l 30 _tmp_handout.pdf pg)",
+      "Bash(pdftoppm -png -r 70 -f 27 -l 36 _tmp_handout.pdf pg)",
+      "Bash(ls pg-2[7-9].png pg-3*.png)"
+    ]
+  }
+}

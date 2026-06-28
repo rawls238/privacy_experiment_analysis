@@ -143,7 +143,7 @@ Email: \texttt{markli@stanford.edu}.}
 \thispagestyle{empty}
 
 \begin{abstract}
-We quantify the consumer welfare effects of privacy regulation via a two-month field experiment with nearly 1,600 participants who browse the web with a custom extension that tracks their behavior and experimentally varies the search costs and complexity of learning about website privacy practices. Our experimental variation identifies the parameters of a structural hurdle model of website choice and information acquisition that separately estimates privacy preferences on the extensive margin (which sites to visit) and the intensive margin (time allocation conditional on visiting), combining revealed browsing behavior with conjoint-elicited stated preferences. We find that comprehension, not access, is the binding friction: making policies easier to find dramatically increases search but produces no learning, while providing simplified, personalized privacy summaries meaningfully improves beliefs. Privacy preferences operate almost entirely through the visit decision: stated preferences overstate revealed extensive-margin preferences by approximately 200\%, while revealed intensive-margin preferences are indistinguishable from zero---providing the first structural decomposition of the privacy paradox across behavioral margins. % scalar 1 - structural
+We quantify the consumer welfare effects of privacy regulation via a two-month field experiment with nearly 1,600 participants who browse the web with a custom extension that tracks their behavior and experimentally varies the search costs and complexity of learning about website privacy practices. Our experimental variation identifies the parameters of a structural consideration-set model of website choice and information acquisition in which privacy preferences operate on both the extensive margin (which sites to visit) and the intensive margin (time allocation conditional on visiting), combining revealed browsing behavior with conjoint-elicited stated preferences. We find that comprehension, not access, is the binding friction: making policies easier to find dramatically increases search but produces no learning, while providing simplified, personalized privacy summaries meaningfully improves beliefs. Privacy preferences operate almost entirely on the extensive margin: stated preferences overstate revealed privacy preferences by approximately XX\%, and this revealed valuation shapes which sites consumers visit rather than how long they stay once there---providing the first structural decomposition of the privacy paradox across behavioral margins. % scalar 1 - structural
 Using our estimates to evaluate two key provisions of privacy regulation: information disclosure and direct practice restrictions, we find that both generate welfare gains but both are inherently limited because consumers' valuations of website quality substantially exceed their privacy costs---implying that consumer-side privacy regulation generates modest benefits relative to the firm costs documented in prior work.
 \end{abstract}
 
@@ -155,72 +155,43 @@ Using our estimates to evaluate two key provisions of privacy regulation: inform
 
 \section{Introduction}
 
-The modern digital economy relies on the collection of consumer data for personalizing online experiences \citep{goldfarb2019digital, farronato2025data}. As data use has expanded, however, consumers have become increasingly concerned about online privacy \citep{goldfarb2012shifts}, motivating large-scale protections such as the European Union's General Data Protection Regulation (GDPR) and Apple’s App Tracking Transparency (ATT). These regulations have two key provisions aimed at improving social welfare: increased transparency of practices (disclosure) and direct, ```standard", regulation of data practices. Existing empirical work suggests that direct regulation has substantially harmed firms by limiting their ability to extract and monetize consumer data \citep{johnson2020consumer, goldberg2023regulating, aridor2023effect, aridor2024privacy}, but we have limited evidence on the other side of the welfare equation: how much consumers benefit. The central challenge in measuring these benefits is that the literature has documented a persistent gap between stated and revealed preferences, known as the ``privacy paradox" \citep{acquisti2016economics, athey2025digital}, which makes it difficult to recover consumer privacy valuations at policy-relevant scale.
+The modern digital economy relies on the collection of consumer data for personalizing online experiences \citep{goldfarb2019digital, farronato2025data}. As data use has expanded, consumers have become increasingly concerned about online privacy \citep{goldfarb2012shifts}. This concern has motivated substantial regulation; examples include the European Union's General Data Protection Regulation (GDPR) and Apple’s App Tracking Transparency (ATT). While privacy regulation has limited the ability of firms to extract and monetize consumer data \citep{johnson2020consumer, goldberg2023regulating, aridor2023effect, aridor2024privacy}, the benefits of these policies have been difficult to measure. 
 
-This paper characterizes the welfare effects of consumer privacy regulation online using a field experiment and a structural model of browsing behavior. The key idea of our approach is to 
+but we have limited evidence on the other side of the welfare equation: how much consumers benefit. The central challenge in measuring these benefits is that the literature has documented a persistent gap between stated and revealed preferences, known as the ``privacy paradox'' \citep{acquisti2016economics, athey2025digital}, which makes it difficult to recover consumer privacy valuations at policy-relevant scale.
+
+These regulations tend to consist of two key provisions: transparent disclosure of data practices to consumers and the setting of standards which directly regulate the allowance of specific data practices. Existing empirical work has found that 
+
+This paper characterizes the welfare effects of consumer privacy regulation online using a field experiment and a structural model of browsing behavior. The key idea of our approach is to combine experimentally induced variation in the search cost and complexity of privacy information with a structural model of browsing that anchors revealed choices to independently elicited stated preferences, allowing us to recover how much consumers value online privacy, to measure the wedge between their stated and revealed preferences, and to quantify the welfare consequences of disclosure and direct regulation. 
 
 We argue that consumers are imperfectly informed about privacy practices due to two key informational frictions: a search cost of accessing privacy policies and a comprehension cost of understanding them. Consumers' incentives to acquire information about a given site depend on the long-run value of learning its privacy practices and the associated reduction in risk from resolving this uncertainty. When choosing between websites, consumers trade off website quality, which may depend on their data sharing choices, against the level of privacy provided, with these informational frictions shaping their expectations over privacy practices.
 
 Our experiment involves nearly 1,600 participants who install a custom developed Chrome extension for two months; the extension collects browsing behavior and experimentally manipulates access to privacy information, and third-party tracking, to quantify the relative importance of each of these forces.\footnote{A key concern is that our measurement itself is privacy-invasive. In Section \ref{sec:selection} we discuss how we directly measure and mitigate selection into the recruiting platforms we use (Prolific, CloudResearch Connect), selection into the baseline survey, and selection into the extension portion of the study.} In our primary intervention, we vary both the ease of access and the complexity of privacy information. For participants in the \textit{saliency} group, we reduce search costs by making the privacy policy more easily accessible as the participant browses. For participants in the \textit{information} group, we both reduce search costs \emph{and} the complexity of privacy information by providing users with binary privacy attributes; which we collect by hand for the top 500 websites online.\footnote{Each policy is read by three trained raters overseen by law students (see Section \ref{sec:policydata} for more details). We show that there is considerable variation in privacy practices across websites within the same category, providing scope for information provision to affect choices.} Finally, our experiment ends with a cookie-deletion intervention in which we exogenously remove third-party cookies associated with advertising and analytics, providing variation in privacy-dependent site quality.
 
-[discuss conjoint and measures of stated preferences]
+To value these choices and to benchmark revealed against stated behavior, we elicit privacy preferences directly. In the baseline survey, before any treatment, each participant completes a choice-based conjoint task that trades off websites differing in their privacy practices against a monthly price \citep{ALLENBY2019151}. This yields, for every participant, a vector of part-worths over the nineteen privacy attributes together with a price coefficient that expresses these valuations in dollars. Participants state positive valuations for user-control protections and negative valuations for data collection and sharing---especially practices with downstream financial consequences---giving us a stated-preference benchmark against which we later measure revealed browsing.
 
-[discuss ]
+Measuring the welfare effects of information provision also requires ground truth about what websites actually do. We therefore construct a novel dataset of privacy practices for the top 500 U.S.\ websites, with trained raters overseen by law students hand-coding each site's privacy policy into the same nineteen binary attributes that we elicit in the conjoint and belief measures. This common attribute space ties together what sites actually do, what consumers believe, and what consumers value, and supplies the cross-site variation in privacy practices that both the information treatment and the structural model exploit.
 
-Our reduced form results suggest significant information frictions in privacy choices, and provide sufficient variation to identify our structural model that captures these different forces. First, we document that our saliency intervention induces search (visiting the privacy policy), but not learning (knowing the privacy practices). In contrast, our information intervention both induces search and learning. To assess this, our endline survey asks participants to recall the privacy practices of their five most visited websites. We find that the participants in the information treatment are \beliefCorrectInfoVsRestPP{} percentage points more likely to be correct about site privacy practices than both the saliency and control groups.\footnote{In the intervention we persistently provide the top two most informative attributes for the participant based on their beliefs and stated preferences.} 
+Our reduced-form results suggest significant information frictions in privacy choices, and provide sufficient variation to identify our structural model that captures these different forces. First, we document that our saliency intervention induces search (visiting the privacy policy), but not learning (knowing the privacy practices). In contrast, our information intervention both induces search and learning. To assess this, our endline survey asks participants to recall the privacy practices of their five most visited websites. We find that the participants in the information treatment are \beliefCorrectInfoVsRestPP{} percentage points more likely to be correct about site privacy practices than both the saliency and control groups.\footnote{In the intervention we persistently provide the top two most informative attributes for the participant based on their beliefs and stated preferences.} 
 While participants in the saliency group may not learn, they do search. Participants in the saliency group viewed privacy policies nearly \policyVisitSaliencyFold{} times more than those in either the information or control group. The combination of these facts points to the important role of information complexity in limiting learning in privacy settings. Finally, we demonstrate that changes in beliefs do translate into small behavioral changes. Participants in the information group exhibit a modest shift, primarily on the extensive margin, to sites more aligned with the participants' privacy preferences and a slight decrease in data sharing. Furthermore, following \cite{haaland2025understanding}, qualitative coding of self-reported changes during the experiment suggests small behavioral adjustments to the intervention.
 
-We next estimate an empirical analogue of our model of website choice in order to fully quantify the welfare benefits of privacy online and of different privacy regulation provisions. Motivated by the reduced-form finding that privacy information affects the extensive margin (which sites consumers visit) but not the intensive margin (time spent conditional on visiting), we specify a hurdle model that allows privacy preferences to operate differently on each margin. As in our theoretical model, participants trade off the direct utility of consumption and the costs associated with privacy over which there is uncertainty, with both search and complexity frictions involved in acquiring information. In addition to the \textit{revealed} preference data of actual browsing choices during our experiment, our model leverages measures of participant's \textit{stated} preferences over privacy attributes---elicited using a conjoint survey in the first stage of our study \citep{ALLENBY2019151}. We rely on these stated preferences to map utilities to dollars and to estimate the gap between stated and revealed preferences for privacy---an object of extensive debate within the privacy literature \citep{norberg2007privacy, f4d6c48d-b77c-3568-b51c-5946aee2b9de, athey2025digital}. We find that stated preferences overstate revealed \emph{extensive-margin} preferences by approximately 200\%, while revealed intensive-margin preferences are indistinguishable from zero---providing the first structural decomposition of the privacy paradox. % scalar 2 - structural
+We next estimate an empirical analogue of our model of website choice in order to fully quantify the welfare benefits of privacy online and of different privacy regulation provisions. Motivated by the reduced-form finding that privacy information affects the extensive margin (which sites consumers visit) far more than the intensive margin (time spent conditional on visiting), we specify a consideration-set model in which privacy preferences operate on both margins---shaping which sites a consumer considers and how she allocates time across those she visits---and let the data determine their relative strength. As in our theoretical model, participants trade off the direct utility of consumption and the costs associated with privacy over which there is uncertainty, with both search and complexity frictions involved in acquiring information. In addition to the \textit{revealed} preference data of actual browsing choices during our experiment, our model leverages measures of participants' \textit{stated} preferences over privacy attributes---elicited using a conjoint survey in the first stage of our study \citep{ALLENBY2019151}. We rely on these stated preferences to map utilities to dollars and to estimate the gap between stated and revealed preferences for privacy---an object of extensive debate within the privacy literature \citep{norberg2007privacy, f4d6c48d-b77c-3568-b51c-5946aee2b9de, athey2025digital}. We find that stated preferences overstate revealed privacy preferences by approximately XX\%, and that this revealed valuation operates almost entirely through the visit decision rather than time-on-site---providing the first structural decomposition of the privacy paradox across behavioral margins. % scalar 2 - structural
 
-We use the model estimates to evaluate how much consumers value privacy online, showing that at baseline consumers experience disutility equivalent to \$76 per month from the privacy-invasive practices they experience---21\% of total consumer surplus from the browsing market. % scalar 3 - structural
-Our hurdle model reveals that 68\% of this cost operates through the extensive margin: consumers forgo utility by excluding privacy-invasive sites from their browsing, even when those sites offer high quality. % scalar 4 - structural
+We use the model estimates to evaluate how much consumers value privacy online, showing that at baseline consumers experience disutility equivalent to \$XX per month from the privacy-invasive practices they experience---XX\% of total consumer surplus from the browsing market. % scalar 3 - structural
+Our model reveals that XX\% of this cost operates through the extensive margin: consumers forgo utility by excluding privacy-invasive sites from their browsing, even when those sites offer high quality. % scalar 4 - structural
 We use our rich privacy characteristic space to characterize which privacy attributes participants care the most about. Our estimates suggest that consumers have disutility from websites engaging in collection and usage, but positive utility from control. In terms of absolute magnitudes, consumers assign the most weight to collecting and sharing financial data, collecting sensitive information and off-site data, and sharing data with law enforcement. These results paired with our survey evidence suggest that most of the privacy disutility comes from the potential downstream consequences (e.g., identity theft, hacking) involved with data sharing.
 
 We then use our model to evaluate the welfare benefits from two distinct aspects of privacy regulation: information provision and direct regulation of privacy practices.
 
-We begin with the full information benchmark, in which participants are exogenously provided with true privacy information for all websites online. We estimate full information leads to a welfare increase of 17\% relative to the status quo, or \$42 per month per participant. % scalar 5 - structural
-Under the hurdle model, this gain operates primarily through the extensive margin: consumers discover that some excluded sites are privacy-friendly and add them to their portfolio. Still, an important element of disclosure regulation online is that information is made salient only on visited websites. This motivates our targeted information counterfactual, in which we remove both search costs and complexity---leading participants to acquire full information only for the sites they browse. Our targeted information provision provides a welfare gain of less than 1\% over the status quo (\$1.20 per month), indicating that the vast majority of the information value comes from learning about sites consumers have not yet visited. % scalar 6 - structural
-Finally, removing complexity while preserving search costs ($\alpha^{\text{search}} = 1$) yields a similarly modest gain of \$1.44 per month, as search costs still limit the number of sites for which consumers acquire information. % scalar 7 - structural
+We begin with the full information benchmark, in which participants are exogenously provided with true privacy information for all websites online. We estimate full information leads to a welfare increase of XX\% relative to the status quo, or \$XX per month per participant. % scalar 5 - structural
+In our model, this gain operates primarily through the extensive margin: consumers discover that some excluded sites are privacy-friendly and add them to their portfolio. Still, an important element of disclosure regulation online is that information is made salient only on visited websites. This motivates our targeted information counterfactual, in which we remove both search costs and complexity---leading participants to acquire full information only for the sites they browse. Our targeted information provision provides a welfare gain of less than XX\% over the status quo (\$XX per month), indicating that the vast majority of the information value comes from learning about sites consumers have not yet visited. % scalar 6 - structural
+Finally, removing complexity while preserving search costs ($\alpha^{\text{search}} = 1$) yields a similarly modest gain of \$XX per month, as search costs still limit the number of sites for which consumers acquire information. % scalar 7 - structural
 
-We next examine how direct regulation of privacy practices, in the spirit of regulations like the GDPR, impacts welfare. We estimate an upper bound welfare effect of banning six GDPR-related practices across all consumers, showing that a joint ban leads to a \$72 per month increase in welfare for consumers, or an increase of 30\% over the status quo. % scalar 8 - structural
-Notably, 68\% of this gain comes from reallocation---consumers re-optimizing their browsing portfolio---rather than the direct benefit of eliminating disliked practices. % scalar 9 - structural
-Under the hurdle model, this reallocation operates primarily on the extensive margin: sites that consumers had been excluding due to bad privacy practices re-enter the browsing when those practices are banned. Critically, these estimates are an upper bound because we do not allow for websites to endogenously adjust quality in response to our intervention, and such restrictions have been shown to be associated with large costs and revenue losses for firms \citep{goldberg2023regulating, aridor2023effect, aridor2024privacy}.
+We next examine how direct regulation of privacy practices, in the spirit of regulations like the GDPR, impacts welfare. We estimate an upper bound welfare effect of banning six GDPR-related practices across all consumers, showing that a joint ban leads to a \$XX per month increase in welfare for consumers, or an increase of XX\% over the status quo. % scalar 8 - structural
+Notably, XX\% of this gain comes from reallocation---consumers re-optimizing their browsing portfolio---rather than the direct benefit of eliminating disliked practices. % scalar 9 - structural
+In our model, this reallocation operates primarily on the extensive margin: sites that consumers had been excluding due to bad privacy practices re-enter browsing when those practices are banned. Critically, these estimates are an upper bound because we do not allow for websites to endogenously adjust quality in response to our intervention, and such restrictions have been shown to be associated with large costs and revenue losses for firms \citep{goldberg2023regulating, aridor2023effect, aridor2024privacy}.
 
 Overall, these results have several important policy implications. First, consumers have reasonably poor understanding of the prevalence of privacy practices online, driven primarily by the complexity of privacy policies. Second, consumers have meaningful valuations for privacy online, but they operate almost entirely through the visit decision, not time allocation---quality preferences dominate conditional on visiting. Third, disclosure policies should target the visit decision (e.g., browser-level warnings, privacy ratings) rather than time-on-site behavior. Direct regulation of practices generates meaningful welfare gains without requiring changes in consumer information, though this is the channel most likely to lead to firm revenue losses. Thus, a combination of broad information disclosure and targeted practice restrictions is likely to maximize consumer welfare.
 
-\sgdelete{
-
-%Our experiment is designed to provide variation across each of these dimensions that allows us to separately estimate the value consumers assign to privacy and the magnitude of the informational frictions.
-
-%frictions begin by characterizing a simple model of website choice and privacy information acquisition. A consumer's utility from a website is determined by its idiosyncratic website quality (which partially depends on privacy choices) and the intrinsic value of privacy -- similar to the formulation of \cite{lin2022} where privacy has an instrumental and non-instrumental component.\footnote{The intrinsic value partially includes downstream consequences of data sharing (e.g., identity theft) that may not directly impact website quality.} However, consumers face information frictions with respect to privacy practices that are driven by both  that prevent both understanding specific website practices and having correct aggregate beliefs about the general prevalence of privacy practices. Following the structure of the information disclosure environment online, in our model consumers first choose the website to use and then determine whether to acquire information based on the long-term value of acquiring that information.
-We design an experiment and a Chrome Extension that allows us to measure and identify the different key parameters of this model of choice in order to characterize the welfare effects of privacy regulation. First, we collect data and build the necessary tools to study these questions. We define a privacy attribute space and manually collect data on their prevalence across the top 500 most trafficked sites in the US.\footnote{We show that there is considerable variation in privacy practices across websites within the same category, providing scope for information provision to affect choices.} We then build a Chrome Extension that extends the popular AdblockPlus extension which allows us to collect time spent on different websites, track and manipulate the data sent to third-parties, and varies the privacy information environment of the participants. Second, we implement two experimental interventions on nearly 1600 consumers who install the extension for 2 months.\footnote{A key concern is that our measurement itself is privacy-invasive. In Section \ref{sec:selection} we discuss how we directly measure and mitigate selection into the recruiting platforms we use (Prolific, CloudResearch Connect), selection into the baseline survey, and selection into the extension portion of the study.} The first is to experimentally manipulate the two information frictions: reducing search costs of privacy information by making the privacy policy more easily accessible (denoted as the \textit{saliency} group) and reducing complexity costs by providing simplified binary attributes (e.g., this website collects biographical data) instead of the privacy policy text (denoted as the \textit{information} group). The second is to exogenously remove third-party cookies associated with advertising and analytics, providing variation in privacy-dependent site quality.
-
-
-We therefore estimate our model using the real browsing choices of participants in the experiment and rely on the experimental variation for identification. In addition to the \textit{revealed} preference data provided by our experiment, our model combines this with the participant's \textit{stated} preferences for the privacy attributes that we elicit using conjoint analysis \citep{ALLENBY2019151}. We rely on the conjoint estimates both to map utilities to dollars, but also to estimate the gap between stated and revealed preferences for privacy -- an object of extensive debate within the privacy literature \citep{norberg2007privacy, f4d6c48d-b77c-3568-b51c-5946aee2b9de, athey2025digital}. We find that the stated preference measures overstated revealed preferences by approximately 59\% -- directionally consistent with the literature but provides the first quantification for how large this gap is.
-
-We use the model estimates to evaluate how much consumers value privacy online, showing that at baseline consumers lose \$6.21 per month from the privacy-invasive practices they experience. Our model is structured to speak to the welfare gains from two key consumer-side provisions of privacy regulation: providing information on privacy practices and enabling consumers to opt out of certain practices. For the information on privacy practices our model allows us to assess the welfare effects of removing separately complexity and search costs for (i) the websites consumers visit and (ii) the full set of sites, including those not visited. We find that the comprehension friction is the larger friction, while search costs are still meaningfully large, and that most of the welfare gains come from reducing frictions on the sites consumers actually visit (a gain of \$0.67 per month), with only an additional \$0.21 per month from resolving uncertainty across all websites. In comparison, enabling GDPR-style regulation of privacy attributes yields an upper bound welfare gain of \$1.22 per month. While the stated preference estimates are larger, both are relatively small compared to the consumer utility estimates for website quality leading to limited gains from such regulation.
-
-Overall, these results have several important policy implications. First, consumers have reasonably poor understanding of the prevalence of privacy practices online which is primarily driven by the complexity and length of privacy policies. Second, consumers have meaningful valuations for privacy online, but they are dwarfed by how much consumers value their most frequented sites. Third, direct regulation of practices has the largest scope for welfare gains -- though this is the channel most likely to lead to firm revenue losses -- but there are also meaningful welfare gains from information provision alone, given the lack of information by consumers. Thus, regulations targeting the information disclosure environment are likely to generate meaningful welfare gains without as much scope for firm revenue losses.}
-
-
-
-\begin{comment}
-
-This paper studies these questions via a large-scale information provision field experiment. In our experiment, we experimentally manipulate the privacy information environment of participants as they browse the web. We recruit nearly 1600 participants to install a custom browser extension for a period of 2 months that allows us to observe browsing and privacy-seeking behavior online and experimentally manipulate the form of privacy information disclosure. The experiment implements two interventions directly targeted at reducing information frictions. In the \textit{saliency} condition, we reduce search and access costs for privacy information by making privacy policies prominent and easily accessible on the webpages that participants visit. In the \textit{information} condition, we similarly reduce access costs but additionally reduce the complexity of disclosure by providing the participants with the true underlying privacy characteristics of the site. We characterize how this information provision impacts participant's knowledge about privacy practices and subsequently characterize how it materializes in changes in data sharing and website choices.
-
-Implementing this experiment requires two novel elements. First, it requires comprehensive data on each website's  privacy characteristics. Due in part to existing regulations, a significant amount of privacy relevant information is accessible in publicly posted privacy policies. While not exhaustive, the information available in privacy policies is reasonably comprehensive but difficult to access. The information that we use in the experiment comes from hand-coding the information contained in privacy policies into nineteen binary characteristics for the top 500 most visited websites in the United States. Second, we develop a browser extension that allows us to measure changes in participant behavior and implement our experimental design. Our technology is based on a custom version of an ad blocker, that uses the same underlying content detection as the popular AdBlockPlus extension. It collects a number of important pieces of data related to our research questions: for every participant we observe how much time they spend on different websites, interactions with cookie banners and privacy policies, all the metadata for third-party trackers set by websites, and enables us to implement our intervention across all the websites a participant visits.
-
-The primary contributions of this paper are:
-\begin{enumerate}
-\item We systematically characterize variation in privacy practices across websites -- documenting that there is substantial variation in privacy practices even for websites in the same category.
-\item We quantify, via a conjoint analysis, participant's valuations for different privacy attributes and their beliefs about privacy practices. We show that participant's beliefs about privacy practices are systematically misspecified for most attributes and that they value privacy practices that relate to off-website consequences (collecting / sharing financial data, collecting sensitive information, securing information), the most.
-\item We show that while reducing search costs leads to participants searching more for privacy information, only participants with \textit{both} reduced search costs and reduced complexity of information presentation internalize the privacy practices of websites. This highlights that reducing complexity is crucial in the implementation of disclosure.
-\item We find modest behavioral responses to the information: there are small but detectable shifts toward more privacy-conscious websites on the extensive margin and a small change in likelihood of sharing data with websites. This suggests that while the intervention improves knowledge, privacy costs are outweighed by website quality for most consumption decisions. 
-\end{enumerate}
-
-Overall, our paper provides evidence for the mechanisms through which disclosure operates and highlights the small effect that it has on participant behavior.
-
-\end{comment}
 \section{Related Work}\label{sec:lit}
 
 Our paper primary contribution is to two significant strands of literature on the economics of privacy and information disclosure.
@@ -323,7 +294,7 @@ Our experiment relies on accurate and comprehensive information about website pr
 
 Privacy policies are legal documents presenting the terms and rights associated with using a website, and they serve as the primary source of participant information on a website's privacy practices. These policies are often obtuse, difficult to find, and require significant expertise to understand \citep{10.1145/3573128.3604902}. We begin by developing an exhaustive list of nineteen privacy attributes that span what data websites collect, how they use collected data, and what rights users have over the collected data (Table~\ref{tab:characteristics}). A team of trained human raters and law students are then tasked with reading each policy and deconstructing it into our nineteen binary attributes.
 
-To ensure accuracy, each policy is read by three independent raters who answer a series of binary questions corresponding to different privacy attributes. In addition, we elicit rater certainty on a five-point scale for each attribute. Raters are trained using twelve practice policies randomly chosen from the top 500 websites, which they score alongside a law student. With three raters and nineteen characteristics, this amounts to 57 different privacy indicators per domain. Privacy policies take on average 17.8 minutes to read, with some exceeding 60 minutes; in total, the rating process has cumulatively taken 383.8 human hours. Additionally, in Appendix \ref{sec:data_collection_appendix} we cross-reference the tracker data collected by the Chrome Extension with the privacy policy data. We focus on attributes that we can reliably measure using the tracker data, such as ``Collecting Browsing on-site data'', and show that these two measures are in general accordance.
+To ensure accuracy, each policy is read by three independent raters who answer a series of binary questions corresponding to different privacy attributes. In addition, we elicit rater certainty on a five-point scale for each attribute. Raters are trained using twelve practice policies randomly chosen from the top 500 websites, which they score alongside a law student. With three raters and nineteen characteristics, this amounts to 57 different privacy indicators per domain. Privacy policies take on average 17.8 minutes to read, with some exceeding 60 minutes; in total, the rating process has cumulatively taken 383.8 human hours. Additionally, in Appendix \ref{sec:data_collection_appendix} we cross-reference the tracker data collected by the Chrome Extension with the privacy policy data. We focus on an attribute that we can reliably measure using the tracker data---``Collecting Browsing on-site data''---and show that our hand-coded measure is aligned with the tracker data.
 
 \subsubsection{Experimental Extension}\label{sec:extension}
 
@@ -493,7 +464,7 @@ Finally, selection could occur when participants are asked to install the extens
 For our information intervention to influence participant choices, three conditions must hold: there must be meaningful heterogeneity in privacy practices across websites within plausible substitute websites, participants must have uncertainty about the privacy practices of websites, and the attributes on which we provide information must be ones participants care about. We document below that all three conditions hold.
 
 \subsubsection{Privacy Practice Heterogeneity}
-We categorize each website using the Klazify API and aggregate each domain into a single score for each of the three privacy practice categories in Table~\ref{tab:characteristics}: \emph{collect} (8 attributes relating to data collection), \emph{use} (7 attributes relating to how data is shared), and \emph{control} (5 attributes relating to user protections). Our conjoint estimates (discussed below) imply that more ``control'' practices are utility-improving while more ``collect'' or ``use'' practices are utility-decreasing. Appendix Figure~\ref{fig:scores_by_category} documents substantial heterogeneity \emph{within} website categories: even among websites offering similar content, privacy practices vary widely---precisely the variation that informed participants could act on, and the cross-site variation in true practices $\mu^*_j$ that the structural model of Section~\ref{sec:empirical_model} exploits.\footnote{Median scores are similar across categories, with two exceptions---``Law \& Government'' and ``Adult''---whose sites collect more sensitive information (e.g., legal records, health data) and accordingly maintain stricter practices, a useful validation that our hand-coded data captures meaningful differences.}
+We categorize each website using the Klazify API and aggregate each domain into a single score for each of the three privacy practice categories in Table~\ref{tab:characteristics}: \emph{collect} (7 attributes relating to data collection), \emph{use} (7 attributes relating to how data is shared), and \emph{control} (5 attributes relating to user protections). Our conjoint estimates (discussed below) imply that more ``control'' practices are utility-improving while more ``collect'' or ``use'' practices are utility-decreasing. Appendix Figure~\ref{fig:scores_by_category} documents substantial heterogeneity \emph{within} website categories: even among websites offering similar content, privacy practices vary widely---precisely the variation that informed participants could act on, and the cross-site variation in true practices $\mu^*_j$ that the structural model of Section~\ref{sec:empirical_model} exploits.\footnote{Median scores are similar across categories, with two exceptions---``Law \& Government'' and ``Adult''---whose sites collect more sensitive information (e.g., legal records, health data) and accordingly maintain stricter practices, a useful validation that our hand-coded data captures meaningful differences.}
 
 \begin{figure}[ht]
     \centering
@@ -749,7 +720,10 @@ We estimate $\theta$ against nine moment blocks of the common form
 \begin{equation}\label{eq:em_moment}
   m_b = \E\bigl[\bigl(y^{\text{obs}}_{i} - \hat y_{i}(\theta)\bigr)\, z_{i}\bigr] = 0,
 \end{equation}
-the average over consumers of a residual between an empirical target $y^{\text{obs}}$ and its model prediction $\hat y(\theta)$, weighted by an instrument $z$. Each block below specifies its own $y^{\text{obs}}$, $\hat y$, and $z$. Identification rests on the experiment's three-way variation: the baseline period and control group anchor structural levels free of treatment, the saliency arm exogenously lowers search cost, and the information arm exogenously corrects beliefs. Combined with our measured evolution in beliefs, $Z_{ijk} = \mu_{jk} - \theta_{ijk}$, comparisons across treatments isolate the privacy channel from quality, habit, and search cost. 
+the average over consumers of a residual between an empirical target $y^{\text{obs}}$ and its model prediction $\hat y(\theta)$, weighted by an instrument $z$. Each block below specifies its own $y^{\text{obs}}$, $\hat y$, and $z$. Identification rests on the experiment's three-way variation: the baseline period and control group provide , the saliency arm exogenously lowers the search cost involved with finding the privacy policy, and the information arm provides simplified information that exogenously shifts beliefs about privacy practices.
+
+%
+%Combined with our measured evolution in beliefs, $Z_{ijk} = \mu_{jk} - \theta_{ijk}$, comparisons across treatments isolate the privacy channel from quality, habit, and search cost. 
 
 Two points organize what follows. First, the latent types are separated by their baseline visit volumes and quality gradients (Block $V$) and their cookie-deletion responses (Block $E$), so the type-specific objects $\lambda_g, \alpha^{\text{ext}}_g, \xi_g$ are anchored to observable type differences. Second, the belief-update magnitude is pinned down separately from the privacy response. The information treatment moves behavior through the product of how far beliefs shift ($\alpha_{\text{info}}$) and how strongly browsing responds to that shift (the privacy scale). Without our independent measures of how far beliefs move, a muted browsing response could mean either that consumers barely learned or that they learned but do not act on privacy. Block $B$ resolves this by identifying $\alpha_{\text{info}}$ from endline belief accuracy rather than from behavior, so the privacy blocks $C_{\text{int}}, T, P$ can attribute the residual response to privacy sensitivity rather than to a smaller belief shift. We group the blocks below by the object they discipline; Table~\ref{tab:em_identification} lists each block's size and the parameters it pins down. 
 
@@ -777,28 +751,29 @@ $\phi_{\text{ext}}$ & $T, P$ & $18{,}\,9$ & magnitude of treatment visit / priva
 \end{tabular}
 \end{table}
 
-\paragraph{Privacy scale.} The magnitude of revealed privacy preference is identified from how sharply browsing responds when the information treatment corrects beliefs about specific sites. Learning that a site is more invasive than she thought pushes a privacy-sensitive consumer away from it---fewer visits, less time---while better-than-expected news pulls her toward it; the size of this reallocation per unit of belief correction is the scale we want to recover. Two features of the design rule out the obvious confounds: the treatment randomizes at least one \emph{which} practices are disclosed, so the response attaches to specific attributes rather than to unobserved site appeal, and the magnitude of the correction is pinned down separately, so the response reflects how much consumers act on privacy rather than how surprising the news was.
-
-We operationalize this with three moments. 
-\begin{enumerate}
-    \item \emph{Block $C_{\text{int}}$} (intensive margin) matches the info$-$control change in log time-share, conditional on visit, to its model analog, weighting by the belief gap ($Z_{ijk}$) aggregated over the attributes actually disclosed at $(i,j)$. This includes the persistent attributes shown to $i$ plus the randomly assigned attribute at site $j$, whose exogeneity makes the disclosure response informative about the scale.
-    \item \emph{Block $P$} (extensive margin) matches, by type and arm, the privacy exposure $\sum_k \mu^*_{jk}\beta_{ik}$ of the sites a consumer visits. Its info$-$control shift---consumers moving toward less invasive sites under the treatment---is the structural counterpart of the assortment response in Section~\ref{sec:website_choice}.
-    \item \emph{Block $A$} (search) The saliency arm supplies a third source of identification: search responds more steeply to the value of resolving a site's uncertainty when the consumer cares more about privacy. Because the same $\beta_i$ enters both margins, the extensive response alone identifies only the ratio $\phi_{\text{ext}}/\xi$. The intensive margin and search responses, which move with $\xi$, separate it from $\phi_{\text{ext}}$.
-\end{enumerate}
-
 \paragraph{Information frictions.} Whether the information treatment changes behavior at all turns on two frictions: how costly it is to find and attend to a site's privacy information, and how much of it consumers absorb once they do. The experiment is designed to separate them---the saliency arm lowers the cost of looking, the information arm additionally simplifies what is found---and two blocks recover them directly from the data. 
 \begin{enumerate}
     \item \emph{Block $A$} (search) matches how often consumers read privacy policies: the baseline rate identifies the search cost, the jump under the saliency treatment identifies how much it falls. 
     \item \emph{Block $B$} (comprehension) matches endline belief accuracy: how far beliefs move toward the truth identifies the information arm's learning rate, against the near-zero gain from policy-reading alone in the saliency arm.
 \end{enumerate} 
 
+
+\paragraph{Privacy scale.} The magnitude of revealed privacy preference is identified from how sharply browsing responds to the information provided by the intervention. Learning that a site is more invasive than she thought pushes a privacy-sensitive consumer away from it---fewer visits, less time---while better-than-expected news pulls her toward it. Two features of the design rule out the obvious confounds: the treatment randomizes at least one of \emph{which} practices are disclosed, so the response attaches to specific attributes rather than to unobserved site appeal, and the magnitude of the correction is pinned down separately, so the response reflects how much consumers act on privacy rather than how surprising the news was.
+
+We operationalize this with three moments. 
+\begin{enumerate}
+    \item \emph{Block $C_{\text{int}}$} (intensive margin) matches the info$-$control change in log time-share, conditional on visit, to its model analog, weighting by the belief gap ($Z_{ijk} = \mu_{jk} - \theta_{ijk}$) aggregated over the attributes actually disclosed at $(i,j)$. This includes the persistent attributes shown to $i$ plus the randomly assigned attribute at site $j$, whose exogeneity makes the disclosure response informative about the scale.
+    \item \emph{Block $P$} (extensive margin) matches, by type and arm, the privacy exposure $\sum_k \mu^*_{jk}\beta_{ik}$ of the sites a consumer visits. Its info$-$control shift---consumers moving toward less invasive sites under the treatment---is the structural counterpart of the assortment response in Section~\ref{sec:website_choice}.
+    \item \emph{Block $A$} (search) The saliency arm supplies a third source of identification: search responds more steeply to the value of resolving a site's uncertainty when the consumer cares more about privacy. Because the same $\beta_i$ enters both margins, the extensive response alone identifies only the ratio $\phi_{\text{ext}}/\xi$. The intensive margin and search responses, which move with $\xi$, separate it from $\phi_{\text{ext}}$.
+\end{enumerate}
+
 \paragraph{Demand and dynamics.} The remaining five blocks pin down the non-privacy structure of browsing---how appealing sites are at baseline, how consumers substitute across them, and how persistent their habits are---so that it is not confounded with the privacy responses. 
 \begin{enumerate}
     \item \emph{Block $V$} (baseline consideration) matches, for each type, the mean number of distinct sites a consumer visits before treatment and the mean quality of those sites, which together fix the level and quality-gradient of consideration.
     \item \emph{Block $T$} (treatment extensive) matches those same two statistics during the treatment period, by type and arm, so that the model reproduces the experiment's effect on how many and which sites consumers visit.
-    \item \emph{Block $E$} (cookie deletion) uses the staggered cookie-deletion rollout, matching the difference-in-differences in log time-share projected onto the personalization and ad-sharing features and an early-cohort indicator.
+    \item \emph{Block $E$} (cookie deletion) uses the staggered cookie-deletion rollout, matching the difference-in-differences in log time-share projected onto the personalization and ad-sharing features. There was a logging bug in the implementation of the cookie deletion intervention that resulted in a level shift of time spent due to data being unable to be sent to the servers, so we use the staggered timing to estimate this level shift captured in $\bar{\pi}$.
     \item \emph{Block $F$} (nesting) identifies the substitution structure by projecting the demand residual onto differentiation instruments following \citet{gandhihoude2019}.
-    \item \emph{Block $R$} (state dependence) matches the rate at which consumers return to sites they have visited before, by type and arm
+    \item \emph{Block $R$} (state dependence) matches the rate at which consumers return to sites they have visited before, by type and arm.
 \end{enumerate}
 
 \section{Conclusion}
@@ -910,7 +885,7 @@ Finally, Figure~\ref{fig:scores_by_category} documents the distribution of priva
 \begin{center}
 \includegraphics[scale=.5]{./output/figures/domain_scores_box_plot.pdf}
 \end{center}
-\caption*{\scriptsize \textsc{Notes}:  Distribution of privacy practice counts by website category. Privacy practices hand-coded from privacy policies of top 500 US websites and aggregated into three indices: collect (8 attributes), control (5 attributes), and use (7 attributes). Each website receives a score equal to the count of practices engaged in within each category. Website categories obtained from the Klazify API. Box plots display median, interquartile range, and outliers.}
+\caption*{\scriptsize \textsc{Notes}:  Distribution of privacy practice counts by website category. Privacy practices hand-coded from privacy policies of top 500 US websites and aggregated into three indices: collect (7 attributes), control (5 attributes), and use (7 attributes). Each website receives a score equal to the count of practices engaged in within each category. Website categories obtained from the Klazify API. Box plots display median, interquartile range, and outliers.}
 \end{figure}
 
 \section{Conjoint Details}\label{sec:conjoint_details}
@@ -1339,6 +1314,460 @@ with site and participant fixed effects $\eta_j$ and $\eta_i$, estimated separat
 We complement the objective measures from Section \ref{sec:website_choice} with qualitative evidence from free-form responses in the endline survey \citep{haaland2025understanding}. Participants were asked: ``Has this experiment changed your view on privacy online? Have you changed any online behaviors in response to this experiment?'' We recruit MTurk raters to classify each response into four categories: behavioral change (site choice or data sharing), heightened awareness, fatalism (resignation that data collection is inevitable), and no change. Three raters coded each response. In cases where the majority coding was tied, the researchers broke ties based on their own interpretation.
  
 Figure~\ref{fig:freeform_change_responses} presents the results. The information group shows elevated rates of both behavioral change and heightened awareness relative to the control group, consistent with the objective evidence of modest behavioral shifts. The saliency group is statistically indistinguishable from the control group on all dimensions and, if anything, shows higher rates of fatalism --- consistent with the complexity mechanism documented in Section~\ref{sec:search_learning}. Participants who were directed to privacy policies but could not extract useful information appear to have concluded that privacy management is futile. One participant in the saliency group captured this sentiment: ``I would click on the data privacy link, and my eyes would just immediately glaze over at the length and legalese, and I just go into every website with the expectation that I will have no power over my data.''
+
+\section{Data Sharing and Cookie Deletion Analysis}\label{sec:cookie_deletion_analysis}
+ 
+We first examine whether participants change their data sharing practices in response to the intervention. Table~\ref{tab:treatment_effect_data_sharing} presents treatment effects on four self-reported measures from the endline survey: whether a participant deleted cookies, explicitly opted out of data sharing, withheld data due to privacy concerns, or changed privacy settings on at least one website.\footnote{This question was only added for the second wave of participants.}
+ 
+The one statistically significant result is that participants in the information group are 6.9 percentage points more likely to have opted out of data sharing on at least one website (column 2, $p < 0.10$), consistent with a 20\% increase relative to the control group mean. Point estimates for the remaining measures are positive for both treatment groups but not statistically distinguishable from zero. The saliency group shows no significant effects on any measure.
+ 
+%We validate these self-reported measures using objective data from the extension. Table~\ref{tab:privacy_settings_visits} estimates treatment effects on visits to privacy settings pages --- detected through our browsing history logs --- using the same difference-in-differences specification as in Section~\ref{sec:search_learning}. The results show precise null effects across all three columns (total visits, ever visiting, and distinct domains), consistent with the self-reported null on privacy settings changes.
+ 
+Overall, there is weak evidence of a small change in data sharing behavior in the information group, concentrated in the opt-out decision, and no detectable response in the saliency group. The limited behavioral response likely reflects the high costs of changing data sharing practices relative to the modest privacy valuations documented in Section~\ref{subsec:stated_privacy_prefs}: even informed participants may rationally choose not to incur the hassle of modifying settings on individual websites.
+
+\subsection{Effect on Third-Party Cookies per Visit}\label{subsec:info_treatment_cpv}
+
+The self-reported opt-out evidence in Table~\ref{tab:treatment_effect_data_sharing} relies on participants' own characterization of their behavior. We complement this with a revealed-preference measure of data sharing constructed directly from the extension's browsing logs: the daily number of third-party cookies per visit (CPV). Lower CPV indicates exposure to fewer tracking technologies per browsing event, capturing all behavioral channels through which information might reduce data sharing, including site avoidance, within-site opt-outs, and reductions in time spent on tracker-heavy sites.
+
+Figure~\ref{fig:cpv_trend_by_treatment} plots the daily mean log CPV by treatment arm, separately for each wave. The Wave 1 series is stable across the pre and post periods with no systematic trend across treatment arms. Wave 2 is stable through late July but exhibits a sharp upward shift in the final ten days of the post-information period, with all three arms rising together from approximately 2.6 to 3.5 in log CPV. Because the shift moves the control, saliency, and information arms in parallel, this parallel shift reflects a calendar-date level change in tracker exposure that affects all users similarly, rather than a treatment-induced response. This pattern motivates reporting both a cross-section and a difference-in-differences specification below: the cross-section captures the raw post-period comparison parallel to the self-report analysis, while the difference-in-differences absorbs the Wave 2 late-period shift through calendar-date fixed effects.
+
+\begin{figure}[H]
+\centering
+\caption{Daily Mean log(1 + CPV) by Treatment Arm}
+\label{fig:cpv_trend_by_treatment}
+
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Wave 1}
+\label{fig:cpv_trend_wave1}
+\includegraphics[width=\textwidth]{figures/cpv_trend_by_treatment_wave1.pdf}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Wave 2}
+\label{fig:cpv_trend_wave2}
+\includegraphics[width=\textwidth]{figures/cpv_trend_by_treatment_wave2.pdf}
+\end{subfigure}
+
+\caption*{\scriptsize \textsc{Notes}: This figure plots the daily mean of $\log(1 + \text{daily CPV})$ for each treatment arm, computed across users in that arm on each calendar date. The vertical dashed line denotes the wave-specific information intervention start (06/28 for Wave 1, 07/12 for Wave 2). The sample ends the day before the first cookie deletion date in each wave (07/26 for Wave 1, 08/09 for Wave 2). Survey and recruitment platforms are excluded.}
+\end{figure}
+
+We compare mean CPV across treatment groups during the four-week post-information / pre-cookie-deletion period (Wave 1: 06/28--07/25; Wave 2: 07/12--08/08). For each user, we compute the mean of $\log(1 + \text{daily CPV})$ across this window, and regress it on the saliency and information treatment indicators with block-by-wave fixed effects matching the randomization unit used in Table~\ref{tab:treatment_effect_data_sharing}.
+
+Table~\ref{tab:info_treatment_cpv} reports the results. The information treatment effect on CPV is small and not statistically significant in any specification. The pooled estimate is 0.101 ($p = 0.19$), corresponding to a 10.6\% increase in mean daily CPV relative to control, with similar magnitudes in each wave. The saliency arm yields comparable estimates, suggesting that both popups produce no detectable reduction in tracking exposure. The Wave 1 saliency estimate is statistically significant at the 5\% level, but this likely reflects baseline imbalance and post-period noise in the smaller Wave 1 subsample of 379 users, as the corresponding difference-in-differences estimate that absorbs baseline variation through user fixed effects attenuates the coefficient to 0.075 and not significant.
+
+\begin{table}[H]
+\centering
+\caption{Effect of Information Intervention on Daily Third-Party Cookies per Visit}
+\label{tab:info_treatment_cpv}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{mean of log(1 + Daily Third-Party Cookies per Visit)}\\
+                                  & Pooled         & Wave 1         & Wave 2 \\
+   Model:                         & (1)            & (2)            & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Saliency Treatment             & 0.1136         & 0.3656$^{**}$  & 0.0279\\
+                                  & (0.0771)       & (0.1514)       & (0.0894)\\
+   Information Treatment          & 0.1008         & 0.1494         & 0.0829\\
+                                  & (0.0763)       & (0.1505)       & (0.0885)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   block-by-wave                  & Yes            & Yes            & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 1,495          & 379            & 1,116\\
+   R$^2$                          & 0.37135        & 0.33532        & 0.38073\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Heteroskedasticity-robust standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports cross-sectional estimates of the effect of the information intervention on third-party cookies per visit during the post-information / pre-cookie-deletion period. The unit of observation is the user. The dependent variable is the user-level mean of $\log(1 + \text{daily CPV})$ across the four-week post-information window (Wave 1: 06/28--07/25; Wave 2: 07/12--08/08). The omitted category is the control group. The sample excludes survey and recruitment platforms. Standard errors are heteroskedasticity-robust.}
+\end{table}
+
+Table~\ref{tab:info_treatment_cpv_did} reports the corresponding difference-in-differences estimates. The pooled coefficient on Information $\times$ Post is 0.044 ($p = 0.22$), corresponding to a 4.5\% increase, and the pooled Saliency $\times$ Post coefficient is 0.017 ($p = 0.65$). The DiD point estimates are smaller than the cross-section. Calendar-date fixed effects in the DiD absorb the parallel Wave 2 late-period shift visible in Figure~\ref{fig:cpv_trend_by_treatment}, which raises all treatment arms together and therefore inflates the cross-section coefficients but cancels under DiD. Both specifications yield the same qualitative conclusion: the information intervention does not significantly reduce third-party cookies per visit.
+
+\begin{table}[H]
+\centering
+\caption{Effect of Information Intervention on Daily Third-Party Cookies per Visit (Difference-in-Differences)}
+\label{tab:info_treatment_cpv_did}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Daily Third-Party Cookies per Visit)}\\
+                                            & Pooled         & Wave 1         & Wave 2 \\
+   Model:                                   & (1)            & (2)            & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Saliency $\times$ Post                   & 0.0169         & 0.0745         & 0.0141\\
+                                            & (0.0370)       & (0.0757)       & (0.0490)\\
+   Information $\times$ Post                & 0.0443         & 0.0908         & 0.0456\\
+                                            & (0.0365)       & (0.0705)       & (0.0481)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                           & Yes            & Yes            & Yes\\
+   date                                     & Yes            & Yes            & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                             & 41,391         & 11,094         & 30,297\\
+   R$^2$                                    & 0.52419        & 0.52801        & 0.52099\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the effect of the information intervention on third-party cookies per visit. The unit of observation is the user-day. The sample includes both the pre-information baseline period (Wave 1: 06/14--06/27; Wave 2: 06/28--07/11) and the post-information / pre-cookie-deletion period (Wave 1: 06/28--07/25; Wave 2: 07/12--08/08). Post is an indicator equal to one for dates on or after the wave-specific information intervention date. The specification includes user and calendar-date fixed effects. The omitted category is the control group. The sample excludes survey and recruitment platforms. Standard errors are clustered at the user level.}
+\end{table}
+
+The CPV null contrasts with the self-reported 6.9 percentage point increase in opt-outs (Table~\ref{tab:treatment_effect_data_sharing}, column 2). Two readings are possible. First, participants may report privacy-protective intentions that do not translate into changes in aggregate tracker exposure. Second, opting out on a few websites does not meaningfully shift CPV when users continue to browse a similar set of tracker-heavy sites elsewhere. Both are consistent with the paper's main finding that behavioral responses concentrate on the extensive margin of site selection rather than on overall data sharing intensity.
+
+The final stage of the experiment automatically removes third-party cookies from participants' browsers. However, approximately 70\% of users have no recorded deletion events in the extension's event logs, due to event bus congestion in the logging system that affects log records but not the deletion process itself. This raises a central question for identification: is cookie deletion plausibly random, or does the bug make deletion affect only a subgroup of users? We address this question in two steps. We first document that deletion broadly affected both third-party cookies and browsing time. We then test whether the deletion effect is similar between users with and without log records. If missing logs indicated execution failure, only users with logs would show effects. We find consistent effects across both groups, and this consistency holds across user types, individual websites, and website categories. We then repeat the heterogeneity analysis using browsing time as the outcome, confirming that the documented decline does not arise from differential logging quality across users or websites.
+
+\subsection{Direct Effects of Cookie Deletion}\label{subsec:deletion_overall_effects}
+
+We exploit the staggered timing of cookie deletion within each wave. The early deletion group begins deletion one week before the late group, providing a seven-day window in which the early group is treated and the late group serves as a clean control. We estimate the following difference-in-differences specification:
+\begin{equation}\label{eq:cookie_deletion_did}
+y_{ijt} = \beta \cdot \bigl(\mathbf{1}\{\text{Post}\} \cdot T_i\bigr) + \eta_i + \eta_j + \eta_{\text{dow}} + \varepsilon_{ijt}
+\end{equation}
+where $y_{ijt}$ is the outcome of interest, $T_i$ indicates assignment to the early deletion group, and $\eta_i$, $\eta_j$, $\eta_{\text{dow}}$ are user, website, and day-of-week fixed effects. Standard errors are clustered at the user level. We use two outcomes. The first is $\log(1 + \text{third-party cookies per visit})$,\footnote{We construct this measure at the (user, website, day) level. The numerator is the number of third-party cookie events recorded by the extension on that website that day. The denominator is the number of page visits the user made to that website that day.} which captures the mechanical removal of cookies. The second is $\log(1 + \text{daily time spent})$, which captures the behavioral consequences of deletion.
+
+Figure~\ref{fig:cpv_over_time_c1} and Figure~\ref{fig:cpv_over_time_c2} plot the daily mean of $\log(1 + \text{third-party cookies per visit})$ for each deletion group, aligned to that group's own deletion start date. Both groups exhibit a sharp drop at the onset of deletion. Figure~\ref{fig:time_over_time_c1} and Figure~\ref{fig:time_over_time_c2} show the corresponding pattern for daily browsing time. The parallel decline in time spent provides independent confirmation, since browsing time is logged separately from cookie counting.
+
+\begin{figure}[H]
+\centering
+\caption{Daily Cookies per Visit Around Deletion Start}
+\label{fig:cpv_over_time}
+
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Early Group}
+\label{fig:cpv_over_time_c1}
+\includegraphics[width=\textwidth]{figures/cpv_over_time_c1.pdf}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Late Group}
+\label{fig:cpv_over_time_c2}
+\includegraphics[width=\textwidth]{figures/cpv_over_time_c2.pdf}
+\end{subfigure}
+
+\caption*{\scriptsize \textsc{Notes}: This figure plots the mean of $\log(1 + \text{third-party cookies per visit})$ for users in the early deletion group (panel a) and late deletion group (panel b), with day~0 corresponding to each group's deletion start date. The shaded area represents 95\% confidence intervals.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Daily Browsing Time Around Deletion Start}
+\label{fig:time_over_time}
+
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Early Group}
+\label{fig:time_over_time_c1}
+\includegraphics[width=\textwidth]{figures/time_over_time_c1.pdf}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Late Group}
+\label{fig:time_over_time_c2}
+\includegraphics[width=\textwidth]{figures/time_over_time_c2.pdf}
+\end{subfigure}
+
+\caption*{\scriptsize \textsc{Notes}: This figure plots the mean of $\log(1 + \text{daily time spent})$ for users in the early deletion group (panel a) and late deletion group (panel b), with day~0 corresponding to each group's deletion start date. The shaded area represents 95\% confidence intervals.}
+\end{figure}
+
+\subsubsection{Third Party Cookies per Visit}
+\label{sec:cpv_did}
+
+Table~\ref{tab:cookie_deletion_did} reports the regression results for cookies per visit. Column (1) indicates that cookie deletion reduces third-party cookies per visit by approximately 28\% ($\hat{\beta} = -0.329$, $p < 0.001$) when pooling both waves. The effect is concentrated in Wave~2 ($\hat{\beta} = -0.407$, $p < 0.001$), while the Wave~1 estimate shows only a small drop that is not statistically significant ($\hat{\beta} = -0.082$, $p = 0.20$).
+
+\begin{table}[H]
+\centering
+\caption{Effect of Cookie Deletion on Third-Party Cookies per Visit}
+\label{tab:cookie_deletion_did}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Third-Party Cookies per Visit)}\\
+                                  & Pooled          & Wave 1   & Wave 2 \\
+   Model:                         & (1)             & (2)      & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Post $\times$ Cookie Deletion  & -0.3288$^{***}$ & -0.0816  & -0.4069$^{***}$\\
+                                  & (0.0286)        & (0.0629) & (0.0319)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                 & Yes             & Yes      & Yes\\
+   website                        & Yes             & Yes      & Yes\\
+   dow                            & Yes             & Yes      & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 120,732         & 31,314   & 89,418\\
+   R$^2$                          & 0.66166         & 0.67009  & 0.69933\\
+   Within R$^2$                   & 0.00607         & 0.00041  & 0.00992\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the effect of cookie deletion on third-party cookies per visit. The treatment group begins cookie deletion one week before the control group. The analysis window spans seven days before and after the treatment group's deletion start time. All specifications include user, website, and day-of-week fixed effects. Standard errors are clustered at the user level.}
+\end{table}
+
+As shown in Figure~\ref{fig:deletion_by_site}, a small set of websites are not affected by third-party cookie deletion, namely \url{www.facebook.com}, \url{mail.google.com}, \url{docs.google.com}, \url{gemini.google.com}, \url{datacompute.google.com}. Their third-party cookie counts increase rather than decrease during the deletion period.
+
+Table~\ref{tab:cookie_deletion_unaffected_sites_summary} reports the share of visits, time spent, and third-party cookies attributed to these five sites by wave and period. Across the two waves, visit and time shares are nearly identical, with visit shares ranging from 15\% to 17\% and time shares ranging from 13\% to 15\%. The cookie share, however, differs sharply: in Wave~1 it rises from 6.58\% pre-deletion to 44.62\% post-deletion, while in Wave~2 it remains stable between 47\% and 49\% throughout. Because cookies on these sites are not removed by the deletion process, this large post-period increase in Wave~1 mechanically attenuates the estimated effect.
+
+\begin{table}[H]
+\centering
+\caption{Visit, Time, and Cookie Shares Attributed to Deletion-Unaffected Sites}
+\label{tab:cookie_deletion_unaffected_sites_summary}
+\begin{tabular}{lcccccc}
+\midrule \midrule
+ & \multicolumn{3}{c}{Wave 1} & \multicolumn{3}{c}{Wave 2} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+Metric & Pre & Post & Change & Pre & Post & Change \\
+\midrule
+Visit Share  & 15.02\% & 16.93\% & +1.91pp  & 14.59\% & 16.86\% & +2.27pp \\
+Time Share   & 12.58\% & 15.34\% & +2.76pp  & 13.55\% & 14.92\% & +1.37pp \\
+Cookie Share &  6.58\% & 44.62\% & +38.04pp & 47.35\% & 49.42\% & +2.07pp \\
+\midrule \midrule
+\end{tabular}
+\caption*{\scriptsize \textsc{Notes}: This table reports the share of total visits, total time spent, and total third-party cookies attributed to the five deletion-unaffected sites (\url{www.facebook.com}, \url{mail.google.com}, \url{docs.google.com}, \url{gemini.google.com}, \url{datacompute.google.com}), separately by wave and period. The pre-period covers the seven days before the early deletion group's deletion start, and the post-period covers the seven days after.}
+\end{table}
+
+Table~\ref{tab:cookie_deletion_did_excluding_unaffected} reports the DiD estimates after excluding these five sites. The Wave~1 effect becomes $\hat{\beta} = -0.399$ ($p < 0.001$), now showing a substantial drop similar to the Wave~2 estimate of $\hat{\beta} = -0.522$ ($p < 0.001$). Excluding the unaffected sites brings the Wave~1 effect into line with Wave~2 and increases the pooled effect substantially, confirming that the small Wave~1 estimate in Table~\ref{tab:cookie_deletion_did} reflects the contribution of these specific sites rather than a general absence of treatment effect.
+
+\begin{table}[H]
+\centering
+\caption{Effect of Cookie Deletion on Third-Party Cookies per Visit (Excluding Five Deletion-Unaffected Sites)}
+\label{tab:cookie_deletion_did_excluding_unaffected}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Third-Party Cookies per Visit)}\\
+                                  & Pooled          & Wave 1          & Wave 2 \\
+   Model:                         & (1)             & (2)             & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Post $\times$ Cookie Deletion  & -0.4895$^{***}$ & -0.3985$^{***}$ & -0.5220$^{***}$\\
+                                  & (0.0286)        & (0.0614)        & (0.0334)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                 & Yes             & Yes             & Yes\\
+   website                        & Yes             & Yes             & Yes\\
+   dow                            & Yes             & Yes             & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 111,165         & 28,946          & 82,219\\
+   R$^2$                          & 0.67695         & 0.71865         & 0.69774\\
+   Within R$^2$                   & 0.01445         & 0.01078         & 0.01691\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports the same difference-in-differences specification as Table~\ref{tab:cookie_deletion_did}, after excluding the five deletion-unaffected sites (\url{www.facebook.com}, \url{mail.google.com}, \url{docs.google.com}, \url{gemini.google.com}, \url{datacompute.google.com}). Standard errors are clustered at the user level.}
+\end{table}
+
+\subsubsection{Browsing Time}
+\label{sec:time_did}
+
+Table~\ref{tab:time_did_regression} reports the corresponding results for browsing time. Column (1) shows that browsing time also declines, by approximately 12\% on average ($\hat{\beta} = -0.129$, $p < 0.001$) when pooling both waves. In contrast to the cookies per visit results, the effect on browsing time is concentrated in Wave~1 ($\hat{\beta} = -0.264$, $p < 0.001$), corresponding to a roughly 23\% decline, while the Wave~2 effect is smaller in magnitude ($\hat{\beta} = -0.082$, $p < 0.01$), corresponding to roughly 8\%. The reduction in browsing time provides independent evidence that the deletion process is taking effect, since browsing time is logged separately from cookie counting and is not mechanically tied to the cookie removal process. The decline is consistent with users experiencing degraded browsing quality after third-party cookie deletion, including less relevant content recommendations, less targeted advertising, and reduced personalization across sites that rely on cross-site tracking. Note that the deletion does not affect login state or site preferences, both of which are stored in first-party cookies.
+
+\begin{table}[H]
+\centering
+\caption{Effect of Cookie Deletion on Daily Browsing Time}
+\label{tab:time_did_regression}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Daily Time Spent)}\\
+                                  & Pooled          & Wave 1          & Wave 2 \\
+   Model:                         & (1)             & (2)             & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Post $\times$ Cookie Deletion  & -0.1287$^{***}$ & -0.2643$^{***}$ & -0.0820$^{***}$\\
+                                  & (0.0257)        & (0.0610)        & (0.0277)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                 & Yes             & Yes             & Yes\\
+   website                        & Yes             & Yes             & Yes\\
+   dow                            & Yes             & Yes             & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 120,732         & 31,314          & 89,418\\
+   R$^2$                          & 0.48970         & 0.54476         & 0.49563\\
+   Within R$^2$                   & 0.00058         & 0.00256         & 0.00024\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the effect of cookie deletion on daily browsing time. The specification mirrors Table~\ref{tab:cookie_deletion_did} except that the dependent variable is $\log(1 + \text{daily time spent})$. All specifications include user, website, and day-of-week fixed effects. Standard errors are clustered at the user level.}
+\end{table}
+
+
+\subsection{Is Cookie Deletion Plausibly Random, or Systematically Selective?}\label{subsec:deletion_plausibly_random}
+
+Approximately 70\% of users have no recorded deletion events in the extension's logs. This raises a concern: did deletion actually execute for these users, or are the observed effects driven entirely by the 30\% with logs? Our central question is whether the missing log records are missing-at-random (MAR) at the (user, time period) level, or if there's some systematic bug.  We test the MAR assumption in two steps.
+
+First, we split the sample by log status and compare the deletion effect across the two subsamples. If missing logs reflect systematic execution failure, the deletion effect should be concentrated among users with logs and absent among users without. If instead missing logs reflect random logging dropouts, the two subsamples should show similar deletion effects, consistent with MAR.
+
+Second, we examine whether the deletion effect is broadly distributed across user types, individual websites, and website categories. We then re-run each heterogeneity analysis split by log status. If the no-log subsample tracks the has-log subsample at every level of granularity, this provides additional MAR-relevant evidence at finer granularity.
+
+\paragraph{By event log status.} We split the sample by whether a user has any recorded deletion events in the extension's event logs. Table~\ref{tab:cookie_deletion_by_log_status} reports the results. The deletion effect is $-0.230$ ($p < 0.001$) for users with deletion logs and $-0.369$ ($p < 0.001$) for users without. The two effects are statistically similar in magnitude, with the no-log effect actually slightly larger.
+
+\begin{table}[H]
+\centering
+\caption{Cookie Deletion Effect by Event Log Status}
+\label{tab:cookie_deletion_by_log_status}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Third-Party Cookies per Visit)}\\
+                                  & All Users       & Has Deletion Log & No Deletion Log \\
+   Model:                         & (1)             & (2)              & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Post $\times$ Cookie Deletion  & -0.3288$^{***}$ & -0.2303$^{***}$  & -0.3686$^{***}$\\
+                                  & (0.0286)        & (0.0522)         & (0.0352)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                 & Yes             & Yes              & Yes\\
+   website                        & Yes             & Yes              & Yes\\
+   dow                            & Yes             & Yes              & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 120,732         & 29,720           & 91,012\\
+   R$^2$                          & 0.66166         & 0.68442          & 0.67226\\
+   Within R$^2$                   & 0.00607         & 0.00370          & 0.00716\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table splits the sample by whether a user has any recorded deletion events in the extension's event logs. The specification is identical to Table~\ref{tab:cookie_deletion_did}. Standard errors are clustered at the user level.}
+\end{table}
+
+\paragraph{Across user types.} Figure~\ref{fig:deletion_by_quintile} reports coefficients estimated separately for each quintile of pre-period total time spent. The deletion effect is negative across all five quintiles. Q2 through Q5 are statistically significant at the 1\% level, while Q1 is negative but not statistically significant due to its wider confidence interval, reflecting greater noise among light browsers with limited browsing activity. Figure~\ref{fig:deletion_by_quintile_log_status} repeats the analysis split by log status. The two subsamples display similar patterns: both groups show negative effects across all quintiles, with the no-log subsample's coefficients closely tracking the has-log subsample's at each quintile.
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by User Time Quintile}
+\label{fig:deletion_by_quintile}
+\includegraphics[width=0.85\textwidth]{figures/cpv_heterogeneity_by_user_quintile.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports the difference-in-differences coefficient from the baseline specification estimated separately for each quintile of pre-period total time spent. Quintiles are assigned based on the seven-day window before the early group's deletion start date. Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by User Time Quintile, Split by Log Status}
+\label{fig:deletion_by_quintile_log_status}
+\includegraphics[width=0.85\textwidth]{figures/cpv_heterogeneity_by_user_quintile_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the user time quintile analysis from Figure~\ref{fig:deletion_by_quintile} with the sample further split by whether the user has any recorded deletion events in the event logs. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+\paragraph{Across the most-visited websites.} Figure~\ref{fig:deletion_by_site} reports per-site coefficients for the fifteen websites with the most user-time in the seven-day pre-deletion window, restricted to sites with sufficient observations in every (log status $\times$ pre/post $\times$ treatment) cell to ensure the coefficient is identifiable in both log-status subsamples used below. Most sites show negative effects. The exceptions are concentrated in Google ecosystem services and Facebook, namely \url{mail.google.com}, \url{docs.google.com}, \url{gemini.google.com}, \url{datacompute.google.com}, and \url{www.facebook.com}. Figure~\ref{fig:deletion_by_site_log_status} repeats the per-site analysis split by log status. The two subsamples produce coefficients with similar signs and magnitudes across the fifteen websites.
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by Website (Top 15 by Pre-Deletion Time)}
+\label{fig:deletion_by_site}
+\includegraphics[width=0.85\textwidth]{figures/cpv_did_by_site.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports per-site difference-in-differences coefficients for the fifteen websites with the largest total time spent in the seven-day pre-deletion window. Sites are restricted to those with at least five users in every combination of log status, pre/post, and early/late deletion group, ensuring the coefficient is identifiable in both log-status subsamples used in Figure~\ref{fig:deletion_by_site_log_status}. Each coefficient is estimated from the baseline specification restricted to that website (omitting the website fixed effect). Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by Website (Top 15), Split by Log Status}
+\label{fig:deletion_by_site_log_status}
+\includegraphics[width=0.85\textwidth]{figures/cpv_did_by_site_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the per-site analysis from Figure~\ref{fig:deletion_by_site} with the sample further split by whether the user has any recorded deletion events. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+\paragraph{Across website categories.} Figure~\ref{fig:deletion_by_category} aggregates websites into broader categories using domain classification metadata, capturing the long tail of sites not in the top fifteen. Sixteen of seventeen categories exhibit statistically significant negative effects. The Internet \& Telecom category is the exception, as it is dominated by the Google ecosystem services discussed above. Figure~\ref{fig:deletion_by_category_log_status} repeats the analysis split by log status. All seventeen categories show same-sign coefficients across the two subsamples.
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by Website Category}
+\label{fig:deletion_by_category}
+\includegraphics[width=0.85\textwidth]{figures/cpv_heterogeneity_by_website_category.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports the difference-in-differences coefficient from the baseline specification estimated separately for each website category with at least 500 observations and 50 users. Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by Website Category, Split by Log Status}
+\label{fig:deletion_by_category_log_status}
+\includegraphics[width=0.85\textwidth]{figures/cpv_heterogeneity_by_website_category_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the category analysis from Figure~\ref{fig:deletion_by_category} with the sample further split by whether the user has any recorded deletion events. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+Overall, the deletion effect is broadly distributed across user types, websites, and categories, and the no-log subsample's coefficients closely track the has-log subsample's at every level of granularity. These findings rule out systematic non-execution of deletion as an explanation for missing logs, and are consistent with the MAR interpretation that missing event logs reflect random logging dropouts.
+
+\subsection{Heterogeneity Analysis for Browsing Time}\label{subsec:deletion_time_heterogeneity}
+
+Differential logging quality across websites and individuals is a related concern: if time-spent measurements are systematically less reliable for some users or sites, the treatment effects we estimate could reflect logging artifacts rather than behavioral responses. To address this, we mirror the heterogeneity analysis from the previous subsection, replacing the cookies-per-visit outcome with $\log(1 + \text{daily time spent})$. Showing that the time effect is broadly distributed across user types, websites, and categories, and that the no-log subsample tracks the has-log subsample, provides a parallel diagnostic for the time-spent outcome and establishes that differential logging quality cannot generate the observed treatment effects.
+
+\paragraph{Across user types.} Figure~\ref{fig:time_by_quintile} reports time-spent coefficients estimated separately for each quintile of pre-period total time spent. The effect is negative for Q2 through Q5 and statistically significant for Q3, Q4, and Q5. Q1 shows a positive coefficient with a wide confidence interval, reflecting greater noise among light browsers. Figure~\ref{fig:time_by_quintile_log_status} repeats the analysis split by log status. Both subsamples display similar patterns across quintiles, with the no-log subsample's coefficients closely tracking the has-log subsample's at each quintile.
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by User Time Quintile}
+\label{fig:time_by_quintile}
+\includegraphics[width=0.85\textwidth]{figures/time_heterogeneity_by_user_quintile.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports the difference-in-differences coefficient on $\log(1 + \text{daily time spent})$ from the baseline specification estimated separately for each quintile of pre-period total time spent. Quintiles are assigned based on the seven-day window before the early group's deletion start date. Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by User Time Quintile, Split by Log Status}
+\label{fig:time_by_quintile_log_status}
+\includegraphics[width=0.85\textwidth]{figures/time_heterogeneity_by_user_quintile_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the user time quintile analysis from Figure~\ref{fig:time_by_quintile} with the sample further split by whether the user has any recorded deletion events in the event logs. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+\paragraph{Across the most-visited websites.} Figure~\ref{fig:time_by_site} reports per-site coefficients for the same fifteen websites used in Figure~\ref{fig:deletion_by_site}. Fourteen of fifteen sites show negative coefficients, with six statistically significant at the 5\% level. Unlike the cookies-per-visit results, no individual site exhibits a positive coefficient that is distinguishable from zero, consistent with browsing time being a behavioral outcome rather than a mechanical function of the deletion mechanism. Figure~\ref{fig:time_by_site_log_status} repeats the analysis split by log status. The sign of the coefficient agrees across the two subsamples for the majority of sites; the few sign disagreements occur at sites where both subsamples are statistically indistinguishable from zero, indicating these reflect noise rather than systematic differences in logging quality.
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by Website (Top 15 by Pre-Deletion Time)}
+\label{fig:time_by_site}
+\includegraphics[width=0.85\textwidth]{figures/time_did_by_site.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports per-site difference-in-differences coefficients on $\log(1 + \text{daily time spent})$ for the fifteen websites used in Figure~\ref{fig:deletion_by_site}. Each coefficient is estimated from the baseline specification restricted to that website (omitting the website fixed effect). Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by Website (Top 15), Split by Log Status}
+\label{fig:time_by_site_log_status}
+\includegraphics[width=0.85\textwidth]{figures/time_did_by_site_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the per-site analysis from Figure~\ref{fig:time_by_site} with the sample further split by whether the user has any recorded deletion events. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+\paragraph{Across website categories.} Figure~\ref{fig:time_by_category} aggregates websites into broader categories. Most categories show negative effects, with eight statistically significant at the 5\% level. The remaining categories produce small estimates that are not statistically distinguishable from zero. Figure~\ref{fig:time_by_category_log_status} repeats the analysis split by log status. The has-log subsample tends to produce coefficients of the same sign as the no-log subsample, with the few sign disagreements concentrated in categories where both estimates have wide confidence intervals.
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by Website Category}
+\label{fig:time_by_category}
+\includegraphics[width=0.85\textwidth]{figures/time_heterogeneity_by_website_category.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports the difference-in-differences coefficient on $\log(1 + \text{daily time spent})$ from the baseline specification estimated separately for each website category with at least 500 observations and 50 users. Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by Website Category, Split by Log Status}
+\label{fig:time_by_category_log_status}
+\includegraphics[width=0.85\textwidth]{figures/time_heterogeneity_by_website_category_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the category analysis from Figure~\ref{fig:time_by_category} with the sample further split by whether the user has any recorded deletion events. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+Taken together, the time-spent results parallel the cookies-per-visit results. The treatment effect on browsing time is broadly distributed across user types, individual websites, and website categories, and the no-log subsample tracks the has-log subsample at every level of granularity. These findings indicate that the documented decline in browsing time does not arise from differential logging quality across users or websites.
 
 
 \section{Structural Model: Robustness [PRELIM]}

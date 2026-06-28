@@ -1334,6 +1334,461 @@ We complement the objective measures from Section \ref{sec:website_choice} with 
 Figure~\ref{fig:freeform_change_responses} presents the results. The information group shows elevated rates of both behavioral change and heightened awareness relative to the control group, consistent with the objective evidence of modest behavioral shifts. The saliency group is statistically indistinguishable from the control group on all dimensions and, if anything, shows higher rates of fatalism --- consistent with the complexity mechanism documented in Section~\ref{sec:search_learning}. Participants who were directed to privacy policies but could not extract useful information appear to have concluded that privacy management is futile. One participant in the saliency group captured this sentiment: ``I would click on the data privacy link, and my eyes would just immediately glaze over at the length and legalese, and I just go into every website with the expectation that I will have no power over my data.''
 
 
+
+\section{Data Sharing and Cookie Deletion Analysis}\label{sec:cookie_deletion_analysis}
+ 
+We first examine whether participants change their data sharing practices in response to the intervention. Table~\ref{tab:treatment_effect_data_sharing} presents treatment effects on four self-reported measures from the endline survey: whether a participant deleted cookies, explicitly opted out of data sharing, withheld data due to privacy concerns, or changed privacy settings on at least one website.\footnote{This question was only added for the second wave of participants.}
+ 
+The one statistically significant result is that participants in the information group are 6.9 percentage points more likely to have opted out of data sharing on at least one website (column 2, $p < 0.10$), consistent with a 20\% increase relative to the control group mean. Point estimates for the remaining measures are positive for both treatment groups but not statistically distinguishable from zero. The saliency group shows no significant effects on any measure.
+ 
+%We validate these self-reported measures using objective data from the extension. Table~\ref{tab:privacy_settings_visits} estimates treatment effects on visits to privacy settings pages --- detected through our browsing history logs --- using the same difference-in-differences specification as in Section~\ref{sec:search_learning}. The results show precise null effects across all three columns (total visits, ever visiting, and distinct domains), consistent with the self-reported null on privacy settings changes.
+ 
+Overall, there is weak evidence of a small change in data sharing behavior in the information group, concentrated in the opt-out decision, and no detectable response in the saliency group. The limited behavioral response likely reflects the high costs of changing data sharing practices relative to the modest privacy valuations documented in Section~\ref{subsec:stated_privacy_prefs}: even informed participants may rationally choose not to incur the hassle of modifying settings on individual websites.
+
+\subsection{Effect on Third-Party Cookies per Visit}\label{subsec:info_treatment_cpv}
+
+The self-reported opt-out evidence in Table~\ref{tab:treatment_effect_data_sharing} relies on participants' own characterization of their behavior. We complement this with a revealed-preference measure of data sharing constructed directly from the extension's browsing logs: the daily number of third-party cookies per visit (CPV). Lower CPV indicates exposure to fewer tracking technologies per browsing event, capturing all behavioral channels through which information might reduce data sharing, including site avoidance, within-site opt-outs, and reductions in time spent on tracker-heavy sites.
+
+Figure~\ref{fig:cpv_trend_by_treatment} plots the daily mean log CPV by treatment arm, separately for each wave. The Wave 1 series is stable across the pre and post periods with no systematic trend across treatment arms. Wave 2 is stable through late July but exhibits a sharp upward shift in the final ten days of the post-information period, with all three arms rising together from approximately 2.6 to 3.5 in log CPV. Because the shift moves the control, saliency, and information arms in parallel, this parallel shift reflects a calendar-date level change in tracker exposure that affects all users similarly, rather than a treatment-induced response. This pattern motivates reporting both a cross-section and a difference-in-differences specification below: the cross-section captures the raw post-period comparison parallel to the self-report analysis, while the difference-in-differences absorbs the Wave 2 late-period shift through calendar-date fixed effects.
+
+\begin{figure}[H]
+\centering
+\caption{Daily Mean log(1 + CPV) by Treatment Arm}
+\label{fig:cpv_trend_by_treatment}
+
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Wave 1}
+\label{fig:cpv_trend_wave1}
+\includegraphics[width=\textwidth]{figures/cpv_trend_by_treatment_wave1.pdf}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Wave 2}
+\label{fig:cpv_trend_wave2}
+\includegraphics[width=\textwidth]{figures/cpv_trend_by_treatment_wave2.pdf}
+\end{subfigure}
+
+\caption*{\scriptsize \textsc{Notes}: This figure plots the daily mean of $\log(1 + \text{daily CPV})$ for each treatment arm, computed across users in that arm on each calendar date. The vertical dashed line denotes the wave-specific information intervention start (06/28 for Wave 1, 07/12 for Wave 2). The sample ends the day before the first cookie deletion date in each wave (07/26 for Wave 1, 08/09 for Wave 2). Survey and recruitment platforms are excluded.}
+\end{figure}
+
+We compare mean CPV across treatment groups during the four-week post-information / pre-cookie-deletion period (Wave 1: 06/28--07/25; Wave 2: 07/12--08/08). For each user, we compute the mean of $\log(1 + \text{daily CPV})$ across this window, and regress it on the saliency and information treatment indicators with block-by-wave fixed effects matching the randomization unit used in Table~\ref{tab:treatment_effect_data_sharing}.
+
+Table~\ref{tab:info_treatment_cpv} reports the results. The information treatment effect on CPV is small and not statistically significant in any specification. The pooled estimate is 0.101 ($p = 0.19$), corresponding to a 10.6\% increase in mean daily CPV relative to control, with similar magnitudes in each wave. The saliency arm yields comparable estimates, suggesting that both popups produce no detectable reduction in tracking exposure. The Wave 1 saliency estimate is statistically significant at the 5\% level, but this likely reflects baseline imbalance and post-period noise in the smaller Wave 1 subsample of 379 users, as the corresponding difference-in-differences estimate that absorbs baseline variation through user fixed effects attenuates the coefficient to 0.075 and not significant.
+
+\begin{table}[H]
+\centering
+\caption{Effect of Information Intervention on Daily Third-Party Cookies per Visit}
+\label{tab:info_treatment_cpv}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{mean of log(1 + Daily Third-Party Cookies per Visit)}\\
+                                  & Pooled         & Wave 1         & Wave 2 \\
+   Model:                         & (1)            & (2)            & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Saliency Treatment             & 0.1136         & 0.3656$^{**}$  & 0.0279\\
+                                  & (0.0771)       & (0.1514)       & (0.0894)\\
+   Information Treatment          & 0.1008         & 0.1494         & 0.0829\\
+                                  & (0.0763)       & (0.1505)       & (0.0885)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   block-by-wave                  & Yes            & Yes            & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 1,495          & 379            & 1,116\\
+   R$^2$                          & 0.37135        & 0.33532        & 0.38073\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Heteroskedasticity-robust standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports cross-sectional estimates of the effect of the information intervention on third-party cookies per visit during the post-information / pre-cookie-deletion period. The unit of observation is the user. The dependent variable is the user-level mean of $\log(1 + \text{daily CPV})$ across the four-week post-information window (Wave 1: 06/28--07/25; Wave 2: 07/12--08/08). The omitted category is the control group. The sample excludes survey and recruitment platforms. Standard errors are heteroskedasticity-robust.}
+\end{table}
+
+Table~\ref{tab:info_treatment_cpv_did} reports the corresponding difference-in-differences estimates. The pooled coefficient on Information $\times$ Post is 0.044 ($p = 0.22$), corresponding to a 4.5\% increase, and the pooled Saliency $\times$ Post coefficient is 0.017 ($p = 0.65$). The DiD point estimates are smaller than the cross-section. Calendar-date fixed effects in the DiD absorb the parallel Wave 2 late-period shift visible in Figure~\ref{fig:cpv_trend_by_treatment}, which raises all treatment arms together and therefore inflates the cross-section coefficients but cancels under DiD. Both specifications yield the same qualitative conclusion: the information intervention does not significantly reduce third-party cookies per visit.
+
+\begin{table}[H]
+\centering
+\caption{Effect of Information Intervention on Daily Third-Party Cookies per Visit (Difference-in-Differences)}
+\label{tab:info_treatment_cpv_did}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Daily Third-Party Cookies per Visit)}\\
+                                            & Pooled         & Wave 1         & Wave 2 \\
+   Model:                                   & (1)            & (2)            & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Saliency $\times$ Post                   & 0.0169         & 0.0745         & 0.0141\\
+                                            & (0.0370)       & (0.0757)       & (0.0490)\\
+   Information $\times$ Post                & 0.0443         & 0.0908         & 0.0456\\
+                                            & (0.0365)       & (0.0705)       & (0.0481)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                           & Yes            & Yes            & Yes\\
+   date                                     & Yes            & Yes            & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                             & 41,391         & 11,094         & 30,297\\
+   R$^2$                                    & 0.52419        & 0.52801        & 0.52099\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the effect of the information intervention on third-party cookies per visit. The unit of observation is the user-day. The sample includes both the pre-information baseline period (Wave 1: 06/14--06/27; Wave 2: 06/28--07/11) and the post-information / pre-cookie-deletion period (Wave 1: 06/28--07/25; Wave 2: 07/12--08/08). Post is an indicator equal to one for dates on or after the wave-specific information intervention date. The specification includes user and calendar-date fixed effects. The omitted category is the control group. The sample excludes survey and recruitment platforms. Standard errors are clustered at the user level.}
+\end{table}
+
+The CPV null contrasts with the self-reported 6.9 percentage point increase in opt-outs (Table~\ref{tab:treatment_effect_data_sharing}, column 2). Two readings are possible. First, participants may report privacy-protective intentions that do not translate into changes in aggregate tracker exposure. Second, opting out on a few websites does not meaningfully shift CPV when users continue to browse a similar set of tracker-heavy sites elsewhere. Both are consistent with the paper's main finding that behavioral responses concentrate on the extensive margin of site selection rather than on overall data sharing intensity.
+
+The final stage of the experiment automatically removes third-party cookies from participants' browsers. However, approximately 70\% of users have no recorded deletion events in the extension's event logs, due to event bus congestion in the logging system that affects log records but not the deletion process itself. This raises a central question for identification: is cookie deletion plausibly random, or does the bug make deletion affect only a subgroup of users? We address this question in two steps. We first document that deletion broadly affected both third-party cookies and browsing time. We then test whether the deletion effect is similar between users with and without log records. If missing logs indicated execution failure, only users with logs would show effects. We find consistent effects across both groups, and this consistency holds across user types, individual websites, and website categories. We then repeat the heterogeneity analysis using browsing time as the outcome, confirming that the documented decline does not arise from differential logging quality across users or websites.
+
+\subsection{Direct Effects of Cookie Deletion}\label{subsec:deletion_overall_effects}
+
+We exploit the staggered timing of cookie deletion within each wave. The early deletion group begins deletion one week before the late group, providing a seven-day window in which the early group is treated and the late group serves as a clean control. We estimate the following difference-in-differences specification:
+\begin{equation}\label{eq:cookie_deletion_did}
+y_{ijt} = \beta \cdot \bigl(\mathbf{1}\{\text{Post}\} \cdot T_i\bigr) + \eta_i + \eta_j + \eta_{\text{dow}} + \varepsilon_{ijt}
+\end{equation}
+where $y_{ijt}$ is the outcome of interest, $T_i$ indicates assignment to the early deletion group, and $\eta_i$, $\eta_j$, $\eta_{\text{dow}}$ are user, website, and day-of-week fixed effects. Standard errors are clustered at the user level. We use two outcomes. The first is $\log(1 + \text{third-party cookies per visit})$,\footnote{We construct this measure at the (user, website, day) level. The numerator is the number of third-party cookie events recorded by the extension on that website that day. The denominator is the number of page visits the user made to that website that day.} which captures the mechanical removal of cookies. The second is $\log(1 + \text{daily time spent})$, which captures the behavioral consequences of deletion.
+
+Figure~\ref{fig:cpv_over_time_c1} and Figure~\ref{fig:cpv_over_time_c2} plot the daily mean of $\log(1 + \text{third-party cookies per visit})$ for each deletion group, aligned to that group's own deletion start date. Both groups exhibit a sharp drop at the onset of deletion. Figure~\ref{fig:time_over_time_c1} and Figure~\ref{fig:time_over_time_c2} show the corresponding pattern for daily browsing time. The parallel decline in time spent provides independent confirmation, since browsing time is logged separately from cookie counting.
+
+\begin{figure}[H]
+\centering
+\caption{Daily Cookies per Visit Around Deletion Start}
+\label{fig:cpv_over_time}
+
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Early Group}
+\label{fig:cpv_over_time_c1}
+\includegraphics[width=\textwidth]{figures/cpv_over_time_c1.pdf}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Late Group}
+\label{fig:cpv_over_time_c2}
+\includegraphics[width=\textwidth]{figures/cpv_over_time_c2.pdf}
+\end{subfigure}
+
+\caption*{\scriptsize \textsc{Notes}: This figure plots the mean of $\log(1 + \text{third-party cookies per visit})$ for users in the early deletion group (panel a) and late deletion group (panel b), with day~0 corresponding to each group's deletion start date. The shaded area represents 95\% confidence intervals.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Daily Browsing Time Around Deletion Start}
+\label{fig:time_over_time}
+
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Early Group}
+\label{fig:time_over_time_c1}
+\includegraphics[width=\textwidth]{figures/time_over_time_c1.pdf}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\caption{Late Group}
+\label{fig:time_over_time_c2}
+\includegraphics[width=\textwidth]{figures/time_over_time_c2.pdf}
+\end{subfigure}
+
+\caption*{\scriptsize \textsc{Notes}: This figure plots the mean of $\log(1 + \text{daily time spent})$ for users in the early deletion group (panel a) and late deletion group (panel b), with day~0 corresponding to each group's deletion start date. The shaded area represents 95\% confidence intervals.}
+\end{figure}
+
+\subsubsection{Third Party Cookies per Visit}
+\label{sec:cpv_did}
+
+Table~\ref{tab:cookie_deletion_did} reports the regression results for cookies per visit. Column (1) indicates that cookie deletion reduces third-party cookies per visit by approximately 28\% ($\hat{\beta} = -0.329$, $p < 0.001$) when pooling both waves. The effect is concentrated in Wave~2 ($\hat{\beta} = -0.407$, $p < 0.001$), while the Wave~1 estimate shows only a small drop that is not statistically significant ($\hat{\beta} = -0.082$, $p = 0.20$).
+
+\begin{table}[H]
+\centering
+\caption{Effect of Cookie Deletion on Third-Party Cookies per Visit}
+\label{tab:cookie_deletion_did}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Third-Party Cookies per Visit)}\\
+                                  & Pooled          & Wave 1   & Wave 2 \\
+   Model:                         & (1)             & (2)      & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Post $\times$ Cookie Deletion  & -0.3288$^{***}$ & -0.0816  & -0.4069$^{***}$\\
+                                  & (0.0286)        & (0.0629) & (0.0319)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                 & Yes             & Yes      & Yes\\
+   website                        & Yes             & Yes      & Yes\\
+   dow                            & Yes             & Yes      & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 120,732         & 31,314   & 89,418\\
+   R$^2$                          & 0.66166         & 0.67009  & 0.69933\\
+   Within R$^2$                   & 0.00607         & 0.00041  & 0.00992\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the effect of cookie deletion on third-party cookies per visit. The treatment group begins cookie deletion one week before the control group. The analysis window spans seven days before and after the treatment group's deletion start time. All specifications include user, website, and day-of-week fixed effects. Standard errors are clustered at the user level.}
+\end{table}
+
+As shown in Figure~\ref{fig:deletion_by_site}, a small set of websites are not affected by third-party cookie deletion, namely \url{www.facebook.com}, \url{mail.google.com}, \url{docs.google.com}, \url{gemini.google.com}, \url{datacompute.google.com}. Their third-party cookie counts increase rather than decrease during the deletion period.
+
+Table~\ref{tab:cookie_deletion_unaffected_sites_summary} reports the share of visits, time spent, and third-party cookies attributed to these five sites by wave and period. Across the two waves, visit and time shares are nearly identical, with visit shares ranging from 15\% to 17\% and time shares ranging from 13\% to 15\%. The cookie share, however, differs sharply: in Wave~1 it rises from 6.58\% pre-deletion to 44.62\% post-deletion, while in Wave~2 it remains stable between 47\% and 49\% throughout. Because cookies on these sites are not removed by the deletion process, this large post-period increase in Wave~1 mechanically attenuates the estimated effect.
+
+\begin{table}[H]
+\centering
+\caption{Visit, Time, and Cookie Shares Attributed to Deletion-Unaffected Sites}
+\label{tab:cookie_deletion_unaffected_sites_summary}
+\begin{tabular}{lcccccc}
+\midrule \midrule
+ & \multicolumn{3}{c}{Wave 1} & \multicolumn{3}{c}{Wave 2} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+Metric & Pre & Post & Change & Pre & Post & Change \\
+\midrule
+Visit Share  & 15.02\% & 16.93\% & +1.91pp  & 14.59\% & 16.86\% & +2.27pp \\
+Time Share   & 12.58\% & 15.34\% & +2.76pp  & 13.55\% & 14.92\% & +1.37pp \\
+Cookie Share &  6.58\% & 44.62\% & +38.04pp & 47.35\% & 49.42\% & +2.07pp \\
+\midrule \midrule
+\end{tabular}
+\caption*{\scriptsize \textsc{Notes}: This table reports the share of total visits, total time spent, and total third-party cookies attributed to the five deletion-unaffected sites (\url{www.facebook.com}, \url{mail.google.com}, \url{docs.google.com}, \url{gemini.google.com}, \url{datacompute.google.com}), separately by wave and period. The pre-period covers the seven days before the early deletion group's deletion start, and the post-period covers the seven days after.}
+\end{table}
+
+Table~\ref{tab:cookie_deletion_did_excluding_unaffected} reports the DiD estimates after excluding these five sites. The Wave~1 effect becomes $\hat{\beta} = -0.399$ ($p < 0.001$), now showing a substantial drop similar to the Wave~2 estimate of $\hat{\beta} = -0.522$ ($p < 0.001$). Excluding the unaffected sites brings the Wave~1 effect into line with Wave~2 and increases the pooled effect substantially, confirming that the small Wave~1 estimate in Table~\ref{tab:cookie_deletion_did} reflects the contribution of these specific sites rather than a general absence of treatment effect.
+
+\begin{table}[H]
+\centering
+\caption{Effect of Cookie Deletion on Third-Party Cookies per Visit (Excluding Five Deletion-Unaffected Sites)}
+\label{tab:cookie_deletion_did_excluding_unaffected}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Third-Party Cookies per Visit)}\\
+                                  & Pooled          & Wave 1          & Wave 2 \\
+   Model:                         & (1)             & (2)             & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Post $\times$ Cookie Deletion  & -0.4895$^{***}$ & -0.3985$^{***}$ & -0.5220$^{***}$\\
+                                  & (0.0286)        & (0.0614)        & (0.0334)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                 & Yes             & Yes             & Yes\\
+   website                        & Yes             & Yes             & Yes\\
+   dow                            & Yes             & Yes             & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 111,165         & 28,946          & 82,219\\
+   R$^2$                          & 0.67695         & 0.71865         & 0.69774\\
+   Within R$^2$                   & 0.01445         & 0.01078         & 0.01691\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports the same difference-in-differences specification as Table~\ref{tab:cookie_deletion_did}, after excluding the five deletion-unaffected sites (\url{www.facebook.com}, \url{mail.google.com}, \url{docs.google.com}, \url{gemini.google.com}, \url{datacompute.google.com}). Standard errors are clustered at the user level.}
+\end{table}
+
+\subsubsection{Browsing Time}
+\label{sec:time_did}
+
+Table~\ref{tab:time_did_regression} reports the corresponding results for browsing time. Column (1) shows that browsing time also declines, by approximately 12\% on average ($\hat{\beta} = -0.129$, $p < 0.001$) when pooling both waves. In contrast to the cookies per visit results, the effect on browsing time is concentrated in Wave~1 ($\hat{\beta} = -0.264$, $p < 0.001$), corresponding to a roughly 23\% decline, while the Wave~2 effect is smaller in magnitude ($\hat{\beta} = -0.082$, $p < 0.01$), corresponding to roughly 8\%. The reduction in browsing time provides independent evidence that the deletion process is taking effect, since browsing time is logged separately from cookie counting and is not mechanically tied to the cookie removal process. The decline is consistent with users experiencing degraded browsing quality after third-party cookie deletion, including less relevant content recommendations, less targeted advertising, and reduced personalization across sites that rely on cross-site tracking. Note that the deletion does not affect login state or site preferences, both of which are stored in first-party cookies.
+
+\begin{table}[H]
+\centering
+\caption{Effect of Cookie Deletion on Daily Browsing Time}
+\label{tab:time_did_regression}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Daily Time Spent)}\\
+                                  & Pooled          & Wave 1          & Wave 2 \\
+   Model:                         & (1)             & (2)             & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Post $\times$ Cookie Deletion  & -0.1287$^{***}$ & -0.2643$^{***}$ & -0.0820$^{***}$\\
+                                  & (0.0257)        & (0.0610)        & (0.0277)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                 & Yes             & Yes             & Yes\\
+   website                        & Yes             & Yes             & Yes\\
+   dow                            & Yes             & Yes             & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 120,732         & 31,314          & 89,418\\
+   R$^2$                          & 0.48970         & 0.54476         & 0.49563\\
+   Within R$^2$                   & 0.00058         & 0.00256         & 0.00024\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the effect of cookie deletion on daily browsing time. The specification mirrors Table~\ref{tab:cookie_deletion_did} except that the dependent variable is $\log(1 + \text{daily time spent})$. All specifications include user, website, and day-of-week fixed effects. Standard errors are clustered at the user level.}
+\end{table}
+
+
+\subsection{Is Cookie Deletion Plausibly Random, or Systematically Selective?}\label{subsec:deletion_plausibly_random}
+
+Approximately 70\% of users have no recorded deletion events in the extension's logs. This raises a concern: did deletion actually execute for these users, or are the observed effects driven entirely by the 30\% with logs? Our central question is whether the missing log records are missing-at-random (MAR) at the (user, time period) level, or if there's some systematic bug.  We test the MAR assumption in two steps.
+
+First, we split the sample by log status and compare the deletion effect across the two subsamples. If missing logs reflect systematic execution failure, the deletion effect should be concentrated among users with logs and absent among users without. If instead missing logs reflect random logging dropouts, the two subsamples should show similar deletion effects, consistent with MAR.
+
+Second, we examine whether the deletion effect is broadly distributed across user types, individual websites, and website categories. We then re-run each heterogeneity analysis split by log status. If the no-log subsample tracks the has-log subsample at every level of granularity, this provides additional MAR-relevant evidence at finer granularity.
+
+\paragraph{By event log status.} We split the sample by whether a user has any recorded deletion events in the extension's event logs. Table~\ref{tab:cookie_deletion_by_log_status} reports the results. The deletion effect is $-0.230$ ($p < 0.001$) for users with deletion logs and $-0.369$ ($p < 0.001$) for users without. The two effects are statistically similar in magnitude, with the no-log effect actually slightly larger.
+
+\begin{table}[H]
+\centering
+\caption{Cookie Deletion Effect by Event Log Status}
+\label{tab:cookie_deletion_by_log_status}
+\scalebox{0.9}{
+\begin{tabular}{lccc}
+   \tabularnewline \midrule \midrule
+   Dependent Variable: & \multicolumn{3}{c}{log(1 + Third-Party Cookies per Visit)}\\
+                                  & All Users       & Has Deletion Log & No Deletion Log \\
+   Model:                         & (1)             & (2)              & (3)\\
+   \midrule
+   \emph{Variables}\\
+   Post $\times$ Cookie Deletion  & -0.3288$^{***}$ & -0.2303$^{***}$  & -0.3686$^{***}$\\
+                                  & (0.0286)        & (0.0522)         & (0.0352)\\
+   \midrule
+   \emph{Fixed-effects}\\
+   experiment\_id                 & Yes             & Yes              & Yes\\
+   website                        & Yes             & Yes              & Yes\\
+   dow                            & Yes             & Yes              & Yes\\
+   \midrule
+   \emph{Fit statistics}\\
+   Observations                   & 120,732         & 29,720           & 91,012\\
+   R$^2$                          & 0.66166         & 0.68442          & 0.67226\\
+   Within R$^2$                   & 0.00607         & 0.00370          & 0.00716\\
+   \midrule \midrule
+   \multicolumn{4}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{4}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+\end{tabular}
+}
+\caption*{\scriptsize \textsc{Notes}: This table splits the sample by whether a user has any recorded deletion events in the extension's event logs. The specification is identical to Table~\ref{tab:cookie_deletion_did}. Standard errors are clustered at the user level.}
+\end{table}
+
+\paragraph{Across user types.} Figure~\ref{fig:deletion_by_quintile} reports coefficients estimated separately for each quintile of pre-period total time spent. The deletion effect is negative across all five quintiles. Q2 through Q5 are statistically significant at the 1\% level, while Q1 is negative but not statistically significant due to its wider confidence interval, reflecting greater noise among light browsers with limited browsing activity. Figure~\ref{fig:deletion_by_quintile_log_status} repeats the analysis split by log status. The two subsamples display similar patterns: both groups show negative effects across all quintiles, with the no-log subsample's coefficients closely tracking the has-log subsample's at each quintile.
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by User Time Quintile}
+\label{fig:deletion_by_quintile}
+\includegraphics[width=0.85\textwidth]{figures/cpv_heterogeneity_by_user_quintile.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports the difference-in-differences coefficient from the baseline specification estimated separately for each quintile of pre-period total time spent. Quintiles are assigned based on the seven-day window before the early group's deletion start date. Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by User Time Quintile, Split by Log Status}
+\label{fig:deletion_by_quintile_log_status}
+\includegraphics[width=0.85\textwidth]{figures/cpv_heterogeneity_by_user_quintile_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the user time quintile analysis from Figure~\ref{fig:deletion_by_quintile} with the sample further split by whether the user has any recorded deletion events in the event logs. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+\paragraph{Across the most-visited websites.} Figure~\ref{fig:deletion_by_site} reports per-site coefficients for the fifteen websites with the most user-time in the seven-day pre-deletion window, restricted to sites with sufficient observations in every (log status $\times$ pre/post $\times$ treatment) cell to ensure the coefficient is identifiable in both log-status subsamples used below. Most sites show negative effects. The exceptions are concentrated in Google ecosystem services and Facebook, namely \url{mail.google.com}, \url{docs.google.com}, \url{gemini.google.com}, \url{datacompute.google.com}, and \url{www.facebook.com}. Figure~\ref{fig:deletion_by_site_log_status} repeats the per-site analysis split by log status. The two subsamples produce coefficients with similar signs and magnitudes across the fifteen websites.
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by Website (Top 15 by Pre-Deletion Time)}
+\label{fig:deletion_by_site}
+\includegraphics[width=0.85\textwidth]{figures/cpv_did_by_site.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports per-site difference-in-differences coefficients for the fifteen websites with the largest total time spent in the seven-day pre-deletion window. Sites are restricted to those with at least five users in every combination of log status, pre/post, and early/late deletion group, ensuring the coefficient is identifiable in both log-status subsamples used in Figure~\ref{fig:deletion_by_site_log_status}. Each coefficient is estimated from the baseline specification restricted to that website (omitting the website fixed effect). Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by Website (Top 15), Split by Log Status}
+\label{fig:deletion_by_site_log_status}
+\includegraphics[width=0.85\textwidth]{figures/cpv_did_by_site_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the per-site analysis from Figure~\ref{fig:deletion_by_site} with the sample further split by whether the user has any recorded deletion events. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+\paragraph{Across website categories.} Figure~\ref{fig:deletion_by_category} aggregates websites into broader categories using domain classification metadata, capturing the long tail of sites not in the top fifteen. Sixteen of seventeen categories exhibit statistically significant negative effects. The Internet \& Telecom category is the exception, as it is dominated by the Google ecosystem services discussed above. Figure~\ref{fig:deletion_by_category_log_status} repeats the analysis split by log status. All seventeen categories show same-sign coefficients across the two subsamples.
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by Website Category}
+\label{fig:deletion_by_category}
+\includegraphics[width=0.85\textwidth]{figures/cpv_heterogeneity_by_website_category.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports the difference-in-differences coefficient from the baseline specification estimated separately for each website category with at least 500 observations and 50 users. Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Cookie Deletion Effect by Website Category, Split by Log Status}
+\label{fig:deletion_by_category_log_status}
+\includegraphics[width=0.85\textwidth]{figures/cpv_heterogeneity_by_website_category_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the category analysis from Figure~\ref{fig:deletion_by_category} with the sample further split by whether the user has any recorded deletion events. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+Overall, the deletion effect is broadly distributed across user types, websites, and categories, and the no-log subsample's coefficients closely track the has-log subsample's at every level of granularity. These findings rule out systematic non-execution of deletion as an explanation for missing logs, and are consistent with the MAR interpretation that missing event logs reflect random logging dropouts.
+
+\subsection{Heterogeneity Analysis for Browsing Time}\label{subsec:deletion_time_heterogeneity}
+
+Differential logging quality across websites and individuals is a related concern: if time-spent measurements are systematically less reliable for some users or sites, the treatment effects we estimate could reflect logging artifacts rather than behavioral responses. To address this, we mirror the heterogeneity analysis from the previous subsection, replacing the cookies-per-visit outcome with $\log(1 + \text{daily time spent})$. Showing that the time effect is broadly distributed across user types, websites, and categories, and that the no-log subsample tracks the has-log subsample, provides a parallel diagnostic for the time-spent outcome and establishes that differential logging quality cannot generate the observed treatment effects.
+
+\paragraph{Across user types.} Figure~\ref{fig:time_by_quintile} reports time-spent coefficients estimated separately for each quintile of pre-period total time spent. The effect is negative for Q2 through Q5 and statistically significant for Q3, Q4, and Q5. Q1 shows a positive coefficient with a wide confidence interval, reflecting greater noise among light browsers. Figure~\ref{fig:time_by_quintile_log_status} repeats the analysis split by log status. Both subsamples display similar patterns across quintiles, with the no-log subsample's coefficients closely tracking the has-log subsample's at each quintile.
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by User Time Quintile}
+\label{fig:time_by_quintile}
+\includegraphics[width=0.85\textwidth]{figures/time_heterogeneity_by_user_quintile.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports the difference-in-differences coefficient on $\log(1 + \text{daily time spent})$ from the baseline specification estimated separately for each quintile of pre-period total time spent. Quintiles are assigned based on the seven-day window before the early group's deletion start date. Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by User Time Quintile, Split by Log Status}
+\label{fig:time_by_quintile_log_status}
+\includegraphics[width=0.85\textwidth]{figures/time_heterogeneity_by_user_quintile_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the user time quintile analysis from Figure~\ref{fig:time_by_quintile} with the sample further split by whether the user has any recorded deletion events in the event logs. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+\paragraph{Across the most-visited websites.} Figure~\ref{fig:time_by_site} reports per-site coefficients for the same fifteen websites used in Figure~\ref{fig:deletion_by_site}. Fourteen of fifteen sites show negative coefficients, with six statistically significant at the 5\% level. Unlike the cookies-per-visit results, no individual site exhibits a positive coefficient that is distinguishable from zero, consistent with browsing time being a behavioral outcome rather than a mechanical function of the deletion mechanism. Figure~\ref{fig:time_by_site_log_status} repeats the analysis split by log status. The sign of the coefficient agrees across the two subsamples for the majority of sites; the few sign disagreements occur at sites where both subsamples are statistically indistinguishable from zero, indicating these reflect noise rather than systematic differences in logging quality.
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by Website (Top 15 by Pre-Deletion Time)}
+\label{fig:time_by_site}
+\includegraphics[width=0.85\textwidth]{figures/time_did_by_site.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports per-site difference-in-differences coefficients on $\log(1 + \text{daily time spent})$ for the fifteen websites used in Figure~\ref{fig:deletion_by_site}. Each coefficient is estimated from the baseline specification restricted to that website (omitting the website fixed effect). Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by Website (Top 15), Split by Log Status}
+\label{fig:time_by_site_log_status}
+\includegraphics[width=0.85\textwidth]{figures/time_did_by_site_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the per-site analysis from Figure~\ref{fig:time_by_site} with the sample further split by whether the user has any recorded deletion events. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+\paragraph{Across website categories.} Figure~\ref{fig:time_by_category} aggregates websites into broader categories. Most categories show negative effects, with eight statistically significant at the 5\% level. The remaining categories produce small estimates that are not statistically distinguishable from zero. Figure~\ref{fig:time_by_category_log_status} repeats the analysis split by log status. The has-log subsample tends to produce coefficients of the same sign as the no-log subsample, with the few sign disagreements concentrated in categories where both estimates have wide confidence intervals.
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by Website Category}
+\label{fig:time_by_category}
+\includegraphics[width=0.85\textwidth]{figures/time_heterogeneity_by_website_category.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure reports the difference-in-differences coefficient on $\log(1 + \text{daily time spent})$ from the baseline specification estimated separately for each website category with at least 500 observations and 50 users. Error bars represent 95\% confidence intervals based on user-clustered standard errors. Red points indicate significance at the 5\% level.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\caption{Browsing Time Effect by Website Category, Split by Log Status}
+\label{fig:time_by_category_log_status}
+\includegraphics[width=0.85\textwidth]{figures/time_heterogeneity_by_website_category_log_status.pdf}
+\caption*{\scriptsize \textsc{Notes}: This figure repeats the category analysis from Figure~\ref{fig:time_by_category} with the sample further split by whether the user has any recorded deletion events. Red points denote the no-log subsample; blue points denote the has-log subsample. Error bars represent 95\% confidence intervals based on user-clustered standard errors.}
+\end{figure}
+
+Taken together, the time-spent results parallel the cookies-per-visit results. The treatment effect on browsing time is broadly distributed across user types, individual websites, and website categories, and the no-log subsample tracks the has-log subsample at every level of granularity. These findings indicate that the documented decline in browsing time does not arise from differential logging quality across users or websites.
+
 \section{Structural Model: Robustness [PRELIM]}
 
 \section{Survey Materials}\label{sec:survey_appendix}
