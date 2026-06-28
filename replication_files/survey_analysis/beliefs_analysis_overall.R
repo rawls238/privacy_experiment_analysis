@@ -28,7 +28,8 @@
 #     (extension sample identification)
 #
 # Dependencies:
-#   replication_files/utils/values.R           (BAD_USERS)
+#   replication_files/utils/values.R           (BAD_USERS, PRIVACY_ATTR_MASTER,
+#                                                get_privacy_attr_order)
 #   replication_files/utils/time_usage_helpers.R
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/number_format_helpers.R
@@ -36,18 +37,6 @@
 # Outputs:
 #   output/figures/beliefs_vs_truth.pdf
 #   output/values/rank_correlation_beliefs_values.tex
-#
-# Note: Previous version of this script also produced (now removed as dead code):
-#   - agg_belief_correctness.tex             (aggregate by category, not in paper)
-#   - agg_indiv_field_belief_correctness.tex (per-attribute table version, not in paper)
-#   - pew_all_effects.tex                    (PEW DiD treatment effects, not in paper)
-#   - SECTION 2 belief-distance DiD          (console-only)
-# Removed dead libraries (verified zero use after dead-code removal):
-#   - library(quantreg), library(stargazer), library(xtable),
-#     library(acs), library(fixest)
-# Removed dead helpers:
-#   - convert_to_numeric() (zero call sites)
-#   - round_to_quarter()   (only used by removed SECTION 2)
 # =============================================================================
 
 # Set working directory to code_github root so all relative paths resolve.
@@ -153,9 +142,10 @@ cat(sprintf("Survey sample (extension): %d respondents\n", nrow(survey_merged_ex
 # =============================================================================
 # BELIEF MAPPING (questionnaire columns -> internal privacy attribute keys)
 # =============================================================================
+# belief_to_internal: survey column -> internal key (matches PRIVACY_ATTR_MASTER).
+# Labels now come from the shared PRIVACY_ATTR_MASTER, not a local vector.
 
 belief_to_internal <- c(
-  # beliefscollection -> collect
   beliefscollection_r1 = "collect-log",
   beliefscollection_r2 = "collect-bio",
   beliefscollection_r3 = "collect-sensitive",
@@ -164,7 +154,6 @@ belief_to_internal <- c(
   beliefscollection_r6 = "collect-location",
   beliefscollection_r7 = "collect-social",
   
-  # beliefsuse -> share / related
   beliefsuse_r1 = "anonymized-anonymized",
   beliefsuse_r2 = "share-social",
   beliefsuse_r3 = "share-finance",
@@ -174,44 +163,21 @@ belief_to_internal <- c(
   beliefsuse_r7 = "share-partners",
   beliefsuse_r8 = "personalization-personalization",
   
-  # beliefscontrol -> control-related
   beliefscontrol_r1 = "change-change",
   beliefscontrol_r2 = "automated-automated",
   beliefscontrol_r3 = "deletion-deletion",
   beliefscontrol_r4 = "storage-storage",
   
-  # beliefsquality (no ground-truth counterpart)
+  # quality has no ground-truth counterpart; filtered out downstream
   beliefsquality_r1 = "quality-content",
   beliefsquality_r2 = "quality-ads",
   beliefsquality_r3 = "quality-navigation"
 )
 
-labels <- c(
-  beliefscollection_r1 = "Collects Browsing Behavior on Site",
-  beliefscollection_r2 = "Collects Demographic Data",
-  beliefscollection_r3 = "Collects Sensitive Personal Information",
-  beliefscollection_r4 = "Collects Financial Data",
-  beliefscollection_r5 = "Collects Browsing Behavior on Other Sites",
-  beliefscollection_r6 = "Collects Location Data",
-  beliefscollection_r7 = "Collects Social Media Profiles",
-  
-  beliefsuse_r1 = "Share Data Only After Anonymized",
-  beliefsuse_r2 = "Share Data with Social Media",
-  beliefsuse_r3 = "Share Data with Financial Providers",
-  beliefsuse_r4 = "Share Data with Advertisers",
-  beliefsuse_r5 = "Share Data with Law Enforcement",
-  beliefsuse_r6 = "Share Data with Service Providers",
-  beliefsuse_r7 = "Share Data with Non-Service Providers",
-  beliefsuse_r8 = "Use Data to Personalize Experience",
-  
-  beliefscontrol_r1 = "Notified of Policy Changes",
-  beliefscontrol_r2 = "Data Auto-Deleted After Time Period",
-  beliefscontrol_r3 = "Can Delete Data on Request",
-  beliefscontrol_r4 = "Data Stored Securely and Anonymized",
-  
-  beliefsquality_r1 = "High Quality Content",
-  beliefsquality_r2 = "Obstructive or Annoying Advertising",
-  beliefsquality_r3 = "Easy to Use and Navigate"
+# Canonical labels keyed by survey column, derived from the shared master.
+labels <- setNames(
+  PRIVACY_ATTR_MASTER$label[match(belief_to_internal, PRIVACY_ATTR_MASTER$internal_key)],
+  names(belief_to_internal)
 )
 
 belief_cols <- names(belief_to_internal)
@@ -274,16 +240,23 @@ beliefs_ext <- beliefs_ext %>%
   rename(belief_mean_experiment = mean) %>%
   select(name, belief_mean_experiment)
 
+# Order attributes by ground-truth prevalence using the shared helper, so the
+# y-axis matches the WTP figure exactly. Join the master label order onto the
+# belief table via the canonical label (name).
+attr_order <- get_privacy_attr_order()   # ascending true_mean, 19 attrs, no sell
+label_levels <- attr_order$label
+
 beliefs_combined <- beliefs_full %>%
   left_join(beliefs_ext, by = "name") %>%
-  arrange(true_mean)
+  filter(name %in% label_levels)
 
 # =============================================================================
 # Fig 5: BELIEFS VS GROUND TRUTH (3 series: Survey / Experiment / True Mean)
+#   Shapes only (no color), legend at bottom. (Sam request.)
 # =============================================================================
 
 plot_df <- beliefs_combined %>%
-  mutate(name = factor(name, levels = unique(name))) %>%
+  mutate(name = factor(name, levels = label_levels)) %>%
   pivot_longer(cols = c(true_mean, belief_mean_survey, belief_mean_experiment),
                names_to = "Measure", values_to = "Value") %>%
   mutate(Measure = recode(Measure,
@@ -296,34 +269,23 @@ plot_df <- beliefs_combined %>%
                                      "True Mean")))
 
 g <- ggplot(plot_df,
-            aes(x = name, y = Value,
-                fill = Measure, shape = Measure, color = Measure)) +
-  geom_point(size = 3) +
+            aes(x = name, y = Value, shape = Measure)) +
+  geom_point(size = 3, color = "black", fill = "black") +
   coord_flip() +
   scale_shape_manual(values = c(
     "Mean Beliefs (Survey)"     = 22,  # square
     "Mean Beliefs (Experiment)" = 24,  # triangle
     "True Mean"                 = 21   # circle
   )) +
-  scale_fill_manual(values = c(
-    "Mean Beliefs (Survey)"     = "#3182bd",  # blue
-    "Mean Beliefs (Experiment)" = "#e6550d",  # red/orange
-    "True Mean"                 = "#2ca25f"   # green
-  )) +
-  scale_color_manual(values = c(
-    "Mean Beliefs (Survey)"     = "black",
-    "Mean Beliefs (Experiment)" = "black",
-    "True Mean"                 = "black"
-  )) +
   labs(
     y     = "Percentage of Sites Engaged in Practice",
     x     = "Privacy Attribute",
-    fill  = NULL, shape = NULL, color = NULL
+    shape = NULL
   ) +
   theme_minimal(base_size = 13) +
   theme(
     panel.grid.minor = element_blank(),
-    legend.position  = "top"
+    legend.position  = "bottom"
   )
 
 ggsave(paste0(FIGURES_DIR, "beliefs_vs_truth.pdf"),
