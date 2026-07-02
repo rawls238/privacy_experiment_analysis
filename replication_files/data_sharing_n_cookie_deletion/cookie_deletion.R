@@ -305,8 +305,9 @@ cpv_panel[, own_tau := as.integer(date - own_anchor)]
 
 agg_traj <- function(dat, yvar) {
   d <- dat[own_tau >= TAU_MIN & own_tau <= TAU_MAX,
-           .(mean_y = mean(get(yvar)), se = sd(get(yvar)) / sqrt(.N)), by = own_tau]
-  d[, `:=`(xt = own_tau, ci_lo = mean_y - 1.96 * se, ci_hi = mean_y + 1.96 * se)]
+           .(mean_y = mean(get(yvar)), se = sd(get(yvar)) / sqrt(.N), n = .N), by = own_tau]
+  d[, tcrit := qt(0.975, pmax(n - 1, 1))]  # t-dist, consistent with coef plots
+  d[, `:=`(xt = own_tau, ci_lo = mean_y - tcrit * se, ci_hi = mean_y + tcrit * se)]
   d[order(xt)]
 }
 
@@ -330,8 +331,9 @@ agg_time_traj <- function(dat, anchor_col) {
   d <- copy(dat)
   d[, own_tau := as.integer(date - get(anchor_col))]
   d <- d[own_tau >= TAU_MIN & own_tau <= TAU_MAX,
-         .(mean_y = mean(log_time), se = sd(log_time) / sqrt(.N)), by = own_tau]
-  d[, `:=`(xt = own_tau, ci_lo = mean_y - 1.96 * se, ci_hi = mean_y + 1.96 * se)]
+         .(mean_y = mean(log_time), se = sd(log_time) / sqrt(.N), n = .N), by = own_tau]
+  d[, tcrit := qt(0.975, pmax(n - 1, 1))]  # t-dist, consistent with coef plots
+  d[, `:=`(xt = own_tau, ci_lo = mean_y - tcrit * se, ci_hi = mean_y + tcrit * se)]
   d[order(xt)]
 }
 
@@ -439,13 +441,15 @@ fit_by_group <- function(data, groups, group_col, yvar, fe_with_website = TRUE) 
     m <- tryCatch(feols(fml, data = sub, cluster = ~experiment_id, notes = FALSE),
                   error = function(e) NULL)
     if (is.null(m) || !"post_treated" %in% names(coef(m))) return(NULL)
+    ci <- confint(m, "post_treated", level = 0.95)  # t-dist CI, matches p-value
     data.table(grp_raw = as.character(g),
                coef = coef(m)["post_treated"],
                se   = se(m)["post_treated"],
-               p    = pvalue(m)["post_treated"])
+               p    = pvalue(m)["post_treated"],
+               ci_lo = as.numeric(ci[1, 1]),
+               ci_hi = as.numeric(ci[1, 2]))
   })
   res <- rbindlist(out)
-  res[, `:=`(ci_lo = coef - 1.96 * se, ci_hi = coef + 1.96 * se)]
   res
 }
 
@@ -458,13 +462,15 @@ fit_by_group_logstatus <- function(data, groups, group_col, yvar, fe_with_websit
     m <- tryCatch(feols(fml, data = sub, cluster = ~experiment_id, notes = FALSE),
                   error = function(e) NULL)
     if (is.null(m) || !"post_treated" %in% names(coef(m))) next
+    ci <- confint(m, "post_treated", level = 0.95)  # t-dist CI, matches p-value
     out[[paste(g, lg)]] <- data.table(
       grp_raw = as.character(g),
       log_status = if (lg == 1) "Has Log" else "No Log",
-      coef = coef(m)["post_treated"], se = se(m)["post_treated"])
+      coef = coef(m)["post_treated"], se = se(m)["post_treated"],
+      p = pvalue(m)["post_treated"],
+      ci_lo = as.numeric(ci[1, 1]), ci_hi = as.numeric(ci[1, 2]))
   }
   res <- rbindlist(out)
-  res[, `:=`(ci_lo = coef - 1.96 * se, ci_hi = coef + 1.96 * se)]
   res[, log_status := factor(log_status, levels = c("No Log", "Has Log"))]
   res
 }
@@ -606,5 +612,52 @@ save_tex_value(format_pct(share_pp[post == 0, cookie_share]),
 save_tex_value(format_pct(share_pp[post == 1, cookie_share]),
                name = "unaffCookieSharePost", file = cookie_values_file)
 
-cat("Saved 10 macros to", cookie_values_file, "\n")
+# Unaffected-site visit / time shares (pre / post)
+save_tex_value(format_pct(share_pp[post == 0, visit_share]),
+               name = "unaffVisitSharePre", file = cookie_values_file)
+save_tex_value(format_pct(share_pp[post == 1, visit_share]),
+               name = "unaffVisitSharePost", file = cookie_values_file)
+save_tex_value(format_pct(share_pp[post == 0, time_share]),
+               name = "unaffTimeSharePre", file = cookie_values_file)
+save_tex_value(format_pct(share_pp[post == 1, time_share]),
+               name = "unaffTimeSharePost", file = cookie_values_file)
+
+# Significance / sign counts for prose. "Significant" = 95% CI excludes zero,
+# which (since CIs now come from confint()) is identical to p < 0.05.
+n_sig <- function(dt) sum(dt$ci_lo > 0 | dt$ci_hi < 0)
+n_neg <- function(dt) sum(dt$coef < 0)
+
+save_tex_value(as.character(n_sig(cat_dt)),
+               name = "nSigCpvCategories", file = cookie_values_file)
+save_tex_value(as.character(nrow(cat_dt)),
+               name = "nCpvCategories", file = cookie_values_file)
+save_tex_value(as.character(n_sig(site_time)),
+               name = "nSigTimeSites", file = cookie_values_file)
+save_tex_value(as.character(n_neg(site_time)),
+               name = "nNegTimeSites", file = cookie_values_file)
+save_tex_value(as.character(nrow(site_time)),
+               name = "nTimeSites", file = cookie_values_file)
+save_tex_value(as.character(n_sig(cat_time)),
+               name = "nSigTimeCategories", file = cookie_values_file)
+
+cat("Saved macros to", cookie_values_file, "\n")
+
+# --- Diagnostic print (NOT written to paper): quintile significance + counts,
+#     so prose about "Q2-Q5 significant" / "X of N" can be written from data. ---
+print_sig <- function(dt, label, keycol = "grp_raw") {
+  cat("\n[", label, "]\n", sep = "")
+  d <- copy(dt)
+  d[, sig := ci_lo > 0 | ci_hi < 0]
+  d[, dir := ifelse(coef < 0, "neg", "pos")]
+  print(d[, c(keycol, "coef", "ci_lo", "ci_hi", "sig", "dir"), with = FALSE])
+  cat(sprintf("  -> %d of %d significant; %d negative\n", sum(d$sig), nrow(d), sum(d$coef < 0)))
+}
+cat("\n", strrep("=", 60), "\nSIGNIFICANCE DIAGNOSTICS (for prose; not in paper)\n",
+    strrep("=", 60), "\n", sep = "")
+print_sig(q_dt,      "CPV quintile")
+print_sig(q_time,    "TIME quintile")
+print_sig(site_dt,   "CPV site")
+print_sig(cat_dt,    "CPV category")
+print_sig(site_time, "TIME site")
+print_sig(cat_time,  "TIME category")
 cat("=== DONE ===\n")
