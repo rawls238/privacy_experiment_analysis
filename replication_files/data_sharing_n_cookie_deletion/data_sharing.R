@@ -172,7 +172,7 @@ dt_user_post <- dt_user_day[post == 1, .(
 xs_pool <- feols(mean_log_cpv ~ i(treatment, ref = "control") | block_by_wave,
                  data = dt_user_post, se = "hetero", notes = FALSE)
 
-DICT_XS <- c(`mean_log_cpv`        = "mean of log(1 + Daily Third-Party Cookies per Visit)",
+DICT_XS <- c(`mean_log_cpv`        = "log CPV",
              `treatment::saliency` = "Saliency Treatment",
              `treatment::info`     = "Information Treatment",
              `block_by_wave`       = "block-by-wave")
@@ -193,7 +193,7 @@ did_pool <- feols(log_daily_cpv ~ i(treatment, post, ref = "control")
                   | experiment_id + date,
                   data = dt_user_day, cluster = ~experiment_id, notes = FALSE)
 
-DICT_DID <- c(`log_daily_cpv`            = "log(1 + Daily Third-Party Cookies per Visit)",
+DICT_DID <- c(`log_daily_cpv`            = "log CPV",
               `treatment::saliency:post` = "Saliency $\\times$ Post",
               `treatment::info:post`     = "Information $\\times$ Post",
               `experiment_id`            = "User", `date` = "Date")
@@ -232,7 +232,7 @@ p_trend <- ggplot(daily_by_tx,
   geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
   scale_color_treatment() +
   labs(x = "Days Relative to Information Intervention",
-       y = "Mean log(1 + Daily Cookies per Visit)", color = NULL) +
+       y = "Mean log CPV", color = NULL) +
   theme_privacy_experiment(legend_position = "bottom",
                            show_grid_x = TRUE, show_grid_y = TRUE)
 

@@ -203,11 +203,11 @@ plot_coef_logstatus <- function(dt, mode = c("vertical", "horizontal"),
 DICT_CPV  <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
-               log_cpv_3p = "log(1 + Third-Party Cookies per Visit)")
+               log_cpv_3p = "log CPV")
 DICT_TIME <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
-               log_time = "log(1 + Daily Time Spent)")
+               log_time = "log time")
 SIGNIF <- c("***" = 0.01, "**" = 0.05, "*" = 0.1)
 
 
@@ -313,9 +313,9 @@ agg_traj <- function(dat, yvar) {
 cpv_c1 <- agg_traj(cpv_panel[cookie_treatment_idx == 1], "log_cpv_3p")
 cpv_c2 <- agg_traj(cpv_panel[cookie_treatment_idx == 2], "log_cpv_3p")
 ggsave(paste0(FIGURES_DIR, "cpv_over_time_c1.pdf"),
-       plot_trajectory(cpv_c1, "Mean log(1 + Cookies per Visit)"), width = FIG_W, height = FIG_H_TREND)
+       plot_trajectory(cpv_c1, "Mean log CPV"), width = FIG_W, height = FIG_H_TREND)
 ggsave(paste0(FIGURES_DIR, "cpv_over_time_c2.pdf"),
-       plot_trajectory(cpv_c2, "Mean log(1 + Cookies per Visit)"), width = FIG_W, height = FIG_H_TREND)
+       plot_trajectory(cpv_c2, "Mean log CPV"), width = FIG_W, height = FIG_H_TREND)
 cat("Saved: cpv_over_time_c1.pdf, cpv_over_time_c2.pdf\n")
 
 # --- 1.2 Daily browsing-time trajectory (c1 / c2) -> fig:time_over_time ------
@@ -338,9 +338,9 @@ agg_time_traj <- function(dat, anchor_col) {
 time_c1 <- agg_time_traj(user_day[cookie_treatment_idx == 1], "c1_anchor")
 time_c2 <- agg_time_traj(user_day[cookie_treatment_idx == 2], "c2_anchor")
 ggsave(paste0(FIGURES_DIR, "time_over_time_c1.pdf"),
-       plot_trajectory(time_c1, "Mean log(1 + Daily Time Spent)"), width = FIG_W, height = FIG_H_TREND)
+       plot_trajectory(time_c1, "Mean log time"), width = FIG_W, height = FIG_H_TREND)
 ggsave(paste0(FIGURES_DIR, "time_over_time_c2.pdf"),
-       plot_trajectory(time_c2, "Mean log(1 + Daily Time Spent)"), width = FIG_W, height = FIG_H_TREND)
+       plot_trajectory(time_c2, "Mean log time"), width = FIG_W, height = FIG_H_TREND)
 cat("Saved: time_over_time_c1.pdf, time_over_time_c2.pdf\n")
 rm(cpv_panel); gc(verbose = FALSE)
 
@@ -489,7 +489,7 @@ QUINT_LAB <- "User Time Quintile (Q1 = Lowest pre-period time spent)"
 q_dt <- fit_by_group(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p")
 q_dt[, grp := factor(grp_raw, levels = paste0("Q", 1:5))]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_user_quintile.pdf"),
-       plot_coef(q_dt, "vertical", "Estimated Effect on log(1 + CPV)", QUINT_LAB),
+       plot_coef(q_dt, "vertical", "Estimated Effect on log CPV", QUINT_LAB),
        width = FIG_W, height = FIG_H_QUINT)
 site_dt <- fit_by_group(t1[website %in% top15_sites], top15_sites, "website",
                         "log_cpv_3p", fe_with_website = FALSE)
@@ -498,19 +498,19 @@ site_dt <- site_dt[order(coef)]
 site_dt[, grp := factor(display_name, levels = rev(display_name))]
 ggsave(paste0(FIGURES_DIR, "cpv_did_by_site.pdf"),
        plot_coef(site_dt, "horizontal",
-                 "Estimated Effect on log(1 + Cookies per Visit)", NULL),
+                 "Estimated Effect on log CPV", NULL),
        width = FIG_W, height = FIG_H_WIDE_SINGLE)
 cat_dt <- fit_by_group(t1_cat, sort(big_cats), "category", "log_cpv_3p")
 cat_dt <- cat_dt[order(coef)]
 cat_dt[, grp := factor(grp_raw, levels = grp_raw)]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category.pdf"),
        plot_coef(cat_dt, "horizontal",
-                 "Estimated Effect on log(1 + Cookies per Visit)", NULL),
+                 "Estimated Effect on log CPV", NULL),
        width = FIG_W, height = FIG_H_WIDE_SINGLE)
 q_log <- fit_by_group_logstatus(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p")
 q_log[, grp := factor(grp_raw, levels = paste0("Q", 1:5))]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_user_quintile_log_status.pdf"),
-       plot_coef_logstatus(q_log, "vertical", "Estimated Effect on log(1 + CPV)", QUINT_LAB),
+       plot_coef_logstatus(q_log, "vertical", "Estimated Effect on log CPV", QUINT_LAB),
        width = FIG_W, height = FIG_H_QUINT)
 site_log <- fit_by_group_logstatus(t1[website %in% top15_sites], top15_sites,
                                    "website", "log_cpv_3p", fe_with_website = FALSE)
@@ -519,21 +519,21 @@ order_site <- site_log[log_status == "Has Log"][order(coef), display_name]
 site_log[, grp := factor(display_name, levels = rev(order_site))]
 ggsave(paste0(FIGURES_DIR, "cpv_did_by_site_log_status.pdf"),
        plot_coef_logstatus(site_log, "horizontal",
-                           "Estimated Effect on log(1 + Cookies per Visit)", NULL),
+                           "Estimated Effect on log CPV", NULL),
        width = FIG_W, height = FIG_H_WIDE_LOGSTATUS)
 cat_log <- fit_by_group_logstatus(t1_cat, sort(big_cats), "category", "log_cpv_3p")
 order_cat <- cat_log[log_status == "No Log"][order(coef), grp_raw]
 cat_log[, grp := factor(grp_raw, levels = rev(order_cat))]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category_log_status.pdf"),
        plot_coef_logstatus(cat_log, "horizontal",
-                           "Estimated Effect on log(1 + Cookies per Visit)", NULL),
+                           "Estimated Effect on log CPV", NULL),
        width = FIG_W, height = FIG_H_WIDE_LOGSTATUS)
 
 
 # =============================================================================
 # SECTION 3: Browsing-time heterogeneity (mirror of 2.2-2.7, outcome log_time)
 # =============================================================================
-TIME_LAB <- "Estimated Effect on log(1 + Daily Time Spent)"
+TIME_LAB <- "Estimated Effect on log time"
 
 # --- 3.2 time by user time quintile -> fig:time_by_quintile -----------------
 q_time <- fit_by_group(t1_q, paste0("Q", 1:5), "time_quintile", "log_time")
