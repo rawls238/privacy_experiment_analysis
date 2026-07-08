@@ -1,22 +1,22 @@
-\begin{tabular}{lcccc}
+\begin{tabular}{lccccc}
    \tabularnewline \midrule \midrule
-                         & Deleted Cookies & Opted out   & Withheld data & Changed privacy settings \\   
-   Model:                & (1)             & (2)         & (3)           & (4)\\  
+                         & Deleted Cookies & Opted out   & Withheld data & Changed privacy settings & Any Behavior \\   
+   Model:                & (1)             & (2)         & (3)           & (4)                      & (5)\\  
    \midrule
    \emph{Variables}\\
-   Saliency Treatment    & 0.008           & 0.030       & 0.040         & 0.034\\   
-                         & (0.040)         & (0.041)     & (0.041)       & (0.039)\\   
-   Information Treatment & 0.018           & 0.069$^{*}$ & 0.032         & 0.017\\   
-                         & (0.039)         & (0.040)     & (0.039)       & (0.038)\\   
+   Saliency Treatment    & 0.008           & 0.030       & 0.040         & 0.034                    & 0.060\\   
+                         & (0.040)         & (0.041)     & (0.041)       & (0.039)                  & (0.043)\\   
+   Information Treatment & 0.018           & 0.069$^{*}$ & 0.032         & 0.017                    & 0.059\\   
+                         & (0.039)         & (0.040)     & (0.039)       & (0.038)                  & (0.041)\\   
    \midrule
    \emph{Fixed-effects}\\
-   Block FE              & Yes             & Yes         & Yes           & Yes\\  
+   Block FE              & Yes             & Yes         & Yes           & Yes                      & Yes\\  
    \midrule
    \emph{Fit statistics}\\
-   Observations          & 966             & 966         & 966           & 966\\  
-   R$^2$                 & 0.32814         & 0.34462     & 0.34334       & 0.35358\\  
-   Within R$^2$          & 0.00036         & 0.00495     & 0.00192       & 0.00129\\  
+   Observations          & 966             & 966         & 966           & 966                      & 966\\  
+   R$^2$                 & 0.32814         & 0.34462     & 0.34334       & 0.35358                  & 0.34552\\  
+   Within R$^2$          & 0.00036         & 0.00495     & 0.00192       & 0.00129                  & 0.00455\\  
    \midrule \midrule
-   \multicolumn{5}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
-   \multicolumn{5}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
+   \multicolumn{6}{l}{\emph{Clustered (experiment\_id) standard-errors in parentheses}}\\
+   \multicolumn{6}{l}{\emph{Signif. Codes: ***: 0.01, **: 0.05, *: 0.1}}\\
 \end{tabular}

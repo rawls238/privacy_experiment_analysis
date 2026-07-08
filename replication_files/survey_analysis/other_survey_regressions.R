@@ -12,6 +12,7 @@
 #     Table C.9 [tab:treatment_effect_data_sharing,
 #                "Treatment Effect on Self-Reported Data Sharing Behavior"]:
 #       output/tables/data_sharing_treatment_effects[_suffix].tex
+#       (4 outcome columns + aggregate "Any Behavior" column)
 #
 #   `_suffix` is empty for unweighted and `_{weight_spec}` otherwise. Set
 #   WEIGHT_SPEC at the top of the script: "unweighted", "weight_census",
@@ -45,6 +46,12 @@
 # Removed dead library() calls (verified zero use in script):
 #   - library(quantreg)
 #   - library(acs)
+#
+# CHANGES this version:
+#   - Table C.9 gains a fifth column "Any Behavior": indicator equal to one if
+#     the participant self-reports at least one of the four behaviors
+#     (any_shared, already constructed alongside the four binaries). Same
+#     specification and weight dispatch as columns (1)-(4).
 # =============================================================================
 
 # Set working directory to code_github root so all relative paths resolve.
@@ -266,6 +273,7 @@ for (WEIGHT_SPEC in .specs_to_run) {
   
   # ===========================================================================
   # Table C.9 [tab:treatment_effect_data_sharing]
+  # 4 self-reported outcomes + aggregate "Any Behavior" column (5 columns)
   # ===========================================================================
   
   cat("\n=== Table C.9: Data Sharing ===\n")
@@ -311,6 +319,11 @@ for (WEIGHT_SPEC in .specs_to_run) {
   model_share4 <- run_weighted_feols(
     data_sharing_4_binary ~ experiment_condition | block_by_wave,
     cluster = ~experiment_id, data = data_sharing_analysis)
+  # Column (5): aggregate indicator, =1 if the participant self-reports at
+  # least one of the four behaviors. any_shared constructed above.
+  model_share5 <- run_weighted_feols(
+    any_shared ~ experiment_condition | block_by_wave,
+    cluster = ~experiment_id, data = data_sharing_analysis)
   
   dict <- c(
     "experiment_conditioninfo"     = "Information Treatment",
@@ -321,8 +334,10 @@ for (WEIGHT_SPEC in .specs_to_run) {
   )
   
   ds_tex <- etable(model_share1, model_share2, model_share3, model_share4,
+                   model_share5,
                    headers = c("Deleted Cookies", "Opted out",
-                               "Withheld data", "Changed privacy settings"),
+                               "Withheld data", "Changed privacy settings",
+                               "Any Behavior"),
                    dict   = dict,
                    tex    = TRUE,
                    depvar = FALSE,
