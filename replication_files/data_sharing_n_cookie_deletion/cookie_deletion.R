@@ -9,7 +9,7 @@
 #   SECTION 1  Did deletion happen, and what are the overall effects?
 #     1.1 Daily CPV trajectory (c1 / c2)                    -> fig:cpv_over_time
 #     1.2 Daily browsing-time trajectory (c1 / c2)          -> fig:time_over_time
-#     1.3 CPV DiD regression                                -> tab:cookie_deletion_did
+#     1.3 CPV DiD regression (2 cols: per-visit + undivided)-> tab:cookie_deletion_did
 #     1.4 Time DiD regression                               -> tab:time_did_regression
 #     1.5 CPV DiD excluding deletion-unaffected sites
 #         1.5a unaffected-site shares (Pre/Post/Change)     -> tab:..._unaffected_sites_summary
@@ -18,7 +18,7 @@
 #
 #   SECTION 2  Is deletion plausibly random? (CPV outcome)
 #     2.1 By event-log status                               -> tab:cookie_deletion_by_log_status
-#     2.1b Robustness: undivided cookie count               -> tab:cookie_deletion_did_ncookies
+#     2.1b Undivided-count models (feed E.1 col 2 + \ncookies* macros)
 #     2.2 By user time quintile                             -> fig:deletion_by_quintile
 #     2.3 By site (top 15)                                  -> fig:deletion_by_site
 #     2.4 By site category (VERTICAL)                       -> fig:deletion_by_category
@@ -44,7 +44,8 @@
 #       \timeExtQOneCoef \timeExtQOnePval \timeIntQOneCoef \timeIntQOnePval
 #       \qOneZeroDayPct \baseCatTopMedCpv \baseCatBottomMedCpv
 #       \ncookiesMainCoef \ncookiesMainPct \ncookiesHasLogCoef \ncookiesNoLogCoef
-#       \nSigCpvCategories \nCpvCategories \nSigTimeSites \nNegTimeSites
+#       \nSigCpvCategories \nSigNegCpvCategories \nSigPosCpvCategories
+#       \sigPosCpvCategory \nCpvCategories \nSigTimeSites \nNegTimeSites
 #       \nTimeSites \nSigTimeCategories
 #
 # DESIGN (unchanged from stage 1):
@@ -55,20 +56,23 @@
 #   Window tau in [-7, 6] (1 week pre + 1 week gap).
 #
 # CHANGES this version:
+#   - Table E.1 (tab:cookie_deletion_did) is now TWO columns (Guy: add the
+#     undivided robustness "to Table E.1"): col 1 = per-visit DV log(1+CPV),
+#     col 2 = undivided DV log(1+third-party cookies). Same sample and FE; only
+#     the DV differs. No `headers`; the etable Dependent-Variable row labels the
+#     columns via DICT_CPV.
+#   - DICT_CPV DV labels changed to "log(CPV)" / "log(3rd party cookies)" (add
+#     parentheses, consistent with DICT_TIME's "log(browsing seconds)").
+#   - The standalone undivided table (cookie_deletion_did_ncookies.tex) is no
+#     longer written, since its main effect now lives in Table E.1. m_n_all is
+#     fit in Section 1.3; the log-status splits (m_n_has/m_n_no) are retained
+#     only to feed the \ncookies* macros in data_sharing_cookie_values.tex.
 #   - Category plots (2.4, 2.7, 3.4, 3.7) and the baseline figure (1.6) are
-#     VERTICAL: categories on the x-axis with 45-degree labels, height 5in
-#     (was horizontal, 6.5-8.5in). Space-saving per Guy. Filenames unchanged.
-#   - 1.6 baseline figure now uses the SHARED big_cats category set (17
-#     categories, same as all effect figures), instead of recomputing the
-#     set on the baseline week (14). Categories consistent across the paper
-#     per Guy. big_cats/t1_cat definition moved up into Section 0.
-#   - NEW 2.1b: robustness with the undivided DV log(1 + n_cookies_third_party)
-#     (Guy: "don't divide through with the denominator"), main + log-status
-#     columns -> cookie_deletion_did_ncookies.tex + \ncookies* macros.
-#   - All browsing-time labels now carry explicit units per Guy ("i hate the
-#     use of the word time ... ambiguous what its units are"):
-#     axis "log(Browsing Seconds)", table dict "log(browsing seconds)".
-#     time_spent is recorded in seconds.
+#     VERTICAL: categories on the x-axis with 45-degree labels, height 5in.
+#     1.6 uses the SHARED big_cats set (17 categories), consistent per Guy.
+#   - All browsing-time labels carry explicit units per Guy: axis
+#     "log(Browsing Seconds)", table dict "log(browsing seconds)". time_spent
+#     is recorded in seconds.
 # =============================================================================
 
 library(jsonlite)   # MUST precede utils: time_usage_helpers.R uses fromJSON()
@@ -214,11 +218,12 @@ plot_coef_logstatus <- function(dt, mode = c("vertical", "horizontal"),
 
 # etable dictionaries (FE row labels + readable dep-var names).
 # Units per Guy: browsing time is recorded in SECONDS; say so everywhere.
+# DV labels use "log(...)" form consistently across CPV, cookies, and time.
 DICT_CPV  <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
-               log_cpv_3p = "log CPV",
-               log_ncookies = "log cookies")
+               log_cpv_3p = "log(CPV)",
+               log_ncookies = "log(3rd party cookies)")
 DICT_TIME <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
@@ -374,10 +379,18 @@ cat("Saved: time_over_time_c1.pdf, time_over_time_c2.pdf\n")
 rm(cpv_panel); gc(verbose = FALSE)
 
 # --- 1.3 CPV DiD regression (Pooled) -> tab:cookie_deletion_did --------------
+# Table E.1 carries TWO columns (Guy: add the undivided robustness "to Table
+# E.1"): col 1 = per-visit DV log(1+CPV); col 2 = undivided DV
+# log(1+third-party cookies). Same sample and FE; only the DV differs. No
+# `headers` -- the etable Dependent-Variable row labels the two columns via
+# DICT_CPV ("log(CPV)" / "log(3rd party cookies)").
 m_pool <- feols(log_cpv_3p ~ post_treated | experiment_id + website + dow,
                 data = t1, cluster = ~experiment_id, notes = FALSE)
+m_n_all <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
+                 data = t1, cluster = ~experiment_id, notes = FALSE)
 write_tabular_only(
-  etable(m_pool, dict = DICT_CPV, digits = 3, signif.code = SIGNIF, tex = TRUE),
+  etable(m_pool, m_n_all, dict = DICT_CPV, digits = 3,
+         signif.code = SIGNIF, tex = TRUE),
   file = paste0(TABLES_DIR, "cookie_deletion_did_regression.tex"))
 
 # --- 1.4 Time DiD regression (Pooled) -> tab:time_did_regression -------------
@@ -486,20 +499,16 @@ write_tabular_only(
          dict = DICT_CPV, digits = 3, signif.code = SIGNIF, tex = TRUE),
   file = paste0(TABLES_DIR, "cookie_deletion_by_log_status.tex"))
 
-# --- 2.1b Robustness: undivided cookie count (Guy: "don't divide through") --
-#          DV = log(1 + n_cookies_third_party); main + log-status columns
-#          -> tab:cookie_deletion_did_ncookies
-m_n_all <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
-                 data = t1, cluster = ~experiment_id, notes = FALSE)
+# --- 2.1b Undivided-count models (feed E.1 col 2 + \ncookies* macros) --------
+#          DV = log(1 + n_cookies_third_party). m_n_all is fit in Section 1.3
+#          (it populates Table E.1 column 2), so it is NOT re-fit here. The
+#          log-status splits are retained only to feed \ncookiesHasLogCoef /
+#          \ncookiesNoLogCoef; the standalone ncookies table is no longer
+#          written now that the undivided main effect lives in Table E.1.
 m_n_has <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
                  data = t1[has_log == 1], cluster = ~experiment_id, notes = FALSE)
 m_n_no  <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
                  data = t1[has_log == 0], cluster = ~experiment_id, notes = FALSE)
-write_tabular_only(
-  etable(m_n_all, m_n_has, m_n_no,
-         headers = c("All Users", "Has Deletion Log", "No Deletion Log"),
-         dict = DICT_CPV, digits = 3, signif.code = SIGNIF, tex = TRUE),
-  file = paste0(TABLES_DIR, "cookie_deletion_did_ncookies.tex"))
 
 # --- 2.2 CPV by user time quintile -> fig:deletion_by_quintile --------------
 # user time quintile (assigned on pre-period total time)
@@ -718,7 +727,7 @@ ggsave(paste0(FIGURES_DIR, "time_heterogeneity_by_website_category_log_status.pd
        width = FIG_W, height = FIG_H_CAT_VERT)
 
 cat("Saved: 18 figures to", FIGURES_DIR, "\n")
-cat("Saved: 6 tables to", TABLES_DIR, "\n")
+cat("Saved: 5 tables to", TABLES_DIR, "\n")
 
 
 # =============================================================================
@@ -779,7 +788,9 @@ save_tex_value(format_count(round(base_stats[, max(med)])),
 save_tex_value(format_count(round(base_stats[, min(med)])),
                name = "baseCatBottomMedCpv", file = cookie_values_file)
 
-# Undivided cookie-count robustness macros (Section 2.1b)
+# Undivided cookie-count robustness macros (Section 2.1b). \ncookiesMainCoef /
+# \ncookiesMainPct are cited in the Table E.1 prose; the log-status pair is
+# retained for potential undivided-DV robustness reporting.
 save_tex_value(format_coef(coef(m_n_all)["post_treated"]),
                name = "ncookiesMainCoef", file = cookie_values_file)
 save_tex_value(format_pct(100 * abs(exp(coef(m_n_all)["post_treated"]) - 1)),
@@ -791,13 +802,40 @@ save_tex_value(format_coef(coef(m_n_no)["post_treated"]),
 
 # Significance / sign counts for prose. "Significant" = 95% CI excludes zero,
 # which (since CIs now come from confint()) is identical to p < 0.05.
-n_sig <- function(dt) sum(dt$ci_lo > 0 | dt$ci_hi < 0)
-n_neg <- function(dt) sum(dt$coef < 0)
+n_sig     <- function(dt) sum(dt$ci_lo > 0 | dt$ci_hi < 0)   # two-sided
+n_sig_neg <- function(dt) sum(dt$ci_hi < 0)                  # significant & negative
+n_sig_pos <- function(dt) sum(dt$ci_lo > 0)                  # significant & positive
+n_neg     <- function(dt) sum(dt$coef < 0)
 
+# Two-sided count retained (\nSigCpvCategories) in case it is already cited
+# elsewhere; the signed counts below are what the "significant negative"
+# prose should use. \nCpvCategories is the total (17).
 save_tex_value(as.character(n_sig(cat_dt)),
                name = "nSigCpvCategories", file = cookie_values_file)
+save_tex_value(as.character(n_sig_neg(cat_dt)),
+               name = "nSigNegCpvCategories", file = cookie_values_file)
+save_tex_value(as.character(n_sig_pos(cat_dt)),
+               name = "nSigPosCpvCategories", file = cookie_values_file)
 save_tex_value(as.character(nrow(cat_dt)),
                name = "nCpvCategories", file = cookie_values_file)
+# Name of the significant-positive CPV category, data-driven (not hardcoded).
+# Expected to be "Internet & Telecom"; verified against the console print below.
+# save_tex_value's default translate=TRUE choked on the "&" and silently dropped
+# the value (the numeric count macros above, which have no specials, wrote
+# fine). The documented lever is translate=FALSE with the value pre-escaped, so
+# we stay on save_tex_value. Belt-and-suspenders: if the package still drops the
+# string, fall back to writing the \newcommand directly so the macro is
+# guaranteed present after one run.
+sig_pos_cats <- paste(gsub("&", "\\\\&", cat_dt[ci_lo > 0, grp_raw]), collapse = ", ")
+save_tex_value(sig_pos_cats, name = "sigPosCpvCategory",
+               file = cookie_values_file, translate = FALSE)
+if (!any(grepl("sigPosCpvCategory", readLines(cookie_values_file)))) {
+  cat(sprintf("\\newcommand{\\sigPosCpvCategory}{%s}\n", sig_pos_cats),
+      file = cookie_values_file, append = TRUE)
+  cat("Note: save_tex_value dropped the string; wrote \\sigPosCpvCategory directly.\n")
+} else {
+  cat("Wrote \\sigPosCpvCategory via save_tex_value (translate=FALSE).\n")
+}
 save_tex_value(as.character(n_sig(site_time)),
                name = "nSigTimeSites", file = cookie_values_file)
 save_tex_value(as.character(n_neg(site_time)),
@@ -828,4 +866,16 @@ print_sig(site_dt,   "CPV site")
 print_sig(cat_dt,    "CPV category")
 print_sig(site_time, "TIME site")
 print_sig(cat_time,  "TIME category")
+
+# CPV-category signed breakdown for the "significant negative" prose. Prints the
+# name of the significant-positive category (expected: Internet & Telecom) so it
+# can be confirmed before the paper sentence names it.
+cat("\n", strrep("-", 60),
+    "\nCPV CATEGORY signed breakdown (for the 'significant negative' sentence):\n",
+    sep = "")
+cat(sprintf("  significant NEGATIVE : %d\n", n_sig_neg(cat_dt)))
+cat(sprintf("  significant POSITIVE : %d  -> %s\n",
+            n_sig_pos(cat_dt),
+            paste(cat_dt[ci_lo > 0, grp_raw], collapse = ", ")))
+cat(sprintf("  total categories     : %d\n", nrow(cat_dt)))
 cat("=== DONE ===\n")
