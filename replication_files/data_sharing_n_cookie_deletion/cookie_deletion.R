@@ -36,7 +36,7 @@
 #     3.7 Time category x log status (MAR, VERTICAL)        -> fig:time_by_category_log_status
 #
 #   Inline scalars (Pooled) cited in E prose:
-#     output/values/data_sharing_cookie_values.tex
+#     output/values/data_sharing_cookie_values.tex   (save_tex_value bundle)
 #       \cookieCpvCoef \cookieCpvPct \cookieCpvExclCoef
 #       \cookieTimeCoef \cookieTimePct
 #       \cookieHasLogCoef \cookieNoLogCoef \noLogPct
@@ -45,8 +45,12 @@
 #       \qOneZeroDayPct \baseCatTopMedCpv \baseCatBottomMedCpv
 #       \ncookiesMainCoef \ncookiesMainPct \ncookiesHasLogCoef \ncookiesNoLogCoef
 #       \nSigCpvCategories \nSigNegCpvCategories \nSigPosCpvCategories
-#       \sigPosCpvCategory \nCpvCategories \nSigTimeSites \nNegTimeSites
+#       \nCpvCategories \nSigTimeSites \nNegTimeSites
 #       \nTimeSites \nSigTimeCategories
+#     output/values/data_sharing_cookie_str_values.tex   (hand-written; the
+#       value contains a space, which the save_tex_value bundle cannot store)
+#       \sigPosCpvCategory
+#     NOTE: both files must be \input in the manuscript preamble.
 #
 # DESIGN (unchanged from stage 1):
 #   Two 2x2 DiDs pooled via event-time alignment (NOT staggered DiD).
@@ -61,8 +65,8 @@
 #     col 2 = undivided DV log(1+third-party cookies). Same sample and FE; only
 #     the DV differs. No `headers`; the etable Dependent-Variable row labels the
 #     columns via DICT_CPV.
-#   - DICT_CPV DV labels changed to "log(CPV)" / "log(3rd party cookies)" (add
-#     parentheses, consistent with DICT_TIME's "log(browsing seconds)").
+#   - DICT_CPV DV labels changed to "log(CPV)" / "log(3rd Party Cookies)" (add
+#     parentheses, Title Case, consistent with the figure axes and DICT_TIME).
 #   - The standalone undivided table (cookie_deletion_did_ncookies.tex) is no
 #     longer written, since its main effect now lives in Table E.1. m_n_all is
 #     fit in Section 1.3; the log-status splits (m_n_has/m_n_no) are retained
@@ -70,9 +74,10 @@
 #   - Category plots (2.4, 2.7, 3.4, 3.7) and the baseline figure (1.6) are
 #     VERTICAL: categories on the x-axis with 45-degree labels, height 5in.
 #     1.6 uses the SHARED big_cats set (17 categories), consistent per Guy.
-#   - All browsing-time labels carry explicit units per Guy: axis
-#     "log(Browsing Seconds)", table dict "log(browsing seconds)". time_spent
-#     is recorded in seconds.
+#   - Browsing-time labels use Title Case with the unit stated in the figure/
+#     table notes (per Guy: make the units unambiguous). Axis and table DV read
+#     "log(Daily Browsing Time)"; time_spent is recorded in seconds, so the
+#     notes state "in seconds". CPV labels read "log(CPV)" to match.
 # =============================================================================
 
 library(jsonlite)   # MUST precede utils: time_usage_helpers.R uses fromJSON()
@@ -223,14 +228,14 @@ DICT_CPV  <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
                log_cpv_3p = "log(CPV)",
-               log_ncookies = "log(3rd party cookies)")
+               log_ncookies = "log(3rd Party Cookies)")
 DICT_TIME <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
-               log_time = "log(browsing seconds)")
+               log_time = "log(Daily Browsing Time)")
 SIGNIF <- c("***" = 0.01, "**" = 0.05, "*" = 0.1)
 
-TIME_LAB  <- "Estimated Effect on log(Browsing Seconds)"
+TIME_LAB  <- "Estimated Effect on log(Daily Browsing Time)"
 QUINT_LAB <- "User Time Quintile (Q1 = Lowest pre-period time spent)"
 
 
@@ -344,9 +349,9 @@ agg_traj <- function(dat, yvar) {
 cpv_c1 <- agg_traj(cpv_panel[cookie_treatment_idx == 1], "log_cpv_3p")
 cpv_c2 <- agg_traj(cpv_panel[cookie_treatment_idx == 2], "log_cpv_3p")
 ggsave(paste0(FIGURES_DIR, "cpv_over_time_c1.pdf"),
-       plot_trajectory(cpv_c1, "Mean log CPV"), width = FIG_W, height = FIG_H_TREND)
+       plot_trajectory(cpv_c1, "Mean log(CPV)"), width = FIG_W, height = FIG_H_TREND)
 ggsave(paste0(FIGURES_DIR, "cpv_over_time_c2.pdf"),
-       plot_trajectory(cpv_c2, "Mean log CPV"), width = FIG_W, height = FIG_H_TREND)
+       plot_trajectory(cpv_c2, "Mean log(CPV)"), width = FIG_W, height = FIG_H_TREND)
 cat("Saved: cpv_over_time_c1.pdf, cpv_over_time_c2.pdf\n")
 
 # --- 1.2 Daily browsing-time trajectory (c1 / c2) -> fig:time_over_time ------
@@ -370,10 +375,10 @@ agg_time_traj <- function(dat, anchor_col) {
 time_c1 <- agg_time_traj(user_day[cookie_treatment_idx == 1], "c1_anchor")
 time_c2 <- agg_time_traj(user_day[cookie_treatment_idx == 2], "c2_anchor")
 ggsave(paste0(FIGURES_DIR, "time_over_time_c1.pdf"),
-       plot_trajectory(time_c1, "Mean log(Browsing Seconds)"),
+       plot_trajectory(time_c1, "Mean log(Daily Browsing Time)"),
        width = FIG_W, height = FIG_H_TREND)
 ggsave(paste0(FIGURES_DIR, "time_over_time_c2.pdf"),
-       plot_trajectory(time_c2, "Mean log(Browsing Seconds)"),
+       plot_trajectory(time_c2, "Mean log(Daily Browsing Time)"),
        width = FIG_W, height = FIG_H_TREND)
 cat("Saved: time_over_time_c1.pdf, time_over_time_c2.pdf\n")
 rm(cpv_panel); gc(verbose = FALSE)
@@ -383,7 +388,7 @@ rm(cpv_panel); gc(verbose = FALSE)
 # E.1"): col 1 = per-visit DV log(1+CPV); col 2 = undivided DV
 # log(1+third-party cookies). Same sample and FE; only the DV differs. No
 # `headers` -- the etable Dependent-Variable row labels the two columns via
-# DICT_CPV ("log(CPV)" / "log(3rd party cookies)").
+# DICT_CPV ("log(CPV)" / "log(3rd Party Cookies)").
 m_pool <- feols(log_cpv_3p ~ post_treated | experiment_id + website + dow,
                 data = t1, cluster = ~experiment_id, notes = FALSE)
 m_n_all <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
@@ -566,7 +571,7 @@ fit_by_group_logstatus <- function(data, groups, group_col, yvar, fe_with_websit
 q_dt <- fit_by_group(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p")
 q_dt[, grp := factor(grp_raw, levels = paste0("Q", 1:5))]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_user_quintile.pdf"),
-       plot_coef(q_dt, "vertical", "Estimated Effect on log CPV", QUINT_LAB),
+       plot_coef(q_dt, "vertical", "Estimated Effect on log(CPV)", QUINT_LAB),
        width = FIG_W, height = FIG_H_QUINT)
 
 # --- 2.3 CPV by site (top 15) -> fig:deletion_by_site ------------------------
@@ -577,7 +582,7 @@ site_dt <- site_dt[order(coef)]
 site_dt[, grp := factor(display_name, levels = rev(display_name))]
 ggsave(paste0(FIGURES_DIR, "cpv_did_by_site.pdf"),
        plot_coef(site_dt, "horizontal",
-                 "Estimated Effect on log CPV", NULL),
+                 "Estimated Effect on log(CPV)", NULL),
        width = FIG_W, height = FIG_H_WIDE_SINGLE)
 
 # --- 2.4 CPV by site category (VERTICAL) -> fig:deletion_by_category ---------
@@ -586,14 +591,14 @@ cat_dt <- cat_dt[order(coef)]
 cat_dt[, grp := factor(grp_raw, levels = grp_raw)]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category.pdf"),
        plot_coef(cat_dt, "vertical",
-                 "Estimated Effect on log CPV", NULL) + rot_x,
+                 "Estimated Effect on log(CPV)", NULL) + rot_x,
        width = FIG_W, height = FIG_H_CAT_VERT)
 
 # --- 2.5 Quintile x log status (MAR) -> fig:deletion_by_quintile_log_status --
 q_log <- fit_by_group_logstatus(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p")
 q_log[, grp := factor(grp_raw, levels = paste0("Q", 1:5))]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_user_quintile_log_status.pdf"),
-       plot_coef_logstatus(q_log, "vertical", "Estimated Effect on log CPV", QUINT_LAB),
+       plot_coef_logstatus(q_log, "vertical", "Estimated Effect on log(CPV)", QUINT_LAB),
        width = FIG_W, height = FIG_H_QUINT)
 
 # --- 2.6 Top-15 sites x log status (MAR) -> fig:deletion_by_site_log_status --
@@ -604,7 +609,7 @@ order_site <- site_log[log_status == "Has Log"][order(coef), display_name]
 site_log[, grp := factor(display_name, levels = rev(order_site))]
 ggsave(paste0(FIGURES_DIR, "cpv_did_by_site_log_status.pdf"),
        plot_coef_logstatus(site_log, "horizontal",
-                           "Estimated Effect on log CPV", NULL),
+                           "Estimated Effect on log(CPV)", NULL),
        width = FIG_W, height = FIG_H_WIDE_LOGSTATUS)
 
 # --- 2.7 Category x log status (MAR, VERTICAL) -------------------------------
@@ -614,7 +619,7 @@ order_cat <- cat_log[log_status == "No Log"][order(coef), grp_raw]
 cat_log[, grp := factor(grp_raw, levels = order_cat)]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category_log_status.pdf"),
        plot_coef_logstatus(cat_log, "vertical",
-                           "Estimated Effect on log CPV", NULL) + rot_x,
+                           "Estimated Effect on log(CPV)", NULL) + rot_x,
        width = FIG_W, height = FIG_H_CAT_VERT)
 
 
@@ -675,7 +680,7 @@ udi[, log_time_pos := log(total_time)]
 int_dt <- fit_margin(udi, "log_time_pos")
 ggsave(paste0(FIGURES_DIR, "time_intensive_by_quintile.pdf"),
        plot_coef(int_dt, "vertical",
-                 "Estimated Effect on log(Browsing Seconds), Browsing Days",
+                 "Estimated Effect on log(Daily Browsing Time), Days with Browsing",
                  QUINT_LAB),
        width = FIG_W, height = FIG_H_QUINT)
 cat("Saved: time_extensive_by_quintile.pdf, time_intensive_by_quintile.pdf\n")
@@ -820,22 +825,19 @@ save_tex_value(as.character(nrow(cat_dt)),
                name = "nCpvCategories", file = cookie_values_file)
 # Name of the significant-positive CPV category, data-driven (not hardcoded).
 # Expected to be "Internet & Telecom"; verified against the console print below.
-# save_tex_value's default translate=TRUE choked on the "&" and silently dropped
-# the value (the numeric count macros above, which have no specials, wrote
-# fine). The documented lever is translate=FALSE with the value pre-escaped, so
-# we stay on save_tex_value. Belt-and-suspenders: if the package still drops the
-# string, fall back to writing the \newcommand directly so the macro is
-# guaranteed present after one run.
+# save_tex_value CANNOT store a value containing spaces: before each write it
+# re-reads the file with data.table::fread(sep = " "), so a value like
+# "Internet & Telecom" is parsed as multiple fields, the row is dropped, and the
+# file is rewritten without it (the sep is hard-coded, so translate/percent
+# cannot help). We therefore write this one string macro to its OWN file by
+# hand, escaping "&" ourselves. Numeric macros stay in the save_tex_value bundle
+# above. This new file must be \input in the preamble alongside the others.
 sig_pos_cats <- paste(gsub("&", "\\\\&", cat_dt[ci_lo > 0, grp_raw]), collapse = ", ")
-save_tex_value(sig_pos_cats, name = "sigPosCpvCategory",
-               file = cookie_values_file, translate = FALSE)
-if (!any(grepl("sigPosCpvCategory", readLines(cookie_values_file)))) {
-  cat(sprintf("\\newcommand{\\sigPosCpvCategory}{%s}\n", sig_pos_cats),
-      file = cookie_values_file, append = TRUE)
-  cat("Note: save_tex_value dropped the string; wrote \\sigPosCpvCategory directly.\n")
-} else {
-  cat("Wrote \\sigPosCpvCategory via save_tex_value (translate=FALSE).\n")
-}
+cookie_str_values_file <- file.path(VALUES_DIR, "data_sharing_cookie_str_values.tex")
+writeLines(sprintf("\\newcommand{\\sigPosCpvCategory}{%s}", sig_pos_cats),
+           cookie_str_values_file)
+cat(sprintf("Wrote \\sigPosCpvCategory = %s -> %s (hand-written; save_tex_value cannot hold spaces)\n",
+            sig_pos_cats, cookie_str_values_file))
 save_tex_value(as.character(n_sig(site_time)),
                name = "nSigTimeSites", file = cookie_values_file)
 save_tex_value(as.character(n_neg(site_time)),

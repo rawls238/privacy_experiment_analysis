@@ -291,7 +291,7 @@ for (WEIGHT_SPEC in .specs_to_run) {
     mutate(
       data_sharing_1_binary = ifelse(data_sharing_1 != "No", 1, 0),
       data_sharing_2_binary = ifelse(data_sharing_2 != "No" & !is.na(data_sharing_2), 1, 0),
-      data_sharing_3_binary = ifelse(data_sharing_3 != "No", 1, 0),
+      data_sharing_3_binary = ifelse(data_sharing_3 != "No" & !is.na(data_sharing_3), 1, 0),
       data_sharing_4_binary = ifelse(data_sharing_4 != "No" & !is.na(data_sharing_4), 1, 0),
       total_shared = data_sharing_1_binary + data_sharing_2_binary +
         data_sharing_3_binary + data_sharing_4_binary,
