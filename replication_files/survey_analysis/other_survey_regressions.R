@@ -13,6 +13,9 @@
 #                "Treatment Effect on Self-Reported Data Sharing Behavior"]:
 #       output/tables/data_sharing_treatment_effects[_suffix].tex
 #       (4 outcome columns + aggregate "Any Behavior" column)
+#     Inline scalars (Data Sharing prose):
+#       output/values/data_sharing_selfreport_values.tex
+#         \optOutPP \optOutPctIncrease
 #
 #   `_suffix` is empty for unweighted and `_{weight_spec}` otherwise. Set
 #   WEIGHT_SPEC at the top of the script: "unweighted", "weight_census",
@@ -35,6 +38,7 @@
 #   output/tables/data_sharing_treatment_effects[_suffix].tex
 #   output/tables/experiment_modified_behavior[_suffix].tex
 #   output/values/data_sharing_purpose_values.tex
+#   output/values/data_sharing_selfreport_values.tex
 #
 # Note: Previous version of this script also produced (now removed as dead code):
 #   - category_summary: aggregate Positive/Negative totals (console-only, not in paper)
@@ -52,6 +56,9 @@
 #     the participant self-reports at least one of the four behaviors
 #     (any_shared, already constructed alongside the four binaries). Same
 #     specification and weight dispatch as columns (1)-(4).
+#   - NEW: opt-out inline scalars \optOutPP / \optOutPctIncrease saved to
+#     data_sharing_selfreport_values.tex (unweighted pass only), replacing
+#     hardcoded "6.9 percentage points" / "20%" in the Data Sharing prose.
 # =============================================================================
 
 # Set working directory to code_github root so all relative paths resolve.
@@ -347,6 +354,26 @@ for (WEIGHT_SPEC in .specs_to_run) {
   write_tabular_only(ds_tex,
                      file = paste0(TABLES_DIR, "data_sharing_treatment_effects",
                                    OUTPUT_SUFFIX, ".tex"))
+  
+  # ---------------------------------------------------------------------------
+  # Inline scalars for the opt-out result cited in the Data Sharing prose
+  # (writeup: "6.9 percentage points more likely ... a 20% increase relative
+  # to the control group mean"). Saved only on the unweighted pass so the
+  # macros match the unweighted table the prose describes.
+  # ---------------------------------------------------------------------------
+  if (WEIGHT_SPEC == "unweighted") {
+    optout_coef      <- coef(model_share2)["experiment_conditioninfo"]
+    optout_ctrl_mean <- mean(data_sharing_analysis$data_sharing_2_binary[
+      data_sharing_analysis$experiment_condition == "control"])
+    
+    ds_values_file <- file.path(VALUES_DIR, "data_sharing_selfreport_values.tex")
+    suppressWarnings(file.remove(ds_values_file))
+    save_tex_value(format_pct(100 * optout_coef),
+                   name = "optOutPP", file = ds_values_file)
+    save_tex_value(format_pct(100 * optout_coef / optout_ctrl_mean),
+                   name = "optOutPctIncrease", file = ds_values_file)
+    cat(sprintf("Saved 2 macros to %s\n", ds_values_file))
+  }
   
   # ===========================================================================
   # Table C.3 [tab:experimenter_demand]

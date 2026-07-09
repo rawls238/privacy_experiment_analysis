@@ -2,7 +2,7 @@
 # cookie_deletion.R   (replication_files pipeline version)
 #
 # Produces the Cookie Deletion analyses for the paper appendix
-# (writeup_v4.tex, "Data Sharing and Cookie Deletion Analysis", E.2-E.4).
+# (writeup_v4.tex, "Analysis of Cookie Deletion Intervention").
 #
 # Guy's question: "Is cookie deletion plausibly random, or a systematic bug?"
 #
@@ -18,17 +18,22 @@
 #
 #   SECTION 2  Is deletion plausibly random? (CPV outcome)
 #     2.1 By event-log status                               -> tab:cookie_deletion_by_log_status
+#     2.1b Robustness: undivided cookie count               -> tab:cookie_deletion_did_ncookies
 #     2.2 By user time quintile                             -> fig:deletion_by_quintile
 #     2.3 By site (top 15)                                  -> fig:deletion_by_site
-#     2.4 By site category                                  -> fig:deletion_by_category
+#     2.4 By site category (VERTICAL)                       -> fig:deletion_by_category
 #     2.5 Quintile x log status (MAR)                       -> fig:deletion_by_quintile_log_status
 #     2.6 Top-15 sites x log status (MAR)                   -> fig:deletion_by_site_log_status
-#     2.7 Category x log status (MAR)                       -> fig:deletion_by_category_log_status
+#     2.7 Category x log status (MAR, VERTICAL)             -> fig:deletion_by_category_log_status
 #
 #   SECTION 3  Browsing-time heterogeneity
 #     3.2 Time by quintile, TWO MARGINS                     -> fig:time_extensive_by_quintile
 #                                                              fig:time_intensive_by_quintile
-#     3.3 ... 3.7 site / category / log-status mirrors      -> fig:time_by_* (+ _log_status)
+#     3.3 Time by site (top 15)                             -> fig:time_by_site
+#     3.4 Time by category (VERTICAL)                       -> fig:time_by_category
+#     3.5 Time quintile x log status (MAR)                  -> fig:time_by_quintile_log_status
+#     3.6 Time sites x log status (MAR)                     -> fig:time_by_site_log_status
+#     3.7 Time category x log status (MAR, VERTICAL)        -> fig:time_by_category_log_status
 #
 #   Inline scalars (Pooled) cited in E prose:
 #     output/values/data_sharing_cookie_values.tex
@@ -36,8 +41,11 @@
 #       \cookieTimeCoef \cookieTimePct
 #       \cookieHasLogCoef \cookieNoLogCoef \noLogPct
 #       \unaffCookieSharePre \unaffCookieSharePost (+ visit/time shares)
-#       \timeExtQOneCoef \timeExtQOnePval \timeIntQOneCoef \qOneZeroDayPct
-#       \timeIntQOnePval \baseCatTopMedCpv \baseCatBottomMedCpv
+#       \timeExtQOneCoef \timeExtQOnePval \timeIntQOneCoef \timeIntQOnePval
+#       \qOneZeroDayPct \baseCatTopMedCpv \baseCatBottomMedCpv
+#       \ncookiesMainCoef \ncookiesMainPct \ncookiesHasLogCoef \ncookiesNoLogCoef
+#       \nSigCpvCategories \nCpvCategories \nSigTimeSites \nNegTimeSites
+#       \nTimeSites \nSigTimeCategories
 #
 # DESIGN (unchanged from stage 1):
 #   Two 2x2 DiDs pooled via event-time alignment (NOT staggered DiD).
@@ -46,35 +54,21 @@
 #     Wave 1 anchor: Jul 26   Wave 2 anchor: Aug 9
 #   Window tau in [-7, 6] (1 week pre + 1 week gap).
 #
-# CHANGES vs stage-1 script (code/cookie_deletion/...):
-#   - Sourced from replication_files/utils (no local SURVEY_WEBSITES / plot
-#     theme / log-status colors). library(jsonlite) before utils so
-#     get_domain_classification() resolves fromJSON().
-#   - Paths: ../data/.. ; outputs to output/{figures,tables,values}/.
-#   - Pooled only: wave-1 / wave-2 columns dropped from every regression table
-#     (paper wave prose rewritten separately). The c1/c2 split in 1.1/1.2 and
-#     the has_log / quintile / category splits are NOT wave splits and stay.
-#   - Tables via write_tabular_only() (bare tabular, no \begingroup..\par..).
-#   - Figures restyled to plot_rules.R: single-series significance plots use
-#     ONE color (read CI vs zero), log-status plots distinguish groups by SHAPE
-#     (not color), single-line trajectories use neutral grey (gray30),
-#     reference/annotation lines are gray (no red).
-#   - Console diagnostics / per-row prints / SUMMARY block removed.
-#   - 1.6: baseline CPV by category figure (median point + IQR bars),
-#     giving the pre-deletion scope for deletion to operate; context for the
-#     per-category effect figures in Section 2.
-#   - 3.2 REWRITTEN (two margins): the former log(1+time) quintile figure is
-#     removed. With zero-browsing days concentrated in Q1 (~67% of days on the
-#     completed user-day panel), the log(1+x) coefficient is unit-dependent
-#     and has no behavioral interpretation (Chen & Roth 2024, QJE). Replaced
-#     by an extensive margin (1[browsed today], completed panel) and an
-#     intensive margin (log time, positive days only) figure. NOTE: the
-#     log-status quintile time figure (3.5) still uses log(1+time); it is a
-#     MAR diagnostic (between-group contrast) and is left for review.
-#
-# USAGE
-#   setwd("~/Dropbox/spring2025experiment/code_github")
-#   source("replication_files/data_sharing_n_cookie_deletion/cookie_deletion.R")
+# CHANGES this version:
+#   - Category plots (2.4, 2.7, 3.4, 3.7) and the baseline figure (1.6) are
+#     VERTICAL: categories on the x-axis with 45-degree labels, height 5in
+#     (was horizontal, 6.5-8.5in). Space-saving per Guy. Filenames unchanged.
+#   - 1.6 baseline figure now uses the SHARED big_cats category set (17
+#     categories, same as all effect figures), instead of recomputing the
+#     set on the baseline week (14). Categories consistent across the paper
+#     per Guy. big_cats/t1_cat definition moved up into Section 0.
+#   - NEW 2.1b: robustness with the undivided DV log(1 + n_cookies_third_party)
+#     (Guy: "don't divide through with the denominator"), main + log-status
+#     columns -> cookie_deletion_did_ncookies.tex + \ncookies* macros.
+#   - All browsing-time labels now carry explicit units per Guy ("i hate the
+#     use of the word time ... ambiguous what its units are"):
+#     axis "log(Browsing Seconds)", table dict "log(browsing seconds)".
+#     time_spent is recorded in seconds.
 # =============================================================================
 
 library(jsonlite)   # MUST precede utils: time_usage_helpers.R uses fromJSON()
@@ -113,14 +107,15 @@ TAU_MAX     <- 6
 VLINE_X     <- -0.5            # deletion-start boundary on the event-time axis
 N_TOP_SITES <- 15
 
-# Figure sizes, standardized by plot type. Change one constant to restyle a
-# whole class of figures. Height scales with item count and point density:
+# Figure sizes, standardized by plot type:
 #   TREND / QUINT   : time-axis line, or 5-item vertical coef plot  -> short
-#   WIDE_SINGLE     : 15-17 item horizontal coef plot, 1 point/item
-#   WIDE_LOGSTATUS  : 15-17 item horizontal, 2 points/item (shape split) -> tall
+#   CAT_VERT        : 17-category vertical coef plot, 45-deg labels -> short
+#   WIDE_SINGLE     : 15-item horizontal coef plot (sites)
+#   WIDE_LOGSTATUS  : 15-item horizontal, 2 points/item (sites, shape split)
 FIG_W                <- 8
 FIG_H_TREND          <- 5
 FIG_H_QUINT          <- 5
+FIG_H_CAT_VERT       <- 5
 FIG_H_WIDE_SINGLE    <- 6.5
 FIG_H_WIDE_LOGSTATUS <- 8.5
 
@@ -128,8 +123,11 @@ FIG_H_WIDE_LOGSTATUS <- 8.5
 # single-line trajectories and coefficient points do not encode groups, so grey
 # suffices; significance is read off the CI vs the zero line).
 POINT_COLOR <- "gray30"        # coefficient points / error bars
-LINE_COLOR  <- "gray30"        # single-line trajectories (was deep-blue accent)
+LINE_COLOR  <- "gray30"        # single-line trajectories
 LOG_SHAPES  <- c("No Log" = 16, "Has Log" = 17)  # distinguish by shape, not color
+
+# 45-degree x labels for the 17-category vertical plots
+rot_x <- theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 # Sites whose 3rd-party cookies are NOT affected by the deletion mechanism
 # (Google-ecosystem services + Facebook). Identified from positive per-site DiD
@@ -148,7 +146,7 @@ UNAFFECTED_SITES <- c(
 # =============================================================================
 
 # Single-line trajectory with CI ribbon (1.1, 1.2). Expects columns
-# xt, mean_y, ci_lo, ci_hi. Accent line color; gray deletion-start line.
+# xt, mean_y, ci_lo, ci_hi.
 plot_trajectory <- function(dt, ylab) {
   ggplot(dt, aes(x = xt, y = mean_y)) +
     geom_ribbon(aes(ymin = ci_lo, ymax = ci_hi), fill = LINE_COLOR, alpha = 0.15) +
@@ -160,9 +158,9 @@ plot_trajectory <- function(dt, ylab) {
     theme_privacy_experiment(show_grid_x = TRUE, show_grid_y = TRUE)
 }
 
-# Single-series coefficient plot (2.2-2.4, 3.2-3.4). ONE color; significance is
-# read from whether the CI crosses the dashed zero line. Expects grp (ordered
-# factor), coef, ci_lo, ci_hi.
+# Single-series coefficient plot. ONE color; significance is read from whether
+# the CI crosses the dashed zero line. Expects grp (ordered factor), coef,
+# ci_lo, ci_hi.
 plot_coef <- function(dt, mode = c("vertical", "horizontal"), value_lab, group_lab) {
   mode <- match.arg(mode)
   if (mode == "vertical") {
@@ -184,9 +182,8 @@ plot_coef <- function(dt, mode = c("vertical", "horizontal"), value_lab, group_l
   }
 }
 
-# Log-status split (2.5-2.7, 3.5-3.7). has_log vs no_log distinguished by SHAPE,
-# not color (per house rule: minimize color). Expects grp, coef, ci_lo, ci_hi,
-# log_status.
+# Log-status split. has_log vs no_log distinguished by SHAPE, not color.
+# Expects grp, coef, ci_lo, ci_hi, log_status.
 plot_coef_logstatus <- function(dt, mode = c("vertical", "horizontal"),
                                 value_lab, group_lab) {
   mode <- match.arg(mode)
@@ -215,16 +212,21 @@ plot_coef_logstatus <- function(dt, mode = c("vertical", "horizontal"),
   }
 }
 
-# etable dictionaries (FE row labels + readable dep-var names)
+# etable dictionaries (FE row labels + readable dep-var names).
+# Units per Guy: browsing time is recorded in SECONDS; say so everywhere.
 DICT_CPV  <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
-               log_cpv_3p = "log CPV")
+               log_cpv_3p = "log CPV",
+               log_ncookies = "log cookies")
 DICT_TIME <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
-               log_time = "log time")
+               log_time = "log(browsing seconds)")
 SIGNIF <- c("***" = 0.01, "**" = 0.05, "*" = 0.1)
+
+TIME_LAB  <- "Estimated Effect on log(Browsing Seconds)"
+QUINT_LAB <- "User Time Quintile (Q1 = Lowest pre-period time spent)"
 
 
 # =============================================================================
@@ -270,6 +272,7 @@ panel <- merge(panel, domain_class_slim,
 t1 <- panel[tau >= TAU_MIN & tau <= TAU_MAX & !is.na(visit_count) & visit_count > 0]
 t1[, cpv_3p       := n_cookies_third_party / visit_count]
 t1[, log_cpv_3p   := log(1 + cpv_3p)]
+t1[, log_ncookies := log(1 + n_cookies_third_party)]   # undivided robustness DV
 t1[, log_time     := log(1 + time_spent)]
 t1[, treated      := as.integer(cookie_treatment_idx == 1)]
 t1[, post         := as.integer(tau >= 0)]
@@ -282,6 +285,12 @@ events <- fread("../data/final_extension_data/event_logs.csv",
 del_users <- unique(events[grepl("^AUTOMATIC_COOKIE_DELETION", event), experiment_id])
 t1[, has_log := as.integer(experiment_id %in% del_users)]
 rm(events); gc(verbose = FALSE)
+
+# big categories (SHARED across ALL category figures incl. 1.6 baseline;
+# defined here in data prep since Section 1.6 needs it before Section 2)
+t1_cat <- t1[!is.na(category) & category != ""]
+big_cats <- t1_cat[, .(n_obs = .N, n_users = uniqueN(experiment_id)),
+                   by = category][n_obs >= 500 & n_users >= 50, category]
 
 # --- top15_sites (shared by 2.3, 2.6, 3.3, 3.6) -----------------------------
 # Sites with >= 5 unique users in EVERY (has_log x post x treated) cell, so the
@@ -356,9 +365,11 @@ agg_time_traj <- function(dat, anchor_col) {
 time_c1 <- agg_time_traj(user_day[cookie_treatment_idx == 1], "c1_anchor")
 time_c2 <- agg_time_traj(user_day[cookie_treatment_idx == 2], "c2_anchor")
 ggsave(paste0(FIGURES_DIR, "time_over_time_c1.pdf"),
-       plot_trajectory(time_c1, "Mean log time"), width = FIG_W, height = FIG_H_TREND)
+       plot_trajectory(time_c1, "Mean log(Browsing Seconds)"),
+       width = FIG_W, height = FIG_H_TREND)
 ggsave(paste0(FIGURES_DIR, "time_over_time_c2.pdf"),
-       plot_trajectory(time_c2, "Mean log time"), width = FIG_W, height = FIG_H_TREND)
+       plot_trajectory(time_c2, "Mean log(Browsing Seconds)"),
+       width = FIG_W, height = FIG_H_TREND)
 cat("Saved: time_over_time_c1.pdf, time_over_time_c2.pdf\n")
 rm(cpv_panel); gc(verbose = FALSE)
 
@@ -430,19 +441,14 @@ write_tabular_only(
   etable(m_pool_excl, dict = DICT_CPV, digits = 3, signif.code = SIGNIF, tex = TRUE),
   file = paste0(TABLES_DIR, "cookie_deletion_did_excluding_unaffected.tex"))
 
-# --- 1.6 Baseline CPV by website category -> fig:cpv_baseline_by_category ----
+# --- 1.6 Baseline CPV by website category (VERTICAL, shared big_cats) --------
+#          -> fig:cpv_baseline_by_category
 # Median (point) and IQR (bars) of site-level mean baseline CPV within each
-# category, pre-deletion week (post == 0). Shows the scope available for the
-# deletion mechanism to operate; context for the per-category effect figures
-# in Section 2. Category set recomputed on the baseline subsample with the
-# same thresholds as Section 2 (>=500 obs & >=50 users).
-base_cat <- t1[post == 0 & !is.na(category) & category != ""]
-base_big_cats <- base_cat[, .(n_obs = .N, n_users = uniqueN(experiment_id)),
-                          by = category][n_obs >= 500 & n_users >= 50, category]
-
-site_base <- base_cat[category %in% base_big_cats,
-                      .(site_mean_cpv = mean(cpv_3p, na.rm = TRUE)),
-                      by = .(website, category)]
+# category, pre-deletion week (post == 0). Category set = shared big_cats
+# (consistent with all effect figures; per Guy).
+site_base <- t1[post == 0 & category %in% big_cats,
+                .(site_mean_cpv = mean(cpv_3p, na.rm = TRUE)),
+                by = .(website, category)]
 
 base_stats <- site_base[, .(
   p25 = quantile(site_mean_cpv, 0.25),
@@ -451,15 +457,15 @@ base_stats <- site_base[, .(
 ), by = category][order(med)]
 base_stats[, grp := factor(category, levels = category)]
 
-p_base <- ggplot(base_stats, aes(x = med, y = grp)) +
-  geom_errorbarh(aes(xmin = p25, xmax = p75),
-                 height = 0.25, linewidth = LINE_WIDTH, color = POINT_COLOR) +
+p_base <- ggplot(base_stats, aes(x = grp, y = med)) +
+  geom_errorbar(aes(ymin = p25, ymax = p75),
+                width = ERRORBAR_WIDTH, linewidth = LINE_WIDTH, color = POINT_COLOR) +
   geom_point(size = POINT_SIZE, color = POINT_COLOR) +
-  labs(x = "Baseline Third-Party Cookies per Visit", y = NULL) +
-  theme_privacy_experiment(show_grid_x = TRUE, show_grid_y = FALSE)
+  labs(x = NULL, y = "Baseline Third-Party Cookies per Visit") +
+  theme_privacy_experiment(show_grid_x = FALSE, show_grid_y = TRUE) + rot_x
 
 ggsave(paste0(FIGURES_DIR, "cpv_baseline_by_category.pdf"),
-       p_base, width = FIG_W, height = FIG_H_WIDE_SINGLE)
+       p_base, width = FIG_W, height = FIG_H_CAT_VERT)
 cat("Saved: cpv_baseline_by_category.pdf\n")
 
 
@@ -479,6 +485,31 @@ write_tabular_only(
          headers = c("All Users", "Has Deletion Log", "No Deletion Log"),
          dict = DICT_CPV, digits = 3, signif.code = SIGNIF, tex = TRUE),
   file = paste0(TABLES_DIR, "cookie_deletion_by_log_status.tex"))
+
+# --- 2.1b Robustness: undivided cookie count (Guy: "don't divide through") --
+#          DV = log(1 + n_cookies_third_party); main + log-status columns
+#          -> tab:cookie_deletion_did_ncookies
+m_n_all <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
+                 data = t1, cluster = ~experiment_id, notes = FALSE)
+m_n_has <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
+                 data = t1[has_log == 1], cluster = ~experiment_id, notes = FALSE)
+m_n_no  <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
+                 data = t1[has_log == 0], cluster = ~experiment_id, notes = FALSE)
+write_tabular_only(
+  etable(m_n_all, m_n_has, m_n_no,
+         headers = c("All Users", "Has Deletion Log", "No Deletion Log"),
+         dict = DICT_CPV, digits = 3, signif.code = SIGNIF, tex = TRUE),
+  file = paste0(TABLES_DIR, "cookie_deletion_did_ncookies.tex"))
+
+# --- 2.2 CPV by user time quintile -> fig:deletion_by_quintile --------------
+# user time quintile (assigned on pre-period total time)
+user_pre_time <- t1[post == 0, .(pre_total_time = sum(time_spent, na.rm = TRUE)),
+                    by = experiment_id][!is.na(pre_total_time) & pre_total_time > 0]
+user_pre_time[, time_quintile := cut(pre_total_time,
+                                     breaks = quantile(pre_total_time, 0:5 / 5, na.rm = TRUE),
+                                     labels = paste0("Q", 1:5), include.lowest = TRUE)]
+t1_q <- merge(t1, user_pre_time[, .(experiment_id, time_quintile)],
+              by = "experiment_id", all.x = TRUE)[!is.na(time_quintile)]
 
 # --- subgroup DiD helper: returns one (coef, ci_lo, ci_hi, p) row per group --
 fit_by_group <- function(data, groups, group_col, yvar, fe_with_website = TRUE) {
@@ -523,23 +554,6 @@ fit_by_group_logstatus <- function(data, groups, group_col, yvar, fe_with_websit
   res
 }
 
-# user time quintile (assigned on pre-period total time)
-user_pre_time <- t1[post == 0, .(pre_total_time = sum(time_spent, na.rm = TRUE)),
-                    by = experiment_id][!is.na(pre_total_time) & pre_total_time > 0]
-user_pre_time[, time_quintile := cut(pre_total_time,
-                                     breaks = quantile(pre_total_time, 0:5 / 5, na.rm = TRUE),
-                                     labels = paste0("Q", 1:5), include.lowest = TRUE)]
-t1_q <- merge(t1, user_pre_time[, .(experiment_id, time_quintile)],
-              by = "experiment_id", all.x = TRUE)[!is.na(time_quintile)]
-
-# big categories
-t1_cat <- t1[!is.na(category) & category != ""]
-big_cats <- t1_cat[, .(n_obs = .N, n_users = uniqueN(experiment_id)),
-                   by = category][n_obs >= 500 & n_users >= 50, category]
-
-QUINT_LAB <- "User Time Quintile (Q1 = Lowest pre-period time spent)"
-
-# --- 2.2 CPV by user time quintile -> fig:deletion_by_quintile --------------
 q_dt <- fit_by_group(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p")
 q_dt[, grp := factor(grp_raw, levels = paste0("Q", 1:5))]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_user_quintile.pdf"),
@@ -557,14 +571,14 @@ ggsave(paste0(FIGURES_DIR, "cpv_did_by_site.pdf"),
                  "Estimated Effect on log CPV", NULL),
        width = FIG_W, height = FIG_H_WIDE_SINGLE)
 
-# --- 2.4 CPV by site category -> fig:deletion_by_category --------------------
+# --- 2.4 CPV by site category (VERTICAL) -> fig:deletion_by_category ---------
 cat_dt <- fit_by_group(t1_cat, sort(big_cats), "category", "log_cpv_3p")
 cat_dt <- cat_dt[order(coef)]
 cat_dt[, grp := factor(grp_raw, levels = grp_raw)]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category.pdf"),
-       plot_coef(cat_dt, "horizontal",
-                 "Estimated Effect on log CPV", NULL),
-       width = FIG_W, height = FIG_H_WIDE_SINGLE)
+       plot_coef(cat_dt, "vertical",
+                 "Estimated Effect on log CPV", NULL) + rot_x,
+       width = FIG_W, height = FIG_H_CAT_VERT)
 
 # --- 2.5 Quintile x log status (MAR) -> fig:deletion_by_quintile_log_status --
 q_log <- fit_by_group_logstatus(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p")
@@ -584,20 +598,20 @@ ggsave(paste0(FIGURES_DIR, "cpv_did_by_site_log_status.pdf"),
                            "Estimated Effect on log CPV", NULL),
        width = FIG_W, height = FIG_H_WIDE_LOGSTATUS)
 
-# --- 2.7 Category x log status (MAR) -> fig:deletion_by_category_log_status --
+# --- 2.7 Category x log status (MAR, VERTICAL) -------------------------------
+#          -> fig:deletion_by_category_log_status
 cat_log <- fit_by_group_logstatus(t1_cat, sort(big_cats), "category", "log_cpv_3p")
 order_cat <- cat_log[log_status == "No Log"][order(coef), grp_raw]
-cat_log[, grp := factor(grp_raw, levels = rev(order_cat))]
+cat_log[, grp := factor(grp_raw, levels = order_cat)]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category_log_status.pdf"),
-       plot_coef_logstatus(cat_log, "horizontal",
-                           "Estimated Effect on log CPV", NULL),
-       width = FIG_W, height = FIG_H_WIDE_LOGSTATUS)
+       plot_coef_logstatus(cat_log, "vertical",
+                           "Estimated Effect on log CPV", NULL) + rot_x,
+       width = FIG_W, height = FIG_H_CAT_VERT)
 
 
 # =============================================================================
 # SECTION 3: Browsing-time heterogeneity
 # =============================================================================
-TIME_LAB <- "Estimated Effect on log time"
 
 # --- 3.2 Time by quintile: TWO MARGINS ---------------------------------------
 #         -> fig:time_extensive_by_quintile, fig:time_intensive_by_quintile
@@ -606,7 +620,7 @@ TIME_LAB <- "Estimated Effect on log time"
 # log(1+x) coefficient is unit-dependent and has no behavioral interpretation
 # (Chen & Roth 2024). We report the two margins separately:
 #   Extensive: completed user-day panel, outcome 1[browsed today]
-#   Intensive: positive-browsing days only, outcome log(time)
+#   Intensive: positive-browsing days only, outcome log(seconds)
 ud_obs <- t1[, .(total_time = sum(time_spent, na.rm = TRUE)),
              by = .(experiment_id, tau, treated, post)]
 ud_grid <- CJ(experiment_id = unique(t1$experiment_id), tau = TAU_MIN:TAU_MAX)
@@ -652,7 +666,8 @@ udi[, log_time_pos := log(total_time)]
 int_dt <- fit_margin(udi, "log_time_pos")
 ggsave(paste0(FIGURES_DIR, "time_intensive_by_quintile.pdf"),
        plot_coef(int_dt, "vertical",
-                 "Estimated Effect on log Time (Browsing Days)", QUINT_LAB),
+                 "Estimated Effect on log(Browsing Seconds), Browsing Days",
+                 QUINT_LAB),
        width = FIG_W, height = FIG_H_QUINT)
 cat("Saved: time_extensive_by_quintile.pdf, time_intensive_by_quintile.pdf\n")
 
@@ -665,14 +680,16 @@ site_time[, display_name := gsub("^www\\.", "", grp_raw)]
 site_time <- site_time[order(coef)]
 site_time[, grp := factor(display_name, levels = rev(display_name))]
 ggsave(paste0(FIGURES_DIR, "time_did_by_site.pdf"),
-       plot_coef(site_time, "horizontal", TIME_LAB, NULL), width = FIG_W, height = FIG_H_WIDE_SINGLE)
+       plot_coef(site_time, "horizontal", TIME_LAB, NULL),
+       width = FIG_W, height = FIG_H_WIDE_SINGLE)
 
-# --- 3.4 time by category -> fig:time_by_category -----------------------------
+# --- 3.4 time by category (VERTICAL) -> fig:time_by_category ------------------
 cat_time <- fit_by_group(t1_cat, sort(big_cats), "category", "log_time")
 cat_time <- cat_time[order(coef)]
 cat_time[, grp := factor(grp_raw, levels = grp_raw)]
 ggsave(paste0(FIGURES_DIR, "time_heterogeneity_by_website_category.pdf"),
-       plot_coef(cat_time, "horizontal", TIME_LAB, NULL), width = FIG_W, height = FIG_H_WIDE_SINGLE)
+       plot_coef(cat_time, "vertical", TIME_LAB, NULL) + rot_x,
+       width = FIG_W, height = FIG_H_CAT_VERT)
 
 # --- 3.5 time quintile x log status (MAR) -------------------------------------
 # NOTE: still log(1+time); kept as a between-group MAR diagnostic pending review.
@@ -692,16 +709,17 @@ ggsave(paste0(FIGURES_DIR, "time_did_by_site_log_status.pdf"),
        plot_coef_logstatus(site_time_log, "horizontal", TIME_LAB, NULL),
        width = FIG_W, height = FIG_H_WIDE_LOGSTATUS)
 
-# --- 3.7 time category x log status (MAR) --------------------------------------
+# --- 3.7 time category x log status (MAR, VERTICAL) ----------------------------
 cat_time_log <- fit_by_group_logstatus(t1_cat, sort(big_cats), "category", "log_time")
 order_cat_t <- cat_time_log[log_status == "No Log"][order(coef), grp_raw]
-cat_time_log[, grp := factor(grp_raw, levels = rev(order_cat_t))]
+cat_time_log[, grp := factor(grp_raw, levels = order_cat_t)]
 ggsave(paste0(FIGURES_DIR, "time_heterogeneity_by_website_category_log_status.pdf"),
-       plot_coef_logstatus(cat_time_log, "horizontal", TIME_LAB, NULL),
-       width = FIG_W, height = FIG_H_WIDE_LOGSTATUS)
+       plot_coef_logstatus(cat_time_log, "vertical", TIME_LAB, NULL) + rot_x,
+       width = FIG_W, height = FIG_H_CAT_VERT)
 
 cat("Saved: 18 figures to", FIGURES_DIR, "\n")
-cat("Saved: 5 tables to", TABLES_DIR, "\n")
+cat("Saved: 6 tables to", TABLES_DIR, "\n")
+
 
 # =============================================================================
 # INLINE SCALARS (Pooled) -> output/values/data_sharing_cookie_values.tex
@@ -760,6 +778,16 @@ save_tex_value(format_count(round(base_stats[, max(med)])),
                name = "baseCatTopMedCpv", file = cookie_values_file)
 save_tex_value(format_count(round(base_stats[, min(med)])),
                name = "baseCatBottomMedCpv", file = cookie_values_file)
+
+# Undivided cookie-count robustness macros (Section 2.1b)
+save_tex_value(format_coef(coef(m_n_all)["post_treated"]),
+               name = "ncookiesMainCoef", file = cookie_values_file)
+save_tex_value(format_pct(100 * abs(exp(coef(m_n_all)["post_treated"]) - 1)),
+               name = "ncookiesMainPct", file = cookie_values_file)
+save_tex_value(format_coef(coef(m_n_has)["post_treated"]),
+               name = "ncookiesHasLogCoef", file = cookie_values_file)
+save_tex_value(format_coef(coef(m_n_no)["post_treated"]),
+               name = "ncookiesNoLogCoef", file = cookie_values_file)
 
 # Significance / sign counts for prose. "Significant" = 95% CI excludes zero,
 # which (since CIs now come from confint()) is identical to p < 0.05.
