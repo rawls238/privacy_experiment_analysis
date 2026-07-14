@@ -9,7 +9,7 @@
 #   SECTION 1  Did deletion happen, and what are the overall effects?
 #     1.1 Daily CPV trajectory (c1 / c2)                    -> fig:cpv_over_time
 #     1.2 Daily browsing-time trajectory (c1 / c2)          -> fig:time_over_time
-#     1.3 CPV DiD regression (2 cols: per-visit + undivided)-> tab:cookie_deletion_did
+#     1.3 CPV DiD regression (2 cols: CPV + UC)            -> tab:cookie_deletion_did
 #     1.4 Time DiD regression                               -> tab:time_did_regression
 #     1.5 CPV DiD excluding deletion-unaffected sites
 #         1.5a unaffected-site shares (Pre/Post/Change)     -> tab:..._unaffected_sites_summary
@@ -18,10 +18,11 @@
 #
 #   SECTION 2  Is deletion plausibly random? (CPV outcome)
 #     2.1 By event-log status                               -> tab:cookie_deletion_by_log_status
-#     2.1b Undivided-count models (feed E.1 col 2 + \ncookies* macros)
+#     2.1b UC log-status models (feed \uc* macros)
 #     2.2 By user time quintile                             -> fig:deletion_by_quintile
 #     2.3 By site (top 15)                                  -> fig:deletion_by_site
 #     2.4 By site category (VERTICAL)                       -> fig:deletion_by_category
+#     2.4b UC by site category (VERTICAL)                    -> fig:deletion_uc_by_category
 #     2.5 Quintile x log status (MAR)                       -> fig:deletion_by_quintile_log_status
 #     2.6 Top-15 sites x log status (MAR)                   -> fig:deletion_by_site_log_status
 #     2.7 Category x log status (MAR, VERTICAL)             -> fig:deletion_by_category_log_status
@@ -43,8 +44,9 @@
 #       \unaffCookieSharePre \unaffCookieSharePost (+ visit/time shares)
 #       \timeExtQOneCoef \timeExtQOnePval \timeIntQOneCoef \timeIntQOnePval
 #       \qOneZeroDayPct \baseCatTopMedCpv \baseCatBottomMedCpv
-#       \ncookiesMainCoef \ncookiesMainPct \ncookiesHasLogCoef \ncookiesNoLogCoef
+#       \ucMainCoef \ucMainPct \ucHasLogCoef \ucNoLogCoef
 #       \nSigCpvCategories \nSigNegCpvCategories \nSigPosCpvCategories
+#       \nSigNegUcCategories \nSigPosUcCategories
 #       \nCpvCategories \nSigTimeSites \nNegTimeSites
 #       \nTimeSites \nSigTimeCategories
 #     output/values/data_sharing_cookie_str_values.tex   (hand-written; the
@@ -60,24 +62,23 @@
 #   Window tau in [-7, 6] (1 week pre + 1 week gap).
 #
 # CHANGES this version:
-#   - Table E.1 (tab:cookie_deletion_did) is now TWO columns (Guy: add the
-#     undivided robustness "to Table E.1"): col 1 = per-visit DV log(1+CPV),
-#     col 2 = undivided DV log(1+third-party cookies). Same sample and FE; only
-#     the DV differs. No `headers`; the etable Dependent-Variable row labels the
-#     columns via DICT_CPV.
-#   - DICT_CPV DV labels changed to "log(CPV)" / "log(3rd Party Cookies)" (add
-#     parentheses, Title Case, consistent with the figure axes and DICT_TIME).
-#   - The standalone undivided table (cookie_deletion_did_ncookies.tex) is no
-#     longer written, since its main effect now lives in Table E.1. m_n_all is
-#     fit in Section 1.3; the log-status splits (m_n_has/m_n_no) are retained
-#     only to feed the \ncookies* macros in data_sharing_cookie_values.tex.
-#   - Category plots (2.4, 2.7, 3.4, 3.7) and the baseline figure (1.6) are
-#     VERTICAL: categories on the x-axis with 45-degree labels, height 5in.
-#     1.6 uses the SHARED big_cats set (17 categories), consistent per Guy.
-#   - Browsing-time labels use Title Case with the unit stated in the figure/
-#     table notes (per Guy: make the units unambiguous). Axis and table DV read
-#     "log(Daily Browsing Time)"; time_spent is recorded in seconds, so the
-#     notes state "in seconds". CPV labels read "log(CPV)" to match.
+#   - DATA: cookie measures now come from the REBUILT panel
+#     (../data/processed_data/panel_cookies_v2.fst; data_construction 02-04,
+#     gate-validated). Fixes vs the old panel: (1) third-party classified by
+#     registrable domain instead of substring matching (Google-own cookies no
+#     longer counted third-party); (2) adds unique_cookies_3rd_p (UC);
+#     (3) the old panel's ~4k duplicated (user, website, day) keys are removed
+#     before merging its time/visit columns.
+#   - DVs: cpv_3p = cookie_events_3rd_p / visit_count (corrected classification,
+#     event intensity). NEW log_uc = log(1 + unique_cookies_3rd_p), the clean
+#     exposure measure (unaffected by background-polling re-sets).
+#   - Table E.1 columns are now CPV + UC (the undivided event count is retired:
+#     event totals are polling-driven and have no clean interpretation).
+#   - New figure 2.4b: UC effect by website category.
+#   - Macros: \ncookies* retired -> \uc*; added \nSigNegUcCategories /
+#     \nSigPosUcCategories; \sigPosCpvCategory writes 'none' with a console
+#     warning if no significant-positive category remains (paper sentence must
+#     then be revised).
 # =============================================================================
 
 library(jsonlite)   # MUST precede utils: time_usage_helpers.R uses fromJSON()
@@ -228,7 +229,7 @@ DICT_CPV  <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
                log_cpv_3p = "log(CPV)",
-               log_ncookies = "log(3rd Party Cookies)")
+               log_uc = "log(Unique 3rd Party Cookies)")
 DICT_TIME <- c(post_treated = "Post $\\times$ Cookie Deletion",
                experiment_id = "Participant FE", website = "Website FE",
                dow = "Day-of-Week FE",
@@ -242,7 +243,26 @@ QUINT_LAB <- "User Time Quintile (Q1 = Lowest pre-period time spent)"
 # =============================================================================
 # 0. DATA PREPARATION   (logic unchanged; pre-flight verified Pooled = -0.3288)
 # =============================================================================
+# Time/visit columns come from the old merged panel (the time pipeline is
+# unaffected by the cookie bugs); its per-key duplicate rows (~4k keys from an
+# unclean historical merge; identical time/visit values within key) are removed
+# by taking the first row per key. Cookie measures come from the rebuilt panel
+# (data_construction 02-04; registrable-domain classification, gate-validated).
 panel <- read_fst("../data/tracker_panel/panel_merged_CLEAN.fst", as.data.table = TRUE)
+panel[, date := as.Date(date)]
+panel[, c("n_cookies_third_party", "n_trackers_third_party",
+          "cookies_per_visit") := NULL]                     # buggy cookie cols: drop
+panel <- unique(panel, by = c("experiment_id", "website", "date"))  # de-dup keys
+
+cookies <- read_fst("../data/processed_data/panel_cookies_v2.fst", as.data.table = TRUE)
+panel <- merge(panel,
+               cookies[, .(experiment_id, website, date,
+                           cookie_events_3rd_p, unique_cookies_3rd_p)],
+               by = c("experiment_id", "website", "date"), all.x = TRUE)
+# cells with time data but no cookie rows that day: zero cookie activity
+panel[is.na(cookie_events_3rd_p),  cookie_events_3rd_p  := 0L]
+panel[is.na(unique_cookies_3rd_p), unique_cookies_3rd_p := 0L]
+rm(cookies); gc(verbose = FALSE)
 
 ec <- fread("../data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
 ec_clean <- ec[in_experiment == "true" & !experiment_id %in% BAD_USERS]
@@ -280,9 +300,9 @@ panel <- merge(panel, domain_class_slim,
 
 # CPV analysis sample
 t1 <- panel[tau >= TAU_MIN & tau <= TAU_MAX & !is.na(visit_count) & visit_count > 0]
-t1[, cpv_3p       := n_cookies_third_party / visit_count]
-t1[, log_cpv_3p   := log(1 + cpv_3p)]
-t1[, log_ncookies := log(1 + n_cookies_third_party)]   # undivided robustness DV
+t1[, cpv_3p     := cookie_events_3rd_p / visit_count]   # corrected classification
+t1[, log_cpv_3p := log(1 + cpv_3p)]
+t1[, log_uc     := log(1 + unique_cookies_3rd_p)]        # unique 3rd-party cookies (UC)
 t1[, log_time     := log(1 + time_spent)]
 t1[, treated      := as.integer(cookie_treatment_idx == 1)]
 t1[, post         := as.integer(tau >= 0)]
@@ -333,7 +353,7 @@ top15_sites <- ranked_sites[pass_8cell == TRUE][1:N_TOP_SITES, website]
 
 # --- 1.1 Daily CPV trajectory (c1 / c2) -> fig:cpv_over_time -----------------
 cpv_panel <- panel[!is.na(visit_count) & visit_count > 0]
-cpv_panel[, cpv_3p := n_cookies_third_party / visit_count]
+cpv_panel[, cpv_3p := cookie_events_3rd_p / visit_count]
 cpv_panel[, log_cpv_3p := log(1 + cpv_3p)]
 cpv_panel[, own_anchor := fifelse(cookie_treatment_idx == 1, c1_anchor, c2_anchor)]
 cpv_panel[, own_tau := as.integer(date - own_anchor)]
@@ -391,10 +411,10 @@ rm(cpv_panel); gc(verbose = FALSE)
 # DICT_CPV ("log(CPV)" / "log(3rd Party Cookies)").
 m_pool <- feols(log_cpv_3p ~ post_treated | experiment_id + website + dow,
                 data = t1, cluster = ~experiment_id, notes = FALSE)
-m_n_all <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
-                 data = t1, cluster = ~experiment_id, notes = FALSE)
+m_uc <- feols(log_uc ~ post_treated | experiment_id + website + dow,
+              data = t1, cluster = ~experiment_id, notes = FALSE)
 write_tabular_only(
-  etable(m_pool, m_n_all, dict = DICT_CPV, digits = 3,
+  etable(m_pool, m_uc, dict = DICT_CPV, digits = 3,
          signif.code = SIGNIF, tex = TRUE),
   file = paste0(TABLES_DIR, "cookie_deletion_did_regression.tex"))
 
@@ -421,8 +441,8 @@ share_pp <- t1[, .(
   unaff_visits  = sum(visit_count[is_unaffected]),
   total_time    = sum(time_spent,            na.rm = TRUE),
   unaff_time    = sum(time_spent[is_unaffected], na.rm = TRUE),
-  total_cookies = sum(n_cookies_third_party, na.rm = TRUE),
-  unaff_cookies = sum(n_cookies_third_party[is_unaffected], na.rm = TRUE)
+  total_cookies = sum(cookie_events_3rd_p, na.rm = TRUE),
+  unaff_cookies = sum(cookie_events_3rd_p[is_unaffected], na.rm = TRUE)
 ), by = post]
 share_pp[, `:=`(visit_share  = 100 * unaff_visits  / total_visits,
                 time_share   = 100 * unaff_time    / total_time,
@@ -504,16 +524,15 @@ write_tabular_only(
          dict = DICT_CPV, digits = 3, signif.code = SIGNIF, tex = TRUE),
   file = paste0(TABLES_DIR, "cookie_deletion_by_log_status.tex"))
 
-# --- 2.1b Undivided-count models (feed E.1 col 2 + \ncookies* macros) --------
-#          DV = log(1 + n_cookies_third_party). m_n_all is fit in Section 1.3
-#          (it populates Table E.1 column 2), so it is NOT re-fit here. The
-#          log-status splits are retained only to feed \ncookiesHasLogCoef /
-#          \ncookiesNoLogCoef; the standalone ncookies table is no longer
-#          written now that the undivided main effect lives in Table E.1.
-m_n_has <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
-                 data = t1[has_log == 1], cluster = ~experiment_id, notes = FALSE)
-m_n_no  <- feols(log_ncookies ~ post_treated | experiment_id + website + dow,
-                 data = t1[has_log == 0], cluster = ~experiment_id, notes = FALSE)
+# --- 2.1b UC log-status models (feed \uc* macros) -----------------------------
+#          DV = log(1 + unique_cookies_3rd_p). m_uc is fit in Section 1.3 (it
+#          populates Table E.1 column 2), so it is NOT re-fit here. The
+#          log-status splits feed \ucHasLogCoef / \ucNoLogCoef for the MAR
+#          discussion; no standalone table is written.
+m_uc_has <- feols(log_uc ~ post_treated | experiment_id + website + dow,
+                  data = t1[has_log == 1], cluster = ~experiment_id, notes = FALSE)
+m_uc_no  <- feols(log_uc ~ post_treated | experiment_id + website + dow,
+                  data = t1[has_log == 0], cluster = ~experiment_id, notes = FALSE)
 
 # --- 2.2 CPV by user time quintile -> fig:deletion_by_quintile --------------
 # user time quintile (assigned on pre-period total time)
@@ -592,6 +611,15 @@ cat_dt[, grp := factor(grp_raw, levels = grp_raw)]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category.pdf"),
        plot_coef(cat_dt, "vertical",
                  "Estimated Effect on log(CPV)", NULL) + rot_x,
+       width = FIG_W, height = FIG_H_CAT_VERT)
+
+# --- 2.4b UC by site category (VERTICAL) -> fig:deletion_uc_by_category ------
+cat_uc <- fit_by_group(t1_cat, sort(big_cats), "category", "log_uc")
+cat_uc <- cat_uc[order(coef)]
+cat_uc[, grp := factor(grp_raw, levels = grp_raw)]
+ggsave(paste0(FIGURES_DIR, "uc_heterogeneity_by_website_category.pdf"),
+       plot_coef(cat_uc, "vertical",
+                 "Estimated Effect on log(Unique 3rd Party Cookies)", NULL) + rot_x,
        width = FIG_W, height = FIG_H_CAT_VERT)
 
 # --- 2.5 Quintile x log status (MAR) -> fig:deletion_by_quintile_log_status --
@@ -793,17 +821,16 @@ save_tex_value(format_count(round(base_stats[, max(med)])),
 save_tex_value(format_count(round(base_stats[, min(med)])),
                name = "baseCatBottomMedCpv", file = cookie_values_file)
 
-# Undivided cookie-count robustness macros (Section 2.1b). \ncookiesMainCoef /
-# \ncookiesMainPct are cited in the Table E.1 prose; the log-status pair is
-# retained for potential undivided-DV robustness reporting.
-save_tex_value(format_coef(coef(m_n_all)["post_treated"]),
-               name = "ncookiesMainCoef", file = cookie_values_file)
-save_tex_value(format_pct(100 * abs(exp(coef(m_n_all)["post_treated"]) - 1)),
-               name = "ncookiesMainPct", file = cookie_values_file)
-save_tex_value(format_coef(coef(m_n_has)["post_treated"]),
-               name = "ncookiesHasLogCoef", file = cookie_values_file)
-save_tex_value(format_coef(coef(m_n_no)["post_treated"]),
-               name = "ncookiesNoLogCoef", file = cookie_values_file)
+# UC (unique 3rd-party cookies) macros, cited in the Table E.1 prose; the
+# log-status pair supports the MAR discussion.
+save_tex_value(format_coef(coef(m_uc)["post_treated"]),
+               name = "ucMainCoef", file = cookie_values_file)
+save_tex_value(format_pct(100 * abs(exp(coef(m_uc)["post_treated"]) - 1)),
+               name = "ucMainPct", file = cookie_values_file)
+save_tex_value(format_coef(coef(m_uc_has)["post_treated"]),
+               name = "ucHasLogCoef", file = cookie_values_file)
+save_tex_value(format_coef(coef(m_uc_no)["post_treated"]),
+               name = "ucNoLogCoef", file = cookie_values_file)
 
 # Significance / sign counts for prose. "Significant" = 95% CI excludes zero,
 # which (since CIs now come from confint()) is identical to p < 0.05.
@@ -823,6 +850,10 @@ save_tex_value(as.character(n_sig_pos(cat_dt)),
                name = "nSigPosCpvCategories", file = cookie_values_file)
 save_tex_value(as.character(nrow(cat_dt)),
                name = "nCpvCategories", file = cookie_values_file)
+save_tex_value(as.character(n_sig_neg(cat_uc)),
+               name = "nSigNegUcCategories", file = cookie_values_file)
+save_tex_value(as.character(n_sig_pos(cat_uc)),
+               name = "nSigPosUcCategories", file = cookie_values_file)
 # Name of the significant-positive CPV category, data-driven (not hardcoded).
 # Expected to be "Internet & Telecom"; verified against the console print below.
 # save_tex_value CANNOT store a value containing spaces: before each write it
@@ -832,7 +863,15 @@ save_tex_value(as.character(nrow(cat_dt)),
 # cannot help). We therefore write this one string macro to its OWN file by
 # hand, escaping "&" ourselves. Numeric macros stay in the save_tex_value bundle
 # above. This new file must be \input in the preamble alongside the others.
-sig_pos_cats <- paste(gsub("&", "\\\\&", cat_dt[ci_lo > 0, grp_raw]), collapse = ", ")
+sig_pos_vec <- cat_dt[ci_lo > 0, grp_raw]
+if (length(sig_pos_vec) == 0) {
+  sig_pos_cats <- "none"
+  cat("WARNING: no significant-positive CPV category under the corrected data.\n")
+  cat("         \\sigPosCpvCategory written as 'none' -- the paper sentence\n")
+  cat("         ('The sole exception is ...') MUST be revised.\n")
+} else {
+  sig_pos_cats <- paste(gsub("&", "\\\\&", sig_pos_vec), collapse = ", ")
+}
 cookie_str_values_file <- file.path(VALUES_DIR, "data_sharing_cookie_str_values.tex")
 writeLines(sprintf("\\newcommand{\\sigPosCpvCategory}{%s}", sig_pos_cats),
            cookie_str_values_file)
@@ -866,6 +905,7 @@ print_sig(ext_dt,    "TIME extensive margin by quintile")
 print_sig(int_dt,    "TIME intensive margin by quintile")
 print_sig(site_dt,   "CPV site")
 print_sig(cat_dt,    "CPV category")
+print_sig(cat_uc,    "UC category")
 print_sig(site_time, "TIME site")
 print_sig(cat_time,  "TIME category")
 

@@ -1480,3 +1480,60 @@ get_privacy_attribute_weights_population_by_user <- function(
   
   return(weights_by_user)
 }
+
+# =============================================================================
+# REGISTRABLE-DOMAIN EXTRACTION (shared: cookie classification + site cleaning)
+# =============================================================================
+# clean_site() approximates eTLD+1 ("registrable domain"). Added for the
+# third-party cookie reclassification (Fix A): a cookie is third-party iff
+# clean_site(cookie_domain) != clean_site(website_domain). Lives here because
+# this file already owns website aggregation/cleaning (aggregate_time_data,
+# high_level_aggregate, get_domain_classification).
+#
+# Validated by replication_files/data_sharing_n_cookie_deletion/test.R
+# (T1 unit tests, 35+ cases).
+
+# Multi-part public suffixes we handle explicitly. Approximation of the Public
+# Suffix List restricted to suffixes occurring in our data; extend as needed.
+# (Full PSL via psl/urltools deliberately avoided -- no new dependencies for a
+# handful of cases.)
+MULTI_TLDS <- c("co.uk","com.au","co.jp","com.br","co.in","co.nz","com.mx",
+                "com.sg","com.hk","co.kr","com.tw","com.ar","com.tr","co.za",
+                "com.cn","org.uk","net.au","ac.uk","gov.uk","edu.au")
+
+#' Extract the registrable domain (eTLD+1 approx.) from a host or cookie domain
+#'
+#' Rules, in order: lowercase+trim; strip one leading dot (cookie Domain
+#' attributes like ".google.com"); strip trailing :port; strip a single common
+#' subdomain prefix (www., m., mobile., amp.); IP literals and single-label
+#' hosts returned unchanged; otherwise last two labels, or last three when the
+#' last two form a known multi-part suffix (bbc.co.uk -> bbc.co.uk).
+#'
+#' Examples:
+#'   clean_site("mail.google.com") == "google.com"
+#'   clean_site(".google.com")     == "google.com"
+#'   clean_site("news.bbc.co.uk")  == "bbc.co.uk"
+#'   clean_site("192.168.1.1")     == "192.168.1.1"
+#'
+#' Known limitation: google.com vs google.com.hk are DIFFERENT registrable
+#' domains (correct per PSL) even though the same corporate entity;
+#' entity-level grouping (SITE_ALIASES-style) is intentionally out of scope.
+#'
+#' @param x character vector of hostnames or cookie Domain values
+#' @return character vector of registrable domains; NA for NA/empty input
+clean_site <- function(x) {
+  x <- tolower(trimws(x))
+  x <- sub("^\\.", "", x)
+  x <- sub(":[0-9]+$", "", x)
+  x <- sub("^(www|m|mobile|amp)\\.", "", x)
+  vapply(x, function(s) {
+    if (is.na(s) || s == "") return(NA_character_)
+    if (grepl("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$", s)) return(s)
+    parts <- strsplit(s, ".", fixed = TRUE)[[1]]
+    n <- length(parts)
+    if (n <= 2) return(s)
+    last2 <- paste(parts[n-1], parts[n], sep = ".")
+    if (last2 %in% MULTI_TLDS && n >= 3) paste(parts[n-2], last2, sep = ".")
+    else last2
+  }, character(1), USE.NAMES = FALSE)
+}
