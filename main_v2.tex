@@ -1314,6 +1314,7 @@ We complement the objective measures from Section \ref{sec:website_choice} with 
 
 Figure~\ref{fig:freeform_change_responses} presents the results. The information group shows elevated rates of both behavioral change and heightened awareness relative to the control group, consistent with the objective evidence of modest behavioral shifts. The saliency group is statistically indistinguishable from the control group on all dimensions and, if anything, shows higher rates of fatalism --- consistent with the complexity mechanism documented in Section~\ref{sec:search_learning}. Participants who were directed to privacy policies but could not extract useful information appear to have concluded that privacy management is futile. One participant in the saliency group captured this sentiment: ``I would click on the data privacy link, and my eyes would just immediately glaze over at the length and legalese, and I just go into every website with the expectation that I will have no power over my data.''
 
+
 \subsection{Data Sharing}\label{sec:cookie_deletion_analysis}
 
 \begin{table}[H]
@@ -1367,6 +1368,7 @@ Overall, using both self-reported and objective measures of data sharing, the bo
 \caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the treatment effect on $\log(1+\text{third-party cookies per visit})$ at the participant--website--day level. The sample is a balanced panel of participant--website pairs observed at least once before and at least once after the intervention. A pair is a participant--website combination and an observation is a participant--website--day. The restriction retains \cpvBalPairPct\% of pairs and \cpvBalObsPct\% of observations, covering \cpvBalNUsers{} participants. All specifications include participant, website, and calendar-date fixed effects, with standard errors clustered at the participant level. The sample covers the information-experiment period and ends before cookie deletion begins.}
 \end{table}
 
+
 \section{Analysis of Cookie Deletion Intervention}\label{subsec:deletion_overall_effects}
 
 In this section we analyze the effects of the third-party cookie deletion portion of the experiment. The primary purpose of this randomization was to induce changes in website quality that are dependent on privacy practices. We therefore focus on measuring the effect of the intervention on two measures: the number of third-party cookies set per site (validation) and the time spent on different websites.
@@ -1405,8 +1407,7 @@ Table~\ref{tab:cookie_deletion_did} reports the regression results for two depen
 
 We next document that heterogeneity within and across categories in terms of the impact of the intervention. We begin by documenting baseline differences within and across website categories: Figure~\ref{fig:cpv_baseline_by_category} reports the baseline level of third-party cookies per visit in each website category, which measures the scope available for cookie deletion to operate. Recall, however, that not each third-party cookie corresponds to one that would be targeted by the intervention as it can be associated with non-advertising and non-analytics domains. Baseline levels vary widely across categories: the median News website sets roughly \baseCatTopMedCpv{} third-party cookies per visit, while the median website in the lowest category sets roughly \baseCatBottomMedCpv{}, so the deletion mechanism has far more room to operate in some categories than in others. Furthermore, the figure plots the interquartile range within category, highlighting that even in these categories, there is substantial heterogeneity.
 
-Figure~\ref{fig:deletion_by_category} presents the estimates of \eqref{eq:cookie_deletion_did} for each category separately. Of the \nCpvCategories{} categories, \nSigNegCpvCategories{} exhibit statistically significant negative effects. The sole exception is \sigPosCpvCategory{}, which shows a significant positive effect, as it is dominated by the Google ecosystem services which rely on their own set of advertising and analytics tools.
-
+Figure~\ref{fig:deletion_by_category} presents the estimates of \eqref{eq:cookie_deletion_did} for each category separately.The effect is negative and statistically significant in all \nCpvCategories{} categories. The decline is smallest in Internet \& Telecom, which is dominated by Google ecosystem services: most cookie activity on these sites is first-party and thus unaffected by the intervention, leaving little third-party volume to remove.
 
 Overall, we conclude that the intervention successfully reduced third-party cookies per visit and that this should have had a differential effect both across and within website categories.
 
@@ -1506,6 +1507,7 @@ First, and most importantly for the model estimation, deletion executed for the 
 \end{figure}
  
 Taken together, this provides supporting evidence that the missing data due to the intervention is plausibly missing at random due to intermittent issues with sending the collected data to the servers. We therefore treat the loss as unrelated to participants' privacy preferences and to deletion-induced quality changes, but with a level effect of \cookieTimePct{}\% of logged browsing time that we account for in our model estimation in Section~\ref{sec:estimation}.
+
 
 
 
