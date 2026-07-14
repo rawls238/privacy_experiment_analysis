@@ -62,6 +62,10 @@
 #   Window tau in [-7, 6] (1 week pre + 1 week gap).
 #
 # CHANGES this version:
+#   - Cookie-DV specifications (CPV and UC: pooled, excl-top-sites, log-status,
+#     quintile/site/category heterogeneity) drop the day-of-week FE for
+#     consistency with the paper's other specifications (per Guy). Effect is in
+#     the third decimal. TIME specifications keep dow (MAR section unchanged).
 #   - DATA: cookie measures now come from the REBUILT panel
 #     (../data/processed_data/panel_cookies_v2.fst; data_construction 02-04,
 #     gate-validated). Fixes vs the old panel: (1) third-party classified by
@@ -409,9 +413,9 @@ rm(cpv_panel); gc(verbose = FALSE)
 # log(1+third-party cookies). Same sample and FE; only the DV differs. No
 # `headers` -- the etable Dependent-Variable row labels the two columns via
 # DICT_CPV ("log(CPV)" / "log(3rd Party Cookies)").
-m_pool <- feols(log_cpv_3p ~ post_treated | experiment_id + website + dow,
+m_pool <- feols(log_cpv_3p ~ post_treated | experiment_id + website,
                 data = t1, cluster = ~experiment_id, notes = FALSE)
-m_uc <- feols(log_uc ~ post_treated | experiment_id + website + dow,
+m_uc <- feols(log_uc ~ post_treated | experiment_id + website,
               data = t1, cluster = ~experiment_id, notes = FALSE)
 write_tabular_only(
   etable(m_pool, m_uc, dict = DICT_CPV, digits = 3,
@@ -473,7 +477,7 @@ cat("Saved (tabular only):", paste0(TABLES_DIR, "cookie_deletion_unaffected_site
 # --- 1.5b DiD excluding unaffected sites (Pooled) ---------------------------
 #          -> tab:cookie_deletion_did_excluding_unaffected
 t1_excl <- t1[is_unaffected == FALSE]
-m_pool_excl <- feols(log_cpv_3p ~ post_treated | experiment_id + website + dow,
+m_pool_excl <- feols(log_cpv_3p ~ post_treated | experiment_id + website,
                      data = t1_excl, cluster = ~experiment_id, notes = FALSE)
 write_tabular_only(
   etable(m_pool_excl, dict = DICT_CPV, digits = 3, signif.code = SIGNIF, tex = TRUE),
@@ -512,11 +516,11 @@ cat("Saved: cpv_baseline_by_category.pdf\n")
 # =============================================================================
 
 # --- 2.1 By event-log status -> tab:cookie_deletion_by_log_status -----------
-m_all <- feols(log_cpv_3p ~ post_treated | experiment_id + website + dow,
+m_all <- feols(log_cpv_3p ~ post_treated | experiment_id + website,
                data = t1, cluster = ~experiment_id, notes = FALSE)
-m_has <- feols(log_cpv_3p ~ post_treated | experiment_id + website + dow,
+m_has <- feols(log_cpv_3p ~ post_treated | experiment_id + website,
                data = t1[has_log == 1], cluster = ~experiment_id, notes = FALSE)
-m_no  <- feols(log_cpv_3p ~ post_treated | experiment_id + website + dow,
+m_no  <- feols(log_cpv_3p ~ post_treated | experiment_id + website,
                data = t1[has_log == 0], cluster = ~experiment_id, notes = FALSE)
 write_tabular_only(
   etable(m_all, m_has, m_no,
@@ -529,9 +533,9 @@ write_tabular_only(
 #          populates Table E.1 column 2), so it is NOT re-fit here. The
 #          log-status splits feed \ucHasLogCoef / \ucNoLogCoef for the MAR
 #          discussion; no standalone table is written.
-m_uc_has <- feols(log_uc ~ post_treated | experiment_id + website + dow,
+m_uc_has <- feols(log_uc ~ post_treated | experiment_id + website,
                   data = t1[has_log == 1], cluster = ~experiment_id, notes = FALSE)
-m_uc_no  <- feols(log_uc ~ post_treated | experiment_id + website + dow,
+m_uc_no  <- feols(log_uc ~ post_treated | experiment_id + website,
                   data = t1[has_log == 0], cluster = ~experiment_id, notes = FALSE)
 
 # --- 2.2 CPV by user time quintile -> fig:deletion_by_quintile --------------
@@ -545,8 +549,10 @@ t1_q <- merge(t1, user_pre_time[, .(experiment_id, time_quintile)],
               by = "experiment_id", all.x = TRUE)[!is.na(time_quintile)]
 
 # --- subgroup DiD helper: returns one (coef, ci_lo, ci_hi, p) row per group --
-fit_by_group <- function(data, groups, group_col, yvar, fe_with_website = TRUE) {
-  fe <- if (fe_with_website) "experiment_id + website + dow" else "experiment_id + dow"
+fit_by_group <- function(data, groups, group_col, yvar, fe_with_website = TRUE,
+                         fe_dow = TRUE) {
+  fe <- if (fe_with_website) "experiment_id + website" else "experiment_id"
+  if (fe_dow) fe <- paste(fe, "+ dow")
   fml <- as.formula(sprintf("%s ~ post_treated | %s", yvar, fe))
   out <- lapply(groups, function(g) {
     sub <- data[get(group_col) == g]
@@ -565,8 +571,10 @@ fit_by_group <- function(data, groups, group_col, yvar, fe_with_website = TRUE) 
   res
 }
 
-fit_by_group_logstatus <- function(data, groups, group_col, yvar, fe_with_website = TRUE) {
-  fe <- if (fe_with_website) "experiment_id + website + dow" else "experiment_id + dow"
+fit_by_group_logstatus <- function(data, groups, group_col, yvar, fe_with_website = TRUE,
+                                   fe_dow = TRUE) {
+  fe <- if (fe_with_website) "experiment_id + website" else "experiment_id"
+  if (fe_dow) fe <- paste(fe, "+ dow")
   fml <- as.formula(sprintf("%s ~ post_treated | %s", yvar, fe))
   out <- list()
   for (g in groups) for (lg in c(0, 1)) {
@@ -587,7 +595,7 @@ fit_by_group_logstatus <- function(data, groups, group_col, yvar, fe_with_websit
   res
 }
 
-q_dt <- fit_by_group(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p")
+q_dt <- fit_by_group(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p", fe_dow = FALSE)
 q_dt[, grp := factor(grp_raw, levels = paste0("Q", 1:5))]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_user_quintile.pdf"),
        plot_coef(q_dt, "vertical", "Estimated Effect on log(CPV)", QUINT_LAB),
@@ -595,7 +603,7 @@ ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_user_quintile.pdf"),
 
 # --- 2.3 CPV by site (top 15) -> fig:deletion_by_site ------------------------
 site_dt <- fit_by_group(t1[website %in% top15_sites], top15_sites, "website",
-                        "log_cpv_3p", fe_with_website = FALSE)
+                        "log_cpv_3p", fe_with_website = FALSE, fe_dow = FALSE)
 site_dt[, display_name := gsub("^www\\.", "", grp_raw)]
 site_dt <- site_dt[order(coef)]
 site_dt[, grp := factor(display_name, levels = rev(display_name))]
@@ -605,7 +613,7 @@ ggsave(paste0(FIGURES_DIR, "cpv_did_by_site.pdf"),
        width = FIG_W, height = FIG_H_WIDE_SINGLE)
 
 # --- 2.4 CPV by site category (VERTICAL) -> fig:deletion_by_category ---------
-cat_dt <- fit_by_group(t1_cat, sort(big_cats), "category", "log_cpv_3p")
+cat_dt <- fit_by_group(t1_cat, sort(big_cats), "category", "log_cpv_3p", fe_dow = FALSE)
 cat_dt <- cat_dt[order(coef)]
 cat_dt[, grp := factor(grp_raw, levels = grp_raw)]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category.pdf"),
@@ -614,7 +622,7 @@ ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category.pdf"),
        width = FIG_W, height = FIG_H_CAT_VERT)
 
 # --- 2.4b UC by site category (VERTICAL) -> fig:deletion_uc_by_category ------
-cat_uc <- fit_by_group(t1_cat, sort(big_cats), "category", "log_uc")
+cat_uc <- fit_by_group(t1_cat, sort(big_cats), "category", "log_uc", fe_dow = FALSE)
 cat_uc <- cat_uc[order(coef)]
 cat_uc[, grp := factor(grp_raw, levels = grp_raw)]
 ggsave(paste0(FIGURES_DIR, "uc_heterogeneity_by_website_category.pdf"),
@@ -623,7 +631,7 @@ ggsave(paste0(FIGURES_DIR, "uc_heterogeneity_by_website_category.pdf"),
        width = FIG_W, height = FIG_H_CAT_VERT)
 
 # --- 2.5 Quintile x log status (MAR) -> fig:deletion_by_quintile_log_status --
-q_log <- fit_by_group_logstatus(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p")
+q_log <- fit_by_group_logstatus(t1_q, paste0("Q", 1:5), "time_quintile", "log_cpv_3p", fe_dow = FALSE)
 q_log[, grp := factor(grp_raw, levels = paste0("Q", 1:5))]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_user_quintile_log_status.pdf"),
        plot_coef_logstatus(q_log, "vertical", "Estimated Effect on log(CPV)", QUINT_LAB),
@@ -631,7 +639,7 @@ ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_user_quintile_log_status.pdf"),
 
 # --- 2.6 Top-15 sites x log status (MAR) -> fig:deletion_by_site_log_status --
 site_log <- fit_by_group_logstatus(t1[website %in% top15_sites], top15_sites,
-                                   "website", "log_cpv_3p", fe_with_website = FALSE)
+                                   "website", "log_cpv_3p", fe_with_website = FALSE, fe_dow = FALSE)
 site_log[, display_name := gsub("^www\\.", "", grp_raw)]
 order_site <- site_log[log_status == "Has Log"][order(coef), display_name]
 site_log[, grp := factor(display_name, levels = rev(order_site))]
@@ -642,7 +650,7 @@ ggsave(paste0(FIGURES_DIR, "cpv_did_by_site_log_status.pdf"),
 
 # --- 2.7 Category x log status (MAR, VERTICAL) -------------------------------
 #          -> fig:deletion_by_category_log_status
-cat_log <- fit_by_group_logstatus(t1_cat, sort(big_cats), "category", "log_cpv_3p")
+cat_log <- fit_by_group_logstatus(t1_cat, sort(big_cats), "category", "log_cpv_3p", fe_dow = FALSE)
 order_cat <- cat_log[log_status == "No Log"][order(coef), grp_raw]
 cat_log[, grp := factor(grp_raw, levels = order_cat)]
 ggsave(paste0(FIGURES_DIR, "cpv_heterogeneity_by_website_category_log_status.pdf"),
