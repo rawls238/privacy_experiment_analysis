@@ -11,9 +11,11 @@
 #     1.2 Daily browsing-time trajectory (c1 / c2)          -> fig:time_over_time
 #     1.3 CPV DiD regression (2 cols: CPV + UC)            -> tab:cookie_deletion_did
 #     1.4 Time DiD regression                               -> tab:time_did_regression
-#     1.5 CPV DiD excluding deletion-unaffected sites
-#         1.5a unaffected-site shares (Pre/Post/Change)     -> tab:..._unaffected_sites_summary
-#         1.5b DiD excluding unaffected sites               -> tab:..._did_excluding_unaffected
+#     1.5 Survey-platform sites (excluded from the MAIN sample in Section 0)
+#         1.5a survey-platform shares, incl. sample         -> tab:..._unaffected_sites_summary
+#         1.5b robustness: DiD INCLUDING survey platforms   -> tab:..._did_excluding_unaffected
+#         (table filenames / \cookieCpvExclCoef kept for tex compatibility;
+#          semantics flipped: main excludes, robustness includes)
 #     1.6 Baseline CPV by website category                  -> fig:cpv_baseline_by_category
 #
 #   SECTION 2  Is deletion plausibly random? (CPV outcome)
@@ -146,13 +148,6 @@ rot_x <- theme(axis.text.x = element_text(angle = 45, hjust = 1))
 # Sites whose 3rd-party cookies are NOT affected by the deletion mechanism
 # (Google-ecosystem services + Facebook). Identified from positive per-site DiD
 # coefficients in Section 2.3.
-UNAFFECTED_SITES <- c(
-  "www.facebook.com",
-  "docs.google.com",
-  "gemini.google.com",
-  "datacompute.google.com",
-  "mail.google.com"
-)
 
 
 # =============================================================================
@@ -291,7 +286,9 @@ site_df <- high_level_aggregate(site_df, field = "website_aggregated")
 site_lookup <- as.data.table(unique(
   site_df[, c("website", "website_aggregated_high_level")]))
 panel <- merge(panel, site_lookup, by = "website", all.x = TRUE)
-panel <- panel[!(tolower(website_aggregated_high_level) %in% SURVEY_WEBSITES)]
+panel[, is_survey := tolower(website_aggregated_high_level) %in% SURVEY_WEBSITES]
+panel_full <- copy(panel)          # BEFORE exclusion: for 1.5a shares / 1.5b robustness
+panel <- panel[is_survey == FALSE]
 
 # Website category
 domain_class <- get_domain_classification()
@@ -304,6 +301,13 @@ panel <- merge(panel, domain_class_slim,
 
 # CPV analysis sample
 t1 <- panel[tau >= TAU_MIN & tau <= TAU_MAX & !is.na(visit_count) & visit_count > 0]
+# Full-window sample INCLUDING survey platforms (1.5a shares, 1.5b robustness)
+t_full <- panel_full[tau >= TAU_MIN & tau <= TAU_MAX & !is.na(visit_count) & visit_count > 0]
+t_full[, cpv_3p       := cookie_events_3rd_p / visit_count]
+t_full[, log_cpv_3p   := log(1 + cpv_3p)]
+t_full[, treated      := as.integer(cookie_treatment_idx == 1)]
+t_full[, post         := as.integer(tau >= 0)]
+t_full[, post_treated := post * treated]
 t1[, cpv_3p     := cookie_events_3rd_p / visit_count]   # corrected classification
 t1[, log_cpv_3p := log(1 + cpv_3p)]
 t1[, log_uc     := log(1 + unique_cookies_3rd_p)]        # unique 3rd-party cookies (UC)
@@ -436,17 +440,19 @@ write_tabular_only(
   etable(m_time_pool, dict = DICT_TIME, digits = 3, signif.code = SIGNIF, tex = TRUE),
   file = paste0(TABLES_DIR, "time_did_regression.tex"))
 
-# --- 1.5a Unaffected-site shares (Pooled Pre/Post/Change) -------------------
+# --- 1.5a Survey-platform shares, sample INCLUDING them (Pre/Post/Change) ---
 #          -> tab:cookie_deletion_unaffected_sites_summary
-t1[, is_unaffected := website %in% UNAFFECTED_SITES]
-
-share_pp <- t1[, .(
+# Shares are computed on t_full (survey platforms INCLUDED): the main sample
+# t1 excludes them in Section 0, so their share there is zero by construction.
+# Flagging reuses the Section 0 aggregated-name match (bare hostnames in
+# SURVEY_WEBSITES never match full hosts, see test_unaffected_match.R T1).
+share_pp <- t_full[, .(
   total_visits  = sum(visit_count),
-  unaff_visits  = sum(visit_count[is_unaffected]),
+  unaff_visits  = sum(visit_count[is_survey]),
   total_time    = sum(time_spent,            na.rm = TRUE),
-  unaff_time    = sum(time_spent[is_unaffected], na.rm = TRUE),
+  unaff_time    = sum(time_spent[is_survey], na.rm = TRUE),
   total_cookies = sum(cookie_events_3rd_p, na.rm = TRUE),
-  unaff_cookies = sum(cookie_events_3rd_p[is_unaffected], na.rm = TRUE)
+  unaff_cookies = sum(cookie_events_3rd_p[is_survey], na.rm = TRUE)
 ), by = post]
 share_pp[, `:=`(visit_share  = 100 * unaff_visits  / total_visits,
                 time_share   = 100 * unaff_time    / total_time,
@@ -474,11 +480,12 @@ share_lines <- c(
 writeLines(share_lines, paste0(TABLES_DIR, "cookie_deletion_unaffected_sites_summary.tex"))
 cat("Saved (tabular only):", paste0(TABLES_DIR, "cookie_deletion_unaffected_sites_summary.tex"), "\n")
 
-# --- 1.5b DiD excluding unaffected sites (Pooled) ---------------------------
+# --- 1.5b Robustness: DiD INCLUDING survey platforms (Pooled) ---------------
 #          -> tab:cookie_deletion_did_excluding_unaffected
-t1_excl <- t1[is_unaffected == FALSE]
+# Main sample already excludes survey platforms; the robustness flips the
+# direction and re-estimates INCLUDING them (test T5: -0.4477 vs main -0.4473).
 m_pool_excl <- feols(log_cpv_3p ~ post_treated | experiment_id + website,
-                     data = t1_excl, cluster = ~experiment_id, notes = FALSE)
+                     data = t_full, cluster = ~experiment_id, notes = FALSE)
 write_tabular_only(
   etable(m_pool_excl, dict = DICT_CPV, digits = 3, signif.code = SIGNIF, tex = TRUE),
   file = paste0(TABLES_DIR, "cookie_deletion_did_excluding_unaffected.tex"))
