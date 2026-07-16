@@ -1,47 +1,57 @@
 # ============================================================================
-# PLOT VIOLIN: Privacy Valuations and Most Valued Information
+# PLOT VIOLIN (WTP-space): Privacy Valuations and Most Valued Information
 # ============================================================================
 #
-# Produces:
-#   Fig 6(a) [fig:privacy_info_partworth]:
-#     individual_heterogeneity_dollars_with_website_extension.pdf    (match panel a order)
-#     individual_heterogeneity_dollars_with_website_extension_2.pdf  (alt: WTP order, lowest at top)
-#   Fig 6(b) [fig:privacy_info_top_2]:
-#     top2_privacy_attributes_extension.pdf
+# ADAPTED FOR THE WTP-SPACE MODEL EXPORTS (conjoint_wtp run). FINAL VERSION.
+#
+# STATUS:
+#   - Table validation: 27/27 checks passed (validate_conjoint_wtp_tables.R)
+#   - Pipeline pre-flight: 41/41 checks passed (test_plot_violin_wtp.R)
+#   - Old preference-space tables archived in ../old_tables_2/ alongside the
+#     original plot_violin.R; this script pairs with the WTP-space tables/.
+#
+# EXPECTED MACRO CHANGES vs the previous .tex (verified in pre-flight):
+#   wtpCollectFinancial  9.01 -> ~5.02  (-44%)
+#   wtpShareFinancial    7.67 -> ~4.21  (-45%)
+#   wtpTopThreeMedian   18.12 -> ~17.52 ( -3%)
+#   Mean-based macros drop because the old E[beta]/E[lambda] ratio tails
+#   inflated means far above medians; median-based macros are stable.
+#   REVIEW ALL PROSE CITING THESE MACROS AFTER RECOMPILING:
+#     grep -rn "wtpCollectFinancial\|wtpShareFinancial\|wtpTopThreeMedian" --include="*.tex" ..
+# Validated by validate_conjoint_wtp_tables.R (27/27 checks passed):
+#   - dollar_value_* columns are draw-wise posterior summaries of -2*omega,
+#     matching the OLD plot sign convention exactly (protective = negative).
+#   - No ratio conversion (beta / price_coef) is needed or wanted: the old
+#     posterior-mean ratio E[beta]/E[lambda] carried ratio bias; dollar_value
+#     is the exact draw-wise posterior quantity.
+#   - Old vs new attribute medians: Spearman rho = 0.991; individual 5-95
+#     tail width shrinks from ~$20 to ~$6.5.
+#
+# Produces (same filenames as before):
+#   Fig 6(a):  individual_heterogeneity_dollars_with_website_extension.pdf
+#              individual_heterogeneity_dollars_with_website_extension_2.pdf
+#   Fig 6(b):  top2_privacy_attributes_extension.pdf
 #   Fig C.5(a): individual_heterogeneity_dollars_with_website_full.pdf
 #   Fig C.5(b): top2_privacy_attributes_full.pdf
-#   Fig C.4:    individual_heterogeneity_experiment_vs_survey.pdf
-#   WTP scalars (prose): output/values/conjoint_wtp_values.tex
-#     \wtpCollectFinancial / \wtpShareFinancial / \wtpTopThreeMedian
+#   Fig C.4:   individual_heterogeneity_experiment_vs_survey.pdf
+#   WTP scalars: output/values/conjoint_wtp_values.tex
 #
 # WTP CONVENTION (full swing): privacy attributes are effects-coded
-# {invasive = -1, protective = +1}. Denominator is the exported constrained
-# price coefficient, price_coef_ind = -exp(eta_price). Meaningful WTP is the
-# full invasive -> protective swing (2 coded units): WTP = (part-worth/price)*2.
+# {invasive = -1, protective = +1}. dollar_value_* = -2 * omega (per-unit WTP
+# in $ times the full swing, old sign convention). No further scaling here.
 #
-# ATTRIBUTE ORDER:
-#   panel (a) beliefs figure displays true_mean DESCENDING top-to-bottom
-#   (Collects Browsing On-Site at top). WTP figures have NO coord_flip, so the
-#   ascending get_privacy_attr_order() vector used directly as factor levels
-#   puts the highest true_mean at the top -> matches panel (a). No rev.
-#   The "_2" variant ranks by each attribute's WTP median with the LOWEST WTP
-#   at the top (arrange desc -> lowest is last level -> drawn at top).
-#   Shared labels + order from PRIVACY_ATTR_MASTER / get_privacy_attr_order().
+# TOP-2 FIGURE NOTE: information value IV_ij = p_ij*(1-p_ij)*|beta_ij| with
+# beta = lambda * omega. lambda_i > 0 is constant within person, so the
+# WITHIN-PERSON top-2 ranking is invariant to lambda; we rank on |omega|
+# (dollar-scale IV) built from individual_wtp_summary.csv. The old wide-means
+# beta table is therefore not required.
 #
-# Dependencies:
-#   replication_files/utils/values.R              (PRIVACY_ATTR_MASTER, get_privacy_attr_order)
-#   replication_files/utils/plot_rules.R
-#   replication_files/utils/number_format_helpers.R
-#
-# Inputs (relative to code_github/; data in sibling ../data):
+# Inputs (relative to code_github/):
+#   ../results/Conjoint_result/conjoint_with_website/tables/individual_wtp_summary.csv
+#   ../results/Conjoint_result/conjoint_with_website/tables/individual_price_coefficients_summary.csv
 #   ../data/Survey/final_baseline_survey.csv
 #   ../data/final_extension_data/experiment_conditions_pilot_july_2024.csv
-#   ../results/Conjoint_result/conjoint_with_website/tables/individual_parameters_summary.csv
-#   ../results/Conjoint_result/conjoint_with_website/tables/individual_price_coefficients_summary.csv
-#   ../results/Conjoint_result/conjoint_with_website/tables/individual_parameters_wide_means.csv
 #   ../data/Survey/survey_merged_final.csv
-#
-# Outputs to: output/figures/ and output/values/
 # ============================================================================
 
 library(tidyverse)
@@ -58,8 +68,10 @@ VALUES_DIR  <- "output/values/"
 
 CONJOINT_TABLE_DIR <- "../results/Conjoint_result/conjoint_with_website/tables"
 
-# Full-swing multiplier: invasive (-1) -> protective (+1) = 2 coded units.
-SWING <- 2
+# Per-person point estimate for the violins/macros. The exported dollar_value
+# column equals dollar_value_median (validated); switch to "dollar_value_mean"
+# here if the mean is preferred.
+POINT_EST <- "dollar_value"
 
 if (!exists("BAD_USERS")) BAD_USERS <- c()
 
@@ -68,7 +80,7 @@ if (!exists("BAD_USERS")) BAD_USERS <- c()
 # ============================================================================
 
 cat(strrep("=", 80), "\n")
-cat("CONVERTING BETA PARAMETERS TO DOLLAR VALUES (full-swing)\n")
+cat("LOADING WTP-SPACE DOLLAR VALUES (full-swing, draw-wise posterior summaries)\n")
 cat(strrep("=", 80), "\n")
 
 survey_intro_0703 <- read_csv("../data/Survey/final_baseline_survey.csv",
@@ -88,8 +100,8 @@ experiment_users <- meta_data %>%
   rename(sys_respnum = sys_RespNum) %>%
   select(sys_respnum, experiment_condition, experiment_id)
 
-with_website_indiv <- read_csv(
-  file.path(CONJOINT_TABLE_DIR, "individual_parameters_summary.csv"),
+wtp_indiv <- read_csv(
+  file.path(CONJOINT_TABLE_DIR, "individual_wtp_summary.csv"),
   show_col_types = FALSE
 )
 
@@ -98,30 +110,38 @@ price_coef_indiv <- read_csv(
   show_col_types = FALSE
 )
 
-# Sanity checks for the constrained-price model.
-if (!"eta_price" %in% unique(with_website_indiv$feature_name)) {
-  stop("Expected eta_price in individual_parameters_summary.csv. The script may be reading the old conjoint table.")
+# --- Format guards (REVERSED vs the old preference-space script) ---
+# The WTP-space export must contain dollar_value columns and must NOT contain
+# eta_price / price_linear rows (eta lives only in the price coefficient file).
+if (!all(c("dollar_value", "dollar_value_median", "omega_median") %in% names(wtp_indiv))) {
+  stop("Expected dollar_value / omega columns in individual_wtp_summary.csv. ",
+       "The script may be reading an old preference-space table.")
 }
-if ("price_linear" %in% unique(with_website_indiv$feature_name)) {
-  stop("Found price_linear in individual_parameters_summary.csv. For the new model, use eta_price plus individual_price_coefficients_summary.csv.")
+if ("eta_price" %in% unique(wtp_indiv$feature_name)) {
+  stop("Found eta_price rows in individual_wtp_summary.csv. ",
+       "This looks like the OLD preference-space export; point CONJOINT_TABLE_DIR at the WTP-space tables.")
+}
+if ("price_linear" %in% unique(wtp_indiv$feature_name)) {
+  stop("Found price_linear rows in individual_wtp_summary.csv; unexpected for the WTP-space export.")
 }
 if (!all(c("respondent_N_id", "mean") %in% names(price_coef_indiv))) {
   stop("individual_price_coefficients_summary.csv must contain respondent_N_id and mean columns.")
 }
 if (any(price_coef_indiv$mean >= 0, na.rm = TRUE)) {
-  stop("Expected all exported price coefficients to be negative. Check individual_price_coefficients_summary.csv.")
+  stop("Expected all exported price coefficients to be negative (-exp(eta)). ",
+       "Check individual_price_coefficients_summary.csv.")
 }
 
 # ID integrity: parameter and price tables must agree on respondent_N_id -> sys_respnum.
 validate_conjoint_id_integrity <- function(indiv_data, price_data) {
-  required_indiv_cols <- c("respondent_N_id", "sys_respnum", "feature_name", "mean")
+  required_indiv_cols <- c("respondent_N_id", "sys_respnum", "feature_name")
   required_price_cols <- c("respondent_N_id", "sys_respnum", "mean")
   
   missing_indiv_cols <- setdiff(required_indiv_cols, names(indiv_data))
   missing_price_cols <- setdiff(required_price_cols, names(price_data))
   
   if (length(missing_indiv_cols) > 0) {
-    stop("individual_parameters_summary.csv is missing required columns: ",
+    stop("individual_wtp_summary.csv is missing required columns: ",
          paste(missing_indiv_cols, collapse = ", "))
   }
   if (length(missing_price_cols) > 0) {
@@ -133,7 +153,7 @@ validate_conjoint_id_integrity <- function(indiv_data, price_data) {
   price_map <- price_data %>% distinct(respondent_N_id, sys_respnum)
   
   if (nrow(indiv_map %>% count(respondent_N_id) %>% filter(n > 1)) > 0) {
-    stop("respondent_N_id maps to multiple sys_respnum in individual_parameters_summary.csv.")
+    stop("respondent_N_id maps to multiple sys_respnum in individual_wtp_summary.csv.")
   }
   if (nrow(price_map %>% count(respondent_N_id) %>% filter(n > 1)) > 0) {
     stop("respondent_N_id maps to multiple sys_respnum in individual_price_coefficients_summary.csv.")
@@ -145,7 +165,7 @@ validate_conjoint_id_integrity <- function(indiv_data, price_data) {
     stop("Missing price coefficients for ", length(missing_price_ids), " respondent_N_id values.")
   }
   if (length(extra_price_ids) > 0) {
-    stop("Price table has ", length(extra_price_ids), " respondent_N_id values absent from the parameter table.")
+    stop("Price table has ", length(extra_price_ids), " respondent_N_id values absent from the WTP table.")
   }
   
   joined_map <- indiv_map %>%
@@ -157,9 +177,9 @@ validate_conjoint_id_integrity <- function(indiv_data, price_data) {
   cat("\u2713 ID integrity check passed.\n")
 }
 
-validate_conjoint_id_integrity(with_website_indiv, price_coef_indiv)
+validate_conjoint_id_integrity(wtp_indiv, price_coef_indiv)
 
-with_website_indiv <- with_website_indiv %>%
+wtp_indiv <- wtp_indiv %>%
   left_join(experiment_users, by = "sys_respnum") %>%
   mutate(sample_group = ifelse(!is.na(experiment_id), "Extension", "Survey"))
 
@@ -187,41 +207,28 @@ get_feature_category <- function(feature_name) {
 
 
 # ============================================================================
-# CONVERSION: Beta -> Dollar Value (full swing)
+# BUILD DOLLAR-VALUE FRAME (no conversion needed)
 # ============================================================================
+# dollar_value_* are already draw-wise posterior summaries of -2*omega — the
+# exact posterior of the old sign convention. The old (mean / price_coef) *
+# SWING ratio step is intentionally GONE (it carried E[beta]/E[lambda] bias).
 
-convert_to_dollars <- function(indiv_data, price_coef_data, model_name) {
-  cat(sprintf("\n%s:\n", model_name))
-  cat(strrep("-", 60), "\n")
-  
-  price_data <- price_coef_data %>%
-    select(respondent_N_id, price_coef = mean) %>%
-    distinct(respondent_N_id, .keep_all = TRUE)
-  
-  cat(sprintf("  Price coefficients: %d individuals\n", nrow(price_data)))
-  cat(sprintf("  Mean price coef: %.4f\n", mean(price_data$price_coef)))
-  cat(sprintf("  Median price coef: %.4f\n", median(price_data$price_coef)))
-  
-  missing_price_ids <- setdiff(unique(indiv_data$respondent_N_id), price_data$respondent_N_id)
-  if (length(missing_price_ids) > 0) {
-    stop("Missing price coefficients for ", length(missing_price_ids), " respondents.")
-  }
-  
-  privacy_data <- indiv_data %>%
-    filter(feature_name %in% privacy_features) %>%
-    inner_join(price_data, by = "respondent_N_id") %>%
-    mutate(dollar_value = (mean / price_coef) * SWING) %>%
-    filter(!is.na(dollar_value), !is.infinite(dollar_value)) %>%
-    mutate(
-      feature_type  = get_feature_category(feature_name),
-      feature_label = feature_labels[feature_name]
-    )
-  
-  cat(sprintf("  Clean rows: %d\n", nrow(privacy_data)))
-  privacy_data
-}
+with_web_dollars <- wtp_indiv %>%
+  filter(feature_name %in% privacy_features) %>%
+  mutate(
+    dollar_value  = .data[[POINT_EST]],
+    feature_type  = get_feature_category(feature_name),
+    feature_label = feature_labels[feature_name]
+  ) %>%
+  filter(!is.na(dollar_value), !is.infinite(dollar_value))
 
-with_web_dollars <- convert_to_dollars(with_website_indiv, price_coef_indiv, "With Website Model")
+cat(sprintf("\nWith Website Model (WTP-space):\n"))
+cat(strrep("-", 60), "\n")
+cat(sprintf("  Respondents: %d\n", n_distinct(with_web_dollars$respondent_N_id)))
+cat(sprintf("  Clean rows: %d\n", nrow(with_web_dollars)))
+cat(sprintf("  Point estimate column: %s\n", POINT_EST))
+cat(sprintf("  Mean price coef: %.4f\n", mean(price_coef_indiv$mean)))
+cat(sprintf("  Median price coef: %.4f\n", median(price_coef_indiv$mean)))
 
 
 # ============================================================================
@@ -238,9 +245,11 @@ fin_wtp <- ext_dollars %>%
 wtp_collect_financial <- abs(fin_wtp$mean_wtp[fin_wtp$feature_name == "collection_financial"])
 wtp_share_financial   <- abs(fin_wtp$mean_wtp[fin_wtp$feature_name == "use_financial"])
 
+# Top-3 most protective-valued attributes per person, ranked on omega_median
+# (equivalent to ranking on protective WTP; lambda-invariant within person).
 top3_per_person <- ext_dollars %>%
   group_by(respondent_N_id) %>%
-  slice_max(mean, n = 3, with_ties = FALSE) %>%
+  slice_max(omega_median, n = 3, with_ties = FALSE) %>%
   summarise(wtp_top3 = sum(dollar_value), .groups = "drop")
 
 wtp_top_three_median <- abs(median(top3_per_person$wtp_top3))
@@ -286,8 +295,9 @@ for (group in c("Extension", "Survey")) {
 
 # ============================================================================
 # PLOT CONSTANTS
-#   SCALE_MIN/MAX: displayed x-axis range (-12..12 gives violins more room).
-#   DATA_MIN/MAX:  clip for extreme values (not the display range).
+#   SCALE_MIN/MAX: displayed x-axis range. WTP-space tails are ~3x narrower
+#   (5-95 width ~$6.5 vs ~$20 old), so -12..12 now covers nearly all mass.
+#   DATA_MIN/MAX:  clip for extreme values (rarely binds in the new export).
 # ============================================================================
 
 SCALE_MIN <- -12
@@ -297,14 +307,7 @@ DATA_MAX  <-  60
 
 
 # ============================================================================
-# Fig 6(a): SINGLE-GROUP VIOLIN PLOT
-#   order_by = "beliefs": match panel (a). get_privacy_attr_order() is true_mean
-#     ASCENDING; used directly as factor levels (no rev), the highest true_mean
-#     lands at the top, matching panel (a)'s coord_flip layout.
-#   order_by = "wtp": rank by each attribute's WTP median, LOWEST at top
-#     (arrange desc so the lowest WTP is the last level -> drawn at top).
-#   Short violins (trim + smaller bandwidth); labels from master; legend bottom;
-#   horizontal grid on; 8x6.
+# Fig 6(a): SINGLE-GROUP VIOLIN PLOT  (unchanged plotting logic)
 # ============================================================================
 
 make_dollar_plot <- function(df, output_file, order_by = c("beliefs", "wtp")) {
@@ -360,9 +363,7 @@ make_dollar_plot <- function(df, output_file, order_by = c("beliefs", "wtp")) {
 
 
 # ============================================================================
-# C.5: COMPARISON VIOLIN PLOT (Extension vs Survey)
-#   Same order as panel (a) (no rev); labels from master; legend bottom;
-#   horizontal grid on; 8x6.
+# C.5: COMPARISON VIOLIN PLOT (Extension vs Survey)  (unchanged)
 # ============================================================================
 
 make_comparison_plot <- function(df, output_file) {
@@ -430,25 +431,25 @@ make_comparison_plot <- function(df, output_file) {
 
 # ============================================================================
 # Fig 6(b): MOST VALUED INFORMATION — Top-2 Personalized Attributes
-# IV_ij = p_ij * (1 - p_ij) * |beta_ij|; top-2 per respondent, then counted.
-# Bars ranked by count; labels from master.
+# IV_ij = p_ij * (1 - p_ij) * |omega_ij| (dollar-scale information value).
+# WITHIN-PERSON top-2 is invariant to lambda_i > 0, so ranking on omega is
+# equivalent to the old beta-based ranking; the wide beta table is not needed.
+# The omega wide table is built from individual_wtp_summary.csv directly.
 # ============================================================================
 
 make_top2_info_plot <- function(use_full_sample = FALSE) {
   
-  utils <- read.csv(
-    file.path(CONJOINT_TABLE_DIR, "individual_parameters_wide_means.csv"),
-    stringsAsFactors = FALSE
-  )
+  # Build wide omega table (posterior means) from the long WTP summary
+  utils <- wtp_indiv %>%
+    select(RespondentId = sys_respnum, feature_name, omega_mean) %>%
+    pivot_wider(names_from = feature_name, values_from = omega_mean) %>%
+    as.data.frame()
   
   if (!"RespondentId" %in% names(utils)) {
-    stop("individual_parameters_wide_means.csv must contain RespondentId.")
+    stop("Failed to construct wide omega table with RespondentId.")
   }
-  if (!"eta_price" %in% names(utils)) {
-    stop("Expected eta_price in individual_parameters_wide_means.csv. The script may be reading the old conjoint wide table.")
-  }
-  if ("price_linear" %in% names(utils)) {
-    stop("Found price_linear in individual_parameters_wide_means.csv. For the new model, the wide table should contain eta_price instead.")
+  if ("eta_price" %in% names(utils) || "price_linear" %in% names(utils)) {
+    stop("Wide omega table unexpectedly contains eta_price/price_linear columns.")
   }
   
   survey_beliefs <- read.csv("../data/Survey/survey_merged_final.csv",
@@ -509,7 +510,7 @@ make_top2_info_plot <- function(use_full_sample = FALSE) {
   
   missing_utility_cols <- setdiff(unname(belief_to_attr), names(utils))
   if (length(missing_utility_cols) > 0) {
-    stop("Missing expected privacy coefficient columns in individual_parameters_wide_means.csv: ",
+    stop("Missing expected omega columns in the wide table: ",
          paste(missing_utility_cols, collapse = ", "))
   }
   
@@ -534,11 +535,11 @@ make_top2_info_plot <- function(use_full_sample = FALSE) {
   utils_long <- utils %>%
     filter(RespondentId %in% valid_respondents) %>%
     select(RespondentId, all_of(unname(belief_to_attr))) %>%
-    pivot_longer(-RespondentId, names_to = "attribute", values_to = "beta_ij")
+    pivot_longer(-RespondentId, names_to = "attribute", values_to = "omega_ij")
   
   iv_df <- inner_join(utils_long, beliefs_long,
                       by = c("RespondentId", "attribute")) %>%
-    mutate(information_value = p_ij * (1 - p_ij) * abs(beta_ij))
+    mutate(information_value = p_ij * (1 - p_ij) * abs(omega_ij))
   
   cat(sprintf("  IV computed: %d respondents, %d rows\n",
               n_distinct(iv_df$RespondentId), nrow(iv_df)))
