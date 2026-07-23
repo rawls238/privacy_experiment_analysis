@@ -171,7 +171,7 @@ We argue that consumers are imperfectly informed about privacy practices due to 
 
 Our experiment involves nearly 1,600 participants who install a custom developed Chrome extension for two months; the extension collects browsing behavior and experimentally manipulates access to privacy information, and third-party tracking, to quantify the relative importance of each of these forces.\footnote{A key concern is that our measurement itself is privacy-invasive. In Section \ref{sec:selection} we discuss how we directly measure and mitigate selection into the recruiting platforms we use (Prolific, CloudResearch Connect), selection into the baseline survey, and selection into the extension portion of the study.} In our primary intervention, we vary both the ease of access and the complexity of privacy information. For participants in the \textit{saliency} group, we reduce search costs by making the privacy policy more easily accessible as the participant browses. For participants in the \textit{information} group, we both reduce search costs \emph{and} the complexity of privacy information by providing users with binary privacy attributes; which we collect by hand for the top 500 websites online.\footnote{Each policy is read by three trained raters overseen by law students (see Section \ref{sec:policydata} for more details). We show that there is considerable variation in privacy practices across websites within the same category, providing scope for information provision to affect choices.} Finally, our experiment ends with a cookie-deletion intervention in which we exogenously remove third-party cookies associated with advertising and analytics, providing variation in privacy-dependent site quality.
 
-To value these choices and to benchmark revealed against stated behavior, we elicit privacy preferences directly. In the baseline survey, before any treatment, each participant completes a choice-based conjoint task that trades off websites differing in their privacy practices against a monthly price \citep{ALLENBY2019151}. This yields, for every participant, a vector of part-worths over the nineteen privacy attributes together with a price coefficient that expresses these valuations in dollars. Participants state positive valuations for user-control protections and negative valuations for data collection and sharing---especially practices with downstream financial consequences---giving us a stated-preference benchmark against which we later measure revealed browsing.
+To value these choices and to benchmark revealed against stated behavior, we elicit privacy preferences directly. In the baseline survey, before any treatment, each participant completes a choice-based conjoint task that trades off websites differing in their privacy practices against a monthly price \citep{ALLENBY2019151}. This yields, for every participant, a vector of willingness-to-pay estimates over the nineteen privacy attributes together with a respondent-specific price coefficient. Participants state positive valuations for user-control protections and negative valuations for data collection and sharing---especially practices with downstream financial consequences---giving us a stated-preference benchmark against which we later measure revealed browsing.
 
 Measuring the welfare effects of information provision also requires ground truth about what websites actually do. We therefore construct a novel dataset of privacy practices for the top 500 U.S.\ websites, with trained raters overseen by law students hand-coding each site's privacy policy into the same nineteen binary attributes that we elicit in the conjoint and belief measures. This common attribute space ties together what sites actually do, what consumers believe, and what consumers value, and supplies the cross-site variation in privacy practices that both the information treatment and the structural model exploit.
 
@@ -380,9 +380,16 @@ Our intervention provides participants with comprehensive and credible informati
 
 A key feature of our information treatment is personalization: we select the privacy attributes that are most informative for each individual participant. Two of the three displayed attributes are held constant across websites and personalized using each participant's conjoint estimates and elicited beliefs. Specifically, we calculate the expected information gain from attribute $k$ for individual $i$ as:
 \begin{equation}\label{eq:provided_info}
-    V_{ik} = E[u_{\text{post}}] - E[u_{\text{prior}}] = \theta^b_{ik}(1 - \theta^b_{ik})\beta_{ik}
+V_{ik}
+=
+\frac{1}{2}
+E\left[
+\left|u_{\text{post}}-u_{\text{prior}}\right|
+\right]
+=
+\theta^b_{ik}(1-\theta^b_{ik})\left|\beta_{ik}\right|.
 \end{equation}
-where $\theta^b_{ik}$ is individual $i$'s belief that a random website in the top 500 engages in practice $k$ and $\beta_{ik}$ is their preference weight from the conjoint. The formula captures the intuition that information is most valuable when a participant both cares about the attribute (high $|\beta_{ik}|$) and is uncertain about its prevalence (beliefs near 0.5). We take the two attributes with highest $V_{ik}$ as individual $i$'s personalized treatment. The third attribute is chosen at random and varies across websites. This design concentrates the provided information on the attributes each participant is most uncertain about and most likely to act on. The resulting personalized sets load heavily on attributes with potential off-platform consequences---collecting and sharing financial data, sharing data with law enforcement, data security, and collecting sensitive information---whereas attributes participants believe to be nearly universal (e.g., collecting location or on-site browsing data) seldom appear. Appendix Figure~\ref{fig:privacy_info_top_2} reports the full distribution of personalized attributes across participants.
+where $\theta^b_{ik}$ is individual $i$'s belief that a random website in the top 500 engages in practice $k$ and $\beta_{ik}$ is their preference weight from the conjoint. We include the common factor of one half to simplify the expression, while preserving the ranking of information gain across attributes. The formula captures the intuition that information is most valuable when a participant both cares about the attribute (high $|\beta_{ik}|$) and is uncertain about its prevalence (beliefs near 0.5). We take the two attributes with highest $V_{ik}$ as individual $i$'s personalized treatment. The third attribute is chosen at random and varies across websites. This design concentrates the provided information on the attributes each participant is most uncertain about and most likely to act on. The resulting personalized sets load heavily on attributes with potential off-platform consequences---collecting and sharing financial data, sharing data with law enforcement, data security, and collecting sensitive information---whereas attributes participants believe to be nearly universal (e.g., collecting location or on-site browsing data) seldom appear. Appendix Figure~\ref{fig:privacy_info_top_2} reports the full distribution of personalized attributes across participants.
 
 \subsubsection{Cookie Deletion State \& Endline}
 
@@ -487,7 +494,7 @@ We categorize each website using the Klazify API and aggregate each domain into 
         \caption{Willingness to Pay for Privacy Attributes}
         \label{fig:privacy_combined}\label{fig:privacy_info_partworth}
     \end{subfigure}
-    \caption*{\scriptsize \textsc{Notes}: Panel (a): Mean prior beliefs versus ground-truth prevalence; beliefs are elicited on a 5-point Likert scale, converted to percentage points via $(r - 1) \times 25$ for $r \in \{1,2,3,4,5\}$, and ground truth is the proportion of websites engaging in each practice. Panel (b): Estimated monthly willingness to pay for each privacy attribute among the extension sample, computed from the estimated part-worth and the price coefficient; green rows denote ``Control'' attributes, blue ``Use'', and orange ``Collect''. Appendix~\ref{sec:conjoint_details} contains the conjoint estimation details, and the full conjoint sample version of panel (b) appears in Figure~\ref{fig:privacy_combined_full}.}
+    \caption*{\scriptsize \textsc{Notes}: Panel (a): Mean prior beliefs versus ground-truth prevalence; beliefs are elicited on a 5-point Likert scale, converted to percentage points via $(r - 1) \times 25$ for $r \in \{1,2,3,4,5\}$, and ground truth is the proportion of websites engaging in each practice. Panel (b): Estimated monthly willingness to pay for each privacy attribute among the extension sample, reported for the full change between attribute levels using estimates from the WTP-space conjoint model; green rows denote “Control” attributes, blue “Use,” and orange “Collect.” Appendix~\ref{sec:conjoint_details} contains the conjoint estimation details, and the full conjoint sample version of panel (b) appears in Figure~\ref{fig:privacy_combined_full}.}
 \end{figure}
 
 \subsubsection{Beliefs about Privacy Practices}
@@ -498,7 +505,7 @@ Figure~\ref{fig:privacy_info_beliefs} presents mean beliefs alongside the true p
 
 \subsubsection{Stated Privacy Preferences}\label{subsec:stated_privacy_prefs}
 
-To understand which privacy attributes participants value most, we estimate willingness to pay (WTP) for each attribute from the conjoint task completed in the baseline survey (Appendix~\ref{sec:conjoint_details}). Figure~\ref{fig:privacy_info_partworth} presents the estimated monthly WTP.\footnote{We derive WTP by dividing the estimated part-worth for each attribute by the price coefficient. Appendix~\ref{sec:conjoint_details} contains the full estimation details.} Control attributes --- data deletion, data security, anonymization --- are associated with positive WTP, consistent with participants viewing these protections as valuable. In contrast, collect and use attributes are associated with negative WTP: participants would need to be compensated for using a website that collects financial data, shares information with law enforcement, or collects sensitive personal information. Column (2) of Table \ref{tab:baseline_demo_heterogeneity} shows that education, being over 60, and being female are associated with valuing privacy more highly.\footnote{Reassuringly, preferring not to answer the question on gender is associated with the largest predicted increase in privacy preference intensity.}$^{,}$\footnote{Table \ref{tab:conjoint_vs_beliefs} examines the cross-sectional relationship between consumers' belief accuracy about privacy practices and their preference intensity. This analysis finds that consumers who would penalize invasive practices most in their choices are precisely those who are unaware of how common those practices are.}
+To understand which privacy attributes participants value most, we estimate willingness to pay (WTP) for each attribute from the conjoint task completed in the baseline survey (Appendix~\ref{sec:conjoint_details}). Figure~\ref{fig:privacy_info_partworth} presents the estimated monthly WTP.\footnote{We estimate individual-level WTP for each attribute directly in WTP space. Appendix~\ref{sec:conjoint_details} contains the full estimation details.} Control attributes --- data deletion, data security, anonymization --- are associated with positive WTP, consistent with participants viewing these protections as valuable. In contrast, collect and use attributes are associated with negative WTP: participants would need to be compensated for using a website that collects financial data, shares information with law enforcement, or collects sensitive personal information. Column (2) of Table \ref{tab:baseline_demo_heterogeneity} shows that education, being over 60, and being female are associated with valuing privacy more highly.\footnote{Reassuringly, preferring not to answer the question on gender is associated with the largest predicted increase in privacy preference intensity.}$^{,}$\footnote{Table \ref{tab:conjoint_vs_beliefs} examines the cross-sectional relationship between consumers' belief accuracy about privacy practices and their preference intensity. This analysis finds that consumers who would penalize invasive practices most in their choices are precisely those who are unaware of how common those practices are.}
 
 The most valued attributes are those associated with potential off-website consequences: collecting (\$\wtpCollectFinancial{}/month) and sharing (\$\wtpShareFinancial{}/month) financial information, sharing with law enforcement, collecting sensitive information, and data security. This pattern is consistent with participants' self-reported concerns about data sharing (Table~\ref{tab:data_sharing_purpose}), which emphasize loss of data control, identity theft, and hacking as the most important consequences.\footnote{\cite{bian2023consumer} document that Apple's App Tracking Transparency allowed consumers to meaningful reduce these harms through changing their data sharing practices -- indicating that information on privacy practices could help consumers take action to reduce the likelihood of these consequences.}
 
@@ -551,7 +558,7 @@ where $y_{ijt}$ denotes whether participant $i$ engaged in search on website $j$
 
 Results are presented in Figure \ref{fig:info_acq_total_sites}. We find that the saliency group persistently engages in more search throughout the treatment period. In the first week of the intervention, participants in the saliency group visited 0.8 more privacy policies than the control group, with this effect being positive and ranging from 0.1 to 0.25 in the following weeks of the intervention. Figure \ref{fig:info_acq_total_sites} also implies that the information group engaged in additional information acquisition -- beyond the presented dialogs -- which typically meant clicking to see all the privacy information for a given website or viewing the extended descriptions of the privacy information.
 
-To understand whether these effects are driven by a small number of participants, we examine the fraction of participants in each treatment group who \emph{ever} visit a privacy policy. Only \policyVisitControlPct{}\% of participants in the control group do so. In the saliency group, this rises to nearly \policyVisitSaliencyPct{}\% --- a \policyVisitSaliencyFold{}-fold increase on the extensive margin.\footnote{Using the browser history data, we can compute a crude estimate of dwell time on the policy by comparing the timestamps between the policy visit and next page visited. The median time spent on the policy page is 20 seconds in the saliency group, while it is 13 seconds in the control group -- indicating that the saliency intervention induced policy reading at a similar or greater intensity than baseline.} Yet even with this dramatic reduction in search costs, nearly two-thirds of saliency group participants never visit a single privacy policy. In the information group, the rate is approximately \policyVisitInfoPct{}\%, reflecting the fact that the popup already provides the key information without requiring a policy visit. \mkcomment{control and info both round to 2.4\% under the macro; prose still describes info as ``approximately 5\%'' -- rewording needed}\footnote{As additional evidence of search, our extension logs engagement with cookie banners. Table~\ref{tab:cookie_banner_interactions_treatment} reports a statistically significant increase in the number of distinct domains where saliency group participants interacted with cookie banners, providing further confirmation of Hypothesis 2(i).}
+To understand whether these effects are driven by a small number of participants, we examine the fraction of participants in each treatment group who \emph{ever} visit a privacy policy. Only \policyVisitControlPct{}\% of participants in the control group do so. In the saliency group, this rises to nearly \policyVisitSaliencyPct{}\% --- a \policyVisitSaliencyFold{}-fold increase on the extensive margin.\footnote{Using the browser history data, we can compute a crude estimate of dwell time on the policy by comparing the timestamps between the policy visit and next page visited. The median time spent on the policy page is 20 seconds in the saliency group, while it is 13 seconds in the control group -- indicating that the saliency intervention induced policy reading at a similar or greater intensity than baseline.} Yet even with this dramatic reduction in search costs, nearly two-thirds of saliency group participants never visit a single privacy policy. In the information group, the rate is approximately \policyVisitInfoPct{}\%, reflecting the fact that the popup already provides the key information without requiring a policy visit. \footnote{As additional evidence of search, our extension logs engagement with cookie banners. Table~\ref{tab:cookie_banner_interactions_treatment} reports a statistically significant increase in the number of distinct domains where saliency group participants interacted with cookie banners, providing further confirmation of Hypothesis 2(i).}
 
 \begin{figure}[ht]
 \centering
@@ -883,7 +890,6 @@ Since our tracker data captures analytics data collection, we focus on the `Brow
 % scalar 16 - not-reproducible
 
 
-
 Finally, Figure~\ref{fig:scores_by_category} documents the distribution of privacy-practice counts across website categories in our hand-coded dataset, showing substantial within-category heterogeneity.
 
 \begin{figure}[H]
@@ -896,92 +902,297 @@ Finally, Figure~\ref{fig:scores_by_category} documents the distribution of priva
 
 \section{Conjoint Details}\label{sec:conjoint_details}
 
-In this section, we detail the conjoint method used to measure participant's stated preferences for privacy attributes. Conjoint experiments consist of a number of tasks. Each task presents a participant with a set of theoretical products which may vary across some set of characteristics, for example price, and asks the participant which product they would most like to purchase. Participants repeat this task multiple times, with product sets and characteristics varying across tasks. Thus, a conjoint experiment generates exogenous variation in product characteristics and choice sets, allowing for the estimation of preferences. As these choices tasks are entirely hypothetical, estimated preferences are reflective of stated-preferences. Yet, conjoint presents a systemized way of eliciting preferences that has been shown to contribute to more reliable as well as internally and externally valid estimates \citep{ALLENBY2019151, doi:10.1287/inte.31.3s.56.9676}. 
+In this section, we detail the conjoint method used to measure participants' stated preferences for privacy attributes. Conjoint experiments consist of a number of tasks. Each task presents a participant with a set of hypothetical products which may vary across some set of characteristics, for example price, and asks the participant which product they would most like to purchase. Participants repeat this task multiple times, with product sets and characteristics varying across tasks. Thus, a conjoint experiment generates exogenous variation in product characteristics and choice sets, allowing for the estimation of preferences. As these choice tasks are entirely hypothetical, estimated preferences reflect stated preferences. Yet, conjoint presents a systemized way of eliciting preferences that has been shown to contribute to more reliable as well as internally and externally valid estimates \citep{ALLENBY2019151, doi:10.1287/inte.31.3s.56.9676}.
 
-Our goal is to elicit preferences for the 19 privacy practices we measure. Our conjoint proceeds in two steps. First, participants are randomly assigned one of four website categories (e-commerce, news, entertainment, or social media) and asked ``what is your favorite website within this category?'' Participants then proceed to the conjoint. Each participant is presented with 12 choice tasks, with each choice task consisting of 4 products and a no purchase option. Products in the choice task consist of versions of the participant's favorite website, with each version varying in price \emph{and} the privacy practices it implements. See Figure \ref{fig:conjoint} for an example choice task. 
-
+Our goal is to elicit preferences for the 19 privacy practices we measure. Our conjoint proceeds in two steps. First, participants are randomly assigned one of four website categories (e-commerce, news, entertainment, or social media) and asked ``what is your favorite website within this category?'' Participants then proceed to the conjoint. Each participant is presented with 12 choice tasks, with each choice task consisting of 4 hypothetical products and a no-purchase option. Products in the choice task consist of versions of the participant's favorite website, with each version varying in price, the privacy practices it implements, and website advertising. See Figure~\ref{fig:conjoint} for an example choice task.
 
 \begin{figure}[H]
     \centering
-        \caption{Sample Conjoint Task}
+    \caption{Sample Conjoint Task}
     \label{fig:conjoint}
-    \includegraphics[scale = .5]{manual_figures/survey/conjoint-example-paper.png}
+    \includegraphics[scale=.5]{manual_figures/survey/conjoint-example-paper.png}
 \end{figure}
 
-Two aspects of our design should be noted. First, we implement our conjoint with a specific website in mind, as practitioners have long highlighted the necessity of specific and realistic choice settings for estimate consistency \citep{conjointly_tips_for_setting_up_conjoint_studies}. Second, the literature on conjoint has found that products with many attributes are likely to confuse participants, leading to poor quality data. To overcome this, we follow practitioners and implement a \emph{partial-profile} conjoint design \citep{sawtooth_cbc_partial_profile}. In partial profile designs, a subset of attributes (in our case, six) are chosen at random for each task and vary across products. Price is always included, and non-visible attributes are assumed to be held constant across products within a task. While partial profile designs require more data collection to estimate preferences, they have been shown to generate more reliable data \citep{Chrzan2010PartialProfile}.
+Two aspects of our design should be noted. First, we implement our conjoint with a specific website in mind, as practitioners have long highlighted the necessity of specific and realistic choice settings for estimate consistency \citep{conjointly_tips_for_setting_up_conjoint_studies}. Second, the literature on conjoint has found that products with many attributes are likely to confuse participants, leading to poor quality data. To overcome this, we follow practitioners and implement a \emph{partial-profile} conjoint design \citep{sawtooth_cbc_partial_profile}. In partial-profile designs, a subset of attributes (in our case, six) are chosen at random for each task and vary across products. Price is always included, and non-visible attributes are assumed to be held constant across products within a task. While partial-profile designs require more data collection to estimate preferences, they have been shown to generate more reliable data \citep{Chrzan2010PartialProfile}.
 
-To make sure participants understand the choice task, our survey includes multiple examples and attention checks to ensure participants (1) understand how products vary within a task and (2) recognize that non-visible attributes remain constant across all products within a choice task. Next, we estimate specify a hierarchical Bayesian utility model in order to estimate preferences from our conjoint data \citep{rossi2005bayesian}. 
+To make sure participants understand the choice task, our survey includes multiple examples and attention checks to ensure that participants (1) understand how products vary within a task and (2) recognize that non-visible attributes remain constant across all products within a choice task.
+
+Under a conventional preference-space mixed logit, the analyst specifies distributions for the utility-space attribute coefficients and the price coefficient and then derives willingness to pay as their ratio. Because both attribute preferences and price sensitivity vary across respondents in our model, this procedure makes WTP a ratio of random coefficients. The resulting WTP distribution can be highly sensitive to the assumed distribution of the price coefficient, particularly to probability mass associated with price coefficients close to zero \citep{daly2012assuring,helveston2023logitr}. 
+
+We therefore estimate the conjoint model in willingness-to-pay (WTP) space \citep{train2005discrete,scarpa2008utility}. At the individual level, this is a reparameterization of the same utility function, but it allows us to specify and estimate the hierarchical distribution of marginal WTP directly. We separately estimate the magnitude of the respondent-specific price coefficient, given by the magnitude of the price coefficient. This parameterization therefore distinguishes heterogeneity in WTP from heterogeneity in price sensitivity.
+
+In the WTP-space parameterization, the model directly estimates respondent
+$n$'s per-unit WTP coefficients, $\boldsymbol{\omega}_n$, together with
+$\lambda_n>0$, the magnitude of respondent $n$'s price coefficient. The
+corresponding utility-space attribute part-worths are recovered as
+\begin{align*}
+    \boldsymbol{\beta}_n
+    =
+    \lambda_n \cdot \boldsymbol{\omega}_n,
+\end{align*}
+while the utility-space price coefficient is $-\lambda_n$. It follows that
+\begin{align*}
+    \mathrm{WTP}_{n,k}
+    =
+    \frac{\beta_{n,k}}{\lambda_n}
+    =
+    \omega_{n,k}.
+\end{align*}
+Thus, $\omega_{n,k}$ is estimated directly as respondent $n$'s per-unit WTP for attribute $k$, while the corresponding utility-space part-worth can be recovered as $\beta_{n,k}=\lambda_n\cdot\omega_{n,k}$. Because the binary attributes are effects-coded as $-1$ and $+1$, the WTP for the full change between attribute levels is $2\omega_{n,k}$.
 
 \subsection{Model and Estimation}
 
-Utility for respondent $n$, task $t$, alternative $a$ is:
+We specify and estimate a hierarchical Bayesian multinomial logit model \citep{rossi2005bayesian}. Utility for respondent $n$, task $t$, and alternative $a$ is
 \begin{align*}
-  U_{n,t,a} = 
+  U_{n,t,a}
+  =
   \begin{cases}
-    \bm x_{n,t,a}^\top \boldsymbol{\beta}_{n} + \alpha_{w(n)} + \boldsymbol{\gamma}^\top \bm d_n + \varepsilon_{n,t,a} & a \in \{1,\dots,A\} \text{ (in-market)} \\[0.3em]
-    0 + \varepsilon_{n,t,A+1} & a = A+1 \text{ (outside)}
+    \mu_0
+    +
+    \lambda_n
+    \left(
+      \bm x_{n,t,a}^{\top}\boldsymbol{\omega}_n
+      -
+      p_{n,t,a}
+    \right)
+    +
+    \alpha_{w(n)}
+    +
+    \boldsymbol{\gamma}^{\top}\bm d_n
+    +
+    \varepsilon_{n,t,a},
+    &
+    a\in\{1,\ldots,A\}
+    \text{ (in-market)},
+    \\[0.4em]
+    0+\varepsilon_{n,t,A+1},
+    &
+    a=A+1
+    \text{ (outside)}.
   \end{cases}
 \end{align*}
-where $\varepsilon_{n,t,a} \overset{\text{iid}}{\sim} T1EV$, outside utility is fixed at 0 for identification. The utility function has three additive components beyond individual preferences:
+The idiosyncratic shocks satisfy
+$\varepsilon_{n,t,a}\overset{\mathrm{iid}}{\sim}\mathrm{T1EV}$, and outside utility is fixed at zero for identification. The vector
+$\bm x_{n,t,a}\in\mathbb{R}^{K}$ contains the non-price attributes, where $K=20$: the 19 privacy attributes and the website-advertising attribute. The variable $p_{n,t,a}$ denotes the monthly price measure. We parameterize the magnitude of respondent $n$'s price coefficient as
+\begin{align*}
+    \lambda_n
+    =
+    \exp(\eta_n)
+    >
+    0,
+\end{align*}
+so that the utility-space price coefficient is constrained to be
+$-\lambda_n<0$.
+
+The utility function has four additive components beyond the idiosyncratic shock:
 \begin{enumerate}[leftmargin=*,nosep]
-  \item $\bm x_{n,t,a}^\top \boldsymbol{\beta}_{n}$: Individual-specific feature preferences (hierarchical)
-  \item $\alpha_{w(n)}$: Website-specific intercept (random effect)
-  \item $\boldsymbol{\gamma}^\top \bm d_n$: Demographic utility shifter (fixed effect)
+  \item
+  $\lambda_n
+  \left(
+    \bm x_{n,t,a}^{\top}\boldsymbol{\omega}_n-p_{n,t,a}
+  \right)$:
+  the respondent-specific utility from the experimentally varied attributes and price. Here, $\bm x_{n,t,a}^{\top}\boldsymbol{\omega}_n$ is the monetary value of the attributes, $p_{n,t,a}$ is the monthly price, and $\lambda_n$, the magnitude of the price coefficient, determines how strongly the net monetary value affects utility.
+  \item
+  $\mu_0$:
+  a common in-market intercept;
+  \item
+  $\alpha_{w(n)}$:
+  a website-by-category random intercept;
+  \item
+  $\boldsymbol{\gamma}^{\top}\bm d_n$:
+  demographic utility-level shifters.
 \end{enumerate}
 
-The website random intercepts ($\alpha_w$) capture website-specific baseline attractiveness that is not explained by the observed features. Some websites may be inherently more engaging or trustworthy, leading respondents to be more likely to choose any alternative when viewing that website's privacy policy. In addition, we include demographic utility shifters ($\boldsymbol{\gamma}$) which are a \emph{utility level shifters} that apply equally to all in-market alternatives. Demographics do not moderate the effects of privacy attributes.
+The common intercept $\mu_0$ captures the average utility of choosing an in-market alternative relative to the outside option. Here, $w(n)$ indexes respondent $n$'s website-by-category assignment. The website-by-category random intercepts $\alpha_w$ capture baseline differences in attractiveness that are not explained by the experimentally varied attributes. Some websites may be inherently more engaging or trustworthy, leading respondents to be more likely to choose an in-market alternative when evaluating versions of that website. In addition, we include demographic utility shifters $\boldsymbol{\gamma}$ which apply equally to all in-market alternatives. Demographics do not moderate the effects of privacy attributes.
 
-Individual preferences $\boldsymbol{\beta}_{n} \in \mathbb{R}^F$ follow a three-level hierarchy:
+We allow WTP and price sensitivity to vary across respondents and estimate their correlations. Define the $(K+1)$-dimensional respondent-specific vector
+\begin{align*}
+    \boldsymbol{\psi}_n
+    =
+    \begin{pmatrix}
+      \boldsymbol{\omega}_n \\
+      \eta_n
+    \end{pmatrix}.
+\end{align*}
+The first $K$ elements are WTP coefficients, while the final element is the log magnitude of the price coefficient. These parameters follow a three-level hierarchy.
 
-\emph{Level 1 (Individual):} 
+\emph{Level 1 (Individual):}
 \begin{align*}
-  \boldsymbol{\beta}_{n} \sim \mathcal{N}(\boldsymbol{\mu}_{c(n)}, \boldsymbol{\Sigma}_{c(n)})
+    \boldsymbol{\psi}_n
+    \sim
+    \mathcal{N}
+    \left(
+      \boldsymbol{\mu}_{c(n)},
+      \boldsymbol{\Sigma}_{c(n)}
+    \right).
 \end{align*}
-We use non-centered parameterization to improve sampling efficiency:
+We use a non-centered parameterization to improve sampling efficiency \citep{papaspiliopoulos2007general}:
 \begin{align*}
-  \boldsymbol{\beta}_{n} = \boldsymbol{\mu}_{c(n)} + \mathbf{L}_{\Sigma_{c(n)}} \bm z_n, \quad \bm z_n \sim \mathcal{N}(\mathbf{0}, \mathbf{I}_F)
-\end{align*}
-
-\emph{Level 2 (Website Category):} Covariance decomposition:
-\begin{align*}
-  \boldsymbol{\Sigma}_c = \text{diag}(\boldsymbol{\tau}_c) \, \boldsymbol{\Omega} \, \text{diag}(\boldsymbol{\tau}_c), \quad \mathbf{L}_{\Sigma_c} = \text{diag}(\boldsymbol{\tau}_c) \mathbf{L}_\Omega
-\end{align*}
-where:
-\begin{align*}
-  \boldsymbol{\mu}_c &\sim \mathcal{N}(\mathbf{0}, 5^2 \mathbf{I}_F) \quad \text{(category mean preferences)} \\
-  \tau_{c,f} &\sim \text{Lognormal}(0, \sigma_\tau^2) \quad \text{(within-category heterogeneity)}
-\end{align*}
-with $\sigma_\tau = 0.75$ for privacy and website features ($f = 1, \ldots, 20$), and $\sigma_\tau = 0.5$ for price ($f = 21$).
-
-\emph{Level 3 (Population):} Shared correlation structure:
-\begin{align*}
-  \mathbf{L}_\Omega \sim \text{LKJcorr}(5), \quad \boldsymbol{\Omega} = \mathbf{L}_\Omega \mathbf{L}_\Omega^\top
-\end{align*}
-
-In addition to preference parameters, our model includes website random effects for the individual's preferred website and demographic fixed effects. We complete our model by specifying their hierarchical structure. The website effects follow a hierarchical structure with sum-to-zero constraint:
-\begin{align*}
-  \alpha_w^{\text{raw}} &\sim \mathcal{N}(0, 1) \quad \forall w \in \{1,\ldots,W\} \\
-  \sigma_w &\sim \text{Lognormal}(0, 0.5^2) \\
-  \alpha_w &= \sigma_w \cdot \left( \alpha_w^{\text{raw}} - \bar{\alpha}^{\text{raw}} \right)
-\end{align*}
-where $\bar{\alpha}^{\text{raw}} = \frac{1}{W} \sum_{w=1}^W \alpha_w^{\text{raw}}$. This parameterization ensures $\sum_w \alpha_w = 0$ for identification. Finally, demographic effects have a prior distribution of:
-\begin{align*}
-  \boldsymbol{\gamma} \sim \mathcal{N}(\mathbf{0}, \mathbf{I}_D)
-\end{align*}
-this weakly informative prior regularizes toward zero effect, appropriate given small sample sizes in some demographic groups.
-
-\paragraph{Choice probability.} After integrating out T1EV errors, we obtain the multinomial logit:
-\begin{align*}
-  P(y_{n,t} = a \mid \boldsymbol{\beta}_{n}, \alpha_{w(n)}, \boldsymbol{\gamma}) = \frac{\exp(V_{n,t,a})}{\sum_{k=1}^{A+1} \exp(V_{n,t,k})}
-\end{align*}
-where:
-\begin{align*}
-  V_{n,t,a} = \begin{cases} \bm x_{n,t,a}^\top \boldsymbol{\beta}_{n} + \alpha_{w(n)} + \boldsymbol{\gamma}^\top \bm d_n & a \leq A \\ 0 & a = A+1 \end{cases}
+    \boldsymbol{\psi}_n
+    &=
+    \boldsymbol{\mu}_{c(n)}
+    +
+    \mathbf L_{\Sigma_{c(n)}}\bm z_n,
+    &
+    \bm z_n
+    &\sim
+    \mathcal{N}
+    \left(
+      \mathbf{0},
+      \mathbf{I}_{K+1}
+    \right).
 \end{align*}
 
-We use the No-U-Turn Sampler (NUTS) with within-chain parallelization via \texttt{reduce\_sum} \citep{hoffman2014nuts} to estimate our model. We run four parallel chains, with 2000 warmup iterations and 3000 sampling iterations per chain.
+\emph{Level 2 (Website Category):}
+The category-specific covariance matrix is decomposed as
+\begin{align*}
+    \boldsymbol{\Sigma}_c
+    &=
+    \operatorname{diag}(\boldsymbol{\tau}_c)
+    \boldsymbol{\Omega}
+    \operatorname{diag}(\boldsymbol{\tau}_c),
+    \\
+    \mathbf L_{\Sigma_c}
+    &=
+    \operatorname{diag}(\boldsymbol{\tau}_c)
+    \mathbf L_{\Omega}.
+\end{align*}
+For the $K$ WTP dimensions, the category means and within-category heterogeneity scales follow
+\begin{align*}
+    \mu_{c,k}
+    &\sim
+    \mathcal{N}(0,1.5^2),
+    &
+    k&=1,\ldots,K,
+    \\
+    \tau_{c,k}
+    &\sim
+    \operatorname{Lognormal}(-0.5,0.5^2),
+    &
+    k&=1,\ldots,K.
+\end{align*}
+For the log magnitude of the price coefficient,
+\begin{align*}
+    \mu_{c,K+1}
+    &\sim
+    \mathcal{N}(-1,0.5^2),
+    \\
+    \tau_{c,K+1}
+    &\sim
+    \operatorname{Lognormal}(-0.5,0.5^2).
+\end{align*}
 
-\newpage
+\emph{Level 3 (Population):}
+The four website categories share a common correlation structure, with an LKJ prior on the correlation matrix \citep{lewandowski2009generating}:
+\begin{align*}
+    \mathbf L_{\Omega}
+    &\sim
+    \operatorname{LKJ\text{-}Cholesky}(5),
+    \\
+    \boldsymbol{\Omega}
+    &=
+    \mathbf L_{\Omega}
+    \mathbf L_{\Omega}^{\top}.
+\end{align*}
+Thus, the means and dispersion of WTP and price sensitivity may differ across website categories, while the correlation structure is shared across categories.
+
+In addition to the respondent-specific parameters, the common in-market intercept has prior
+\begin{align*}
+    \mu_0
+    \sim
+    \mathcal{N}(0,2.5^2).
+\end{align*}
+The website-by-category effects follow a hierarchical structure with a sum-to-zero constraint:
+\begin{align*}
+    \alpha_w^{\mathrm{raw}}
+    &\sim
+    \mathcal{N}(0,1)
+    \qquad
+    \forall w\in\{1,\ldots,W\},
+    \\
+    \sigma_{\alpha}
+    &\sim
+    \operatorname{Lognormal}(0,0.5^2),
+    \\
+    \alpha_w
+    &=
+    \sigma_{\alpha}
+    \left(
+      \alpha_w^{\mathrm{raw}}
+      -
+      \bar{\alpha}^{\mathrm{raw}}
+    \right),
+\end{align*}
+where
+\begin{align*}
+    \bar{\alpha}^{\mathrm{raw}}
+    =
+    \frac{1}{W}
+    \sum_{w=1}^{W}
+    \alpha_w^{\mathrm{raw}}.
+\end{align*}
+This parameterization ensures that
+$\sum_w\alpha_w=0$ for identification. Finally, the demographic effects have prior
+\begin{align*}
+    \boldsymbol{\gamma}
+    \sim
+    \mathcal{N}
+    \left(
+      \mathbf{0},
+      \mathbf{I}_D
+    \right).
+\end{align*}
+This weakly informative prior regularizes the demographic utility shifters toward zero, which is appropriate given the small sample sizes in some demographic groups.
+
+\paragraph{Choice probability.}
+After integrating out the T1EV errors, we obtain the multinomial logit choice probability
+\begin{align*}
+    P
+    \left(
+      y_{n,t}=a
+      \mid
+      \boldsymbol{\omega}_n,
+      \eta_n,
+      \alpha_{w(n)},
+      \boldsymbol{\gamma},
+      \mu_0
+    \right)
+    =
+    \frac{
+      \exp(V_{n,t,a})
+    }{
+      \sum_{r=1}^{A+1}
+      \exp(V_{n,t,r})
+    },
+\end{align*}
+where
+\begin{align*}
+    V_{n,t,a}
+    =
+    \begin{cases}
+      \mu_0
+      +
+      \lambda_n
+      \left(
+        \bm x_{n,t,a}^{\top}\boldsymbol{\omega}_n
+        -
+        p_{n,t,a}
+      \right)
+      +
+      \alpha_{w(n)}
+      +
+      \boldsymbol{\gamma}^{\top}\bm d_n,
+      &
+      a\leq A,
+      \\[0.4em]
+      0,
+      &
+      a=A+1.
+    \end{cases}
+\end{align*}
+
+We use the No-U-Turn Sampler (NUTS) with within-chain parallelization via \texttt{reduce\_sum} \citep{hoffman2014nuts} to estimate our model. We run four parallel chains, with 1,500 warmup iterations and 3,000 sampling iterations per chain.
+
 \section{Additional Figures and Tables}
 
 
@@ -1112,7 +1323,7 @@ online browsing?" on a scale from 0 (Not at all) to 1 (Always) in increments of 
 \end{subfigure}
 
 \vspace{0.4em}
-\caption*{\scriptsize \textsc{Notes}: Both panels use the full conjoint sample, including all respondents who completed the baseline survey. Panel (a) presents the estimated monthly willingness to pay for different privacy attributes, computed using the estimated part-worth for each attribute and the price coefficient. Green rows denote ``Control'' attributes, blue rows denote ``Use'' attributes, and orange rows denote ``Collect'' attributes. Panel (b) shows the distribution of top-2 personalized attributes. Information value is computed per Equation \eqref{eq:provided_info}. The extension sample versions are in Figures \ref{fig:privacy_combined} (WTP) and \ref{fig:privacy_info_top_2} (top-2 attributes).}
+\caption*{\scriptsize \textsc{Notes}: Both panels use the full conjoint sample, including all respondents who completed the baseline survey. Panel (a) presents the estimated monthly willingness to pay for different privacy attributes using estimates from the WTP-space conjoint model. Green rows denote ``Control'' attributes, blue rows denote ``Use'' attributes, and orange rows denote ``Collect'' attributes. Panel (b) shows the distribution of top-2 personalized attributes. Information value is computed per Equation \eqref{eq:provided_info}. The extension sample versions are in Figures \ref{fig:privacy_combined} (WTP) and \ref{fig:privacy_info_top_2} (top-2 attributes).}
 \end{figure}
 
 \begin{figure}[H]
