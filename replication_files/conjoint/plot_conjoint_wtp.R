@@ -1,15 +1,17 @@
 # ============================================================================
-# PLOT VIOLIN (WTP-space): Privacy Valuations and Most Valued Information
+# PLOT CONJOINT WTP: Paper Figures and Macros from the Final WTP-Space Model
 # ============================================================================
 #
-# ADAPTED FOR THE WTP-SPACE MODEL EXPORTS (conjoint_wtp run).
+# PURPOSE:
+#   Generate the paper outputs that use the final WTP-space conjoint estimates.
+#   Experimental Top-2 assignment figures are intentionally handled in the
+#   separate script plot_exp_top2_feature.R.
 #
-# STATUS:
-#   - WTP tables validated; top-2 now uses matched-draw recovered beta.
-#   - No manual clipping/winsorization is applied to violin or boxplot data.
-#   - Pipeline pre-flight: 41/41 checks passed (test_plot_violin_wtp.R)
-#   - Old preference-space tables archived in ../old_tables_2/ alongside the
-#     original plot_violin.R; this script pairs with the WTP-space tables/.
+# OUTPUTS:
+#   - output/figures/individual_heterogeneity_dollars_with_website_extension.pdf
+#   - output/figures/individual_heterogeneity_dollars_with_website_full.pdf
+#   - output/figures/individual_heterogeneity_experiment_vs_survey.pdf
+#   - output/values/conjoint_wtp_values.tex
 #
 # WTP MACRO CONVENTION:
 #   Each respondent contributes a posterior-median full-swing WTP estimate.
@@ -18,46 +20,24 @@
 #   cross-respondent median of each person's top-three WTP sum.
 #   REVIEW ALL PROSE CITING THESE MACROS AFTER RECOMPILING:
 #     grep -rn "wtpCollectFinancial\|wtpShareFinancial\|wtpTopThreeMedian" --include="*.tex" ..
-# Validated by validate_conjoint_wtp_tables.R (27/27 checks passed):
+#
+# VALIDATION:
 #   - dollar_value_* columns are draw-wise posterior summaries of -2*omega,
-#     matching the OLD plot sign convention exactly (protective = negative).
-#   - No ratio conversion (beta / price_coef) is needed or wanted: the old
-#     posterior-mean ratio E[beta]/E[lambda] carried ratio bias; dollar_value
-#     is the exact draw-wise posterior quantity.
-#   - Old vs new attribute medians: Spearman rho = 0.991; individual 5-95
-#     tail width shrinks from ~$20 to ~$6.5.
+#     matching the established plot sign convention (protective = negative).
+#   - No ratio conversion (beta / price_coef) is used: WTP is estimated directly
+#     in WTP space, and dollar_value is the draw-wise posterior quantity.
+#   - No manual clipping or winsorization is applied to violin or boxplot data.
 #
-# Produces (same filenames as before):
-#   Fig 6(a):  individual_heterogeneity_dollars_with_website_extension.pdf
-#              individual_heterogeneity_dollars_with_website_extension_2.pdf
-#   Fig 6(b):  top2_privacy_attributes_extension.pdf
-#   Fig C.5(a): individual_heterogeneity_dollars_with_website_full.pdf
-#   Fig C.5(b): top2_privacy_attributes_full.pdf
-#   Fig C.4:   individual_heterogeneity_experiment_vs_survey.pdf
-#   WTP scalars: output/values/conjoint_wtp_values.tex
+# WTP CONVENTION (full swing):
+#   Privacy attributes are effects-coded {invasive = -1, protective = +1}.
+#   dollar_value_* = -2 * omega (per-unit WTP in dollars times the full swing,
+#   using the established plot sign convention). No further scaling is applied.
 #
-# WTP CONVENTION (full swing): privacy attributes are effects-coded
-# {invasive = -1, protective = +1}. dollar_value_* = -2 * omega (per-unit WTP
-# in $ times the full swing, old sign convention). No further scaling here.
-#
-# TOP-2 FIGURE NOTE: information value IV_ij = p_ij*(1-p_ij)*|beta_ij|.
-# The figure uses beta_exact = E[lambda_i*omega_ik | data], computed from
-# matched posterior draws. E[lambda_i*omega_ik] need not equal
-# E[lambda_i]E[omega_ik], so the exact recovered-beta export is used.
-#
-# PAPER TODO FOR COAUTHOR DISCUSSION:
-# Equation (provided_info) should use |beta_ik| rather than signed beta_ik
-# because the score ranks preference intensity, not direction. No additional
-# superscript is required unless the paper needs to distinguish this beta from
-# another beta defined elsewhere.
-#
-# Inputs (relative to code_github/):
+# INPUTS (relative to code_github/):
 #   ../results/Conjoint_result/conjoint_with_website/tables/individual_wtp_summary.csv
 #   ../results/Conjoint_result/conjoint_with_website/tables/individual_price_coefficients_summary.csv
-#   ../results/Conjoint_result/conjoint_with_website/tables/recovered_beta_exact.csv
 #   ../data/Survey/final_baseline_survey.csv
 #   ../data/final_extension_data/experiment_conditions_pilot_july_2024.csv
-#   ../data/Survey/survey_merged_final.csv
 # ============================================================================
 
 library(tidyverse)
@@ -96,15 +76,11 @@ survey_intro_0703 <- survey_intro_0703 %>%
   mutate(email = tolower(emailid))
 
 meta_data <- read.csv("../data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
-meta_data <- meta_data %>%
-  mutate(wave_id     = ifelse(wave_id == 3, 2, wave_id),
-         block_by_wave = paste(wave_id, block_idx, sep = "_"))
-
 experiment_users <- meta_data %>%
   filter(experiment_condition != "", !(experiment_id %in% BAD_USERS)) %>%
   left_join(survey_intro_0703, by = "email") %>%
   rename(sys_respnum = sys_RespNum) %>%
-  select(sys_respnum, experiment_condition, experiment_id)
+  select(sys_respnum, experiment_id)
 
 wtp_indiv <- read_csv(
   file.path(CONJOINT_TABLE_DIR, "individual_wtp_summary.csv"),
@@ -113,11 +89,6 @@ wtp_indiv <- read_csv(
 
 price_coef_indiv <- read_csv(
   file.path(CONJOINT_TABLE_DIR, "individual_price_coefficients_summary.csv"),
-  show_col_types = FALSE
-)
-
-beta_exact_indiv <- read_csv(
-  file.path(CONJOINT_TABLE_DIR, "recovered_beta_exact.csv"),
   show_col_types = FALSE
 )
 
@@ -142,15 +113,6 @@ if (any(price_coef_indiv$mean >= 0, na.rm = TRUE)) {
   stop("Expected all exported price coefficients to be negative (-exp(eta)). ",
        "Check individual_price_coefficients_summary.csv.")
 }
-if (!all(c("sys_respnum", "respondent_N_id", "feature_name", "beta_exact",
-           "beta_approx_from_means", "cov_gap", "lambda_mean") %in%
-         names(beta_exact_indiv))) {
-  stop("recovered_beta_exact.csv is missing required matched-draw beta columns.")
-}
-if (anyDuplicated(beta_exact_indiv[c("respondent_N_id", "feature_name")]) > 0) {
-  stop("Duplicate respondent_N_id x feature_name rows in recovered_beta_exact.csv.")
-}
-
 # ID integrity: parameter and price tables must agree on respondent_N_id -> sys_respnum.
 validate_conjoint_id_integrity <- function(indiv_data, price_data) {
   required_indiv_cols <- c("respondent_N_id", "sys_respnum", "feature_name")
@@ -198,51 +160,6 @@ validate_conjoint_id_integrity <- function(indiv_data, price_data) {
 
 validate_conjoint_id_integrity(wtp_indiv, price_coef_indiv)
 
-validate_exact_beta_integrity <- function(wtp_data, beta_data) {
-  wtp_map <- wtp_data %>%
-    distinct(respondent_N_id, sys_respnum)
-  beta_map <- beta_data %>%
-    distinct(respondent_N_id, sys_respnum)
-  
-  if (length(setdiff(wtp_map$respondent_N_id, beta_map$respondent_N_id)) > 0 ||
-      length(setdiff(beta_map$respondent_N_id, wtp_map$respondent_N_id)) > 0) {
-    stop("Respondent coverage differs between WTP and exact-beta tables.")
-  }
-  
-  joined_map <- wtp_map %>%
-    inner_join(beta_map, by = "respondent_N_id",
-               suffix = c("_wtp", "_beta"))
-  if (nrow(joined_map %>%
-           filter(as.character(sys_respnum_wtp) !=
-                  as.character(sys_respnum_beta))) > 0) {
-    stop("respondent_N_id maps to different sys_respnum across WTP and exact-beta tables.")
-  }
-  
-  expected_features <- sort(unique(wtp_data$feature_name))
-  actual_features   <- sort(unique(beta_data$feature_name))
-  if (!identical(expected_features, actual_features)) {
-    stop("Feature coverage differs between WTP and exact-beta tables.")
-  }
-  
-  counts <- beta_data %>%
-    count(respondent_N_id, name = "n_features")
-  if (nrow(counts %>% filter(n_features != length(actual_features))) > 0) {
-    stop("Some respondents do not have exactly one exact-beta row per feature.")
-  }
-  
-  gap_error <- max(
-    abs((beta_data$beta_exact - beta_data$beta_approx_from_means) -
-          beta_data$cov_gap),
-    na.rm = TRUE
-  )
-  if (!is.finite(gap_error) || gap_error > 1e-8) {
-    stop("Exact-beta covariance identity failed.")
-  }
-  
-  cat("\u2713 Exact recovered-beta integrity check passed.\n")
-}
-
-validate_exact_beta_integrity(wtp_indiv, beta_exact_indiv)
 
 wtp_indiv <- wtp_indiv %>%
   left_join(experiment_users, by = "sys_respnum") %>%
@@ -275,8 +192,9 @@ get_feature_category <- function(feature_name) {
 # BUILD DOLLAR-VALUE FRAME (no conversion needed)
 # ============================================================================
 # dollar_value_* are already draw-wise posterior summaries of -2*omega — the
-# exact posterior of the old sign convention. The old (mean / price_coef) *
-# SWING ratio step is intentionally GONE (it carried E[beta]/E[lambda] bias).
+# exact posterior under the established sign convention. The previous
+# (mean / price_coef) * SWING ratio step is intentionally absent because it
+# carried E[beta]/E[lambda] ratio bias.
 
 with_web_dollars <- wtp_indiv %>%
   filter(feature_name %in% privacy_features) %>%
@@ -598,217 +516,41 @@ make_comparison_plot <- function(df, output_file) {
 
 
 # ============================================================================
-# Fig 6(b): MOST VALUED INFORMATION — Top-2 Personalized Attributes
-# IV_ij = p_ij * (1 - p_ij) * |beta_ij|.
-# beta_ij is the matched-draw posterior mean E[lambda_i*omega_ik | data]
-# from recovered_beta_exact.csv. The absolute value makes the score depend on
-# preference intensity rather than whether the coefficient is positive or
-# negative. This also avoids E[lambda_i]E[omega_ik].
-# ============================================================================
-
-make_top2_info_plot <- function(use_full_sample = FALSE) {
-  
-  # Build wide exact-beta table from matched posterior draws
-  utils <- beta_exact_indiv %>%
-    select(RespondentId = sys_respnum, feature_name, beta_exact) %>%
-    pivot_wider(names_from = feature_name, values_from = beta_exact) %>%
-    as.data.frame()
-  
-  if (!"RespondentId" %in% names(utils)) {
-    stop("Failed to construct wide exact-beta table with RespondentId.")
-  }
-  if ("eta_price" %in% names(utils) || "price_linear" %in% names(utils)) {
-    stop("Wide exact-beta table unexpectedly contains eta_price/price_linear columns.")
-  }
-  
-  survey_beliefs <- read.csv("../data/Survey/survey_merged_final.csv",
-                             stringsAsFactors = FALSE)
-  if ("sys_RespNum" %in% names(survey_beliefs)) {
-    survey_beliefs <- survey_beliefs %>% rename(RespondentId = sys_RespNum)
-  }
-  
-  if (use_full_sample) {
-    valid_respondents <- intersect(
-      unique(utils$RespondentId),
-      unique(survey_beliefs$RespondentId)
-    )
-    cat(sprintf("  Full conjoint sample: %d respondents\n", length(valid_respondents)))
-  } else {
-    meta <- read.csv(
-      "../data/final_extension_data/experiment_conditions_pilot_july_2024.csv",
-      stringsAsFactors = FALSE
-    )
-    exp_emails <- meta %>%
-      filter(in_experiment == "true") %>%
-      pull(email) %>%
-      unique()
-    
-    resp_email <- survey_beliefs %>%
-      select(RespondentId, emailid) %>%
-      distinct()
-    resp_in_exp <- resp_email %>% filter(emailid %in% exp_emails)
-    
-    valid_respondents <- intersect(
-      unique(utils$RespondentId),
-      resp_in_exp$RespondentId
-    )
-    cat(sprintf("  Extension sample: %d respondents\n", length(valid_respondents)))
-  }
-  
-  belief_to_attr <- c(
-    beliefscollection_r1 = "collection_log",
-    beliefscollection_r2 = "collection_bio",
-    beliefscollection_r3 = "collection_sensitive",
-    beliefscollection_r4 = "collection_financial",
-    beliefscollection_r5 = "collection_offsite",
-    beliefscollection_r6 = "collection_location",
-    beliefscollection_r7 = "collection_social",
-    beliefsuse_r1        = "usel_anonymized",
-    beliefsuse_r2        = "use_social",
-    beliefsuse_r3        = "use_financial",
-    beliefsuse_r4        = "use_advertising",
-    beliefsuse_r5        = "use_law",
-    beliefsuse_r6        = "use_service",
-    beliefsuse_r7        = "use_partners",
-    beliefsuse_r8        = "use_personalization",
-    beliefscontrol_r1    = "control_change",
-    beliefscontrol_r2    = "control_automated",
-    beliefscontrol_r3    = "control_delete",
-    beliefscontrol_r4    = "control_storage"
-  )
-  
-  missing_utility_cols <- setdiff(unname(belief_to_attr), names(utils))
-  if (length(missing_utility_cols) > 0) {
-    stop("Missing expected exact-beta columns in the wide table: ",
-         paste(missing_utility_cols, collapse = ", "))
-  }
-  
-  beliefs_long <- survey_beliefs %>%
-    filter(RespondentId %in% valid_respondents) %>%
-    select(RespondentId, all_of(names(belief_to_attr))) %>%
-    pivot_longer(-RespondentId, names_to = "belief_col", values_to = "belief_raw") %>%
-    mutate(
-      attribute = belief_to_attr[belief_col],
-      p_ij = case_when(
-        belief_raw == 1 ~ 0.0,
-        belief_raw == 2 ~ 0.25,
-        belief_raw == 3 ~ 0.50,
-        belief_raw == 4 ~ 0.75,
-        belief_raw == 5 ~ 1.0,
-        TRUE ~ NA_real_
-      )
-    ) %>%
-    select(RespondentId, attribute, p_ij) %>%
-    filter(!is.na(p_ij))
-  
-  utils_long <- utils %>%
-    filter(RespondentId %in% valid_respondents) %>%
-    select(RespondentId, all_of(unname(belief_to_attr))) %>%
-    pivot_longer(-RespondentId, names_to = "attribute", values_to = "beta_exact_ij")
-  
-  iv_df <- inner_join(utils_long, beliefs_long,
-                      by = c("RespondentId", "attribute")) %>%
-    mutate(information_value = p_ij * (1 - p_ij) * abs(beta_exact_ij))
-  
-  cat(sprintf("  IV computed: %d respondents, %d rows\n",
-              n_distinct(iv_df$RespondentId), nrow(iv_df)))
-  
-  top2 <- iv_df %>%
-    group_by(RespondentId) %>%
-    slice_max(information_value, n = 2, with_ties = FALSE) %>%
-    ungroup()
-  
-  top2_check <- top2 %>%
-    count(RespondentId, name = "n_selected")
-  if (nrow(top2_check %>% filter(n_selected != 2)) > 0) {
-    stop("Top-2 selection did not return exactly two attributes per respondent.")
-  }
-  
-  cat_cap <- c(control = "Control", use = "Use", collect = "Collect")
-  
-  top2_counts <- top2 %>%
-    count(attribute, name = "n_users") %>%
-    mutate(
-      label        = feature_labels[attribute],
-      category     = get_feature_category(attribute),
-      category_cap = factor(cat_cap[category],
-                            levels = c("Control", "Use", "Collect"))
-    ) %>%
-    arrange(n_users) %>%
-    mutate(label = factor(label, levels = label))
-  
-  fill_colors <- c(
-    "Control" = unname(PRIVACY_CATEGORY_COLORS["control"]),
-    "Use"     = unname(PRIVACY_CATEGORY_COLORS["use"]),
-    "Collect" = unname(PRIVACY_CATEGORY_COLORS["collect"])
-  )
-  
-  g <- ggplot(top2_counts, aes(x = label, y = n_users, fill = category_cap)) +
-    geom_col(width = 0.75) +
-    geom_text(aes(label = n_users), hjust = -0.15, size = 3.2, color = TEXT_COLOR) +
-    coord_flip() +
-    scale_fill_manual(values = fill_colors, name = NULL) +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
-    theme_privacy_experiment(show_grid_y = FALSE) +
-    labs(
-      x = NULL,
-      y = "Count of Appearances in Users' Top-2 Preferences"
-    )
-  
-  return(g)
-}
-
-
-# ============================================================================
 # RUN
 # ============================================================================
 
 cat("\n", strrep("=", 80), "\n")
-cat("CREATING PLOTS\n")
+cat("CREATING CONJOINT WTP OUTPUTS\n")
 cat(strrep("=", 80), "\n\n")
 
-cat("=== Main Paper (Extension Sample) ===\n\n")
+# Remove the deprecated extension-sample alternative plot if it exists.
+obsolete_extension_alt <- paste0(
+  FIGURES_DIR,
+  "individual_heterogeneity_dollars_with_website_extension_2.pdf"
+)
+if (file.exists(obsolete_extension_alt)) {
+  file.remove(obsolete_extension_alt)
+  cat(sprintf("Removed obsolete output: %s\n\n", obsolete_extension_alt))
+}
 
-cat("--- Fig 6(a): WTP Violin (extension) -- match panel (a) order ---\n")
+cat("=== Main Paper: Extension-Sample WTP ===\n\n")
 make_dollar_plot(
   with_web_dollars %>% filter(sample_group == "Extension"),
   paste0(FIGURES_DIR, "individual_heterogeneity_dollars_with_website_extension.pdf"),
   order_by = "beliefs"
 )
 
-cat("\n--- Fig 6(a) ALT: WTP Violin (extension) -- WTP order, lowest at top ---\n")
-make_dollar_plot(
-  with_web_dollars %>% filter(sample_group == "Extension"),
-  paste0(FIGURES_DIR, "individual_heterogeneity_dollars_with_website_extension_2.pdf"),
-  order_by = "wtp"
-)
-
-cat("\n--- Fig 6(b): Top-2 Information (extension) ---\n")
-g_ext <- make_top2_info_plot(use_full_sample = FALSE)
-ggsave(paste0(FIGURES_DIR, "top2_privacy_attributes_extension.pdf"),
-       g_ext, width = 8, height = 6)
-cat("Saved: top2_privacy_attributes_extension.pdf\n")
-
-cat("\n=== Appendix (Full Conjoint Sample) ===\n\n")
-
-cat("--- Fig C.5(a): WTP Violin (full) -- WTP median order, smallest at top ---\n")
+cat("\n=== Appendix: Full-Sample WTP ===\n\n")
 make_dollar_plot(
   with_web_dollars,
   paste0(FIGURES_DIR, "individual_heterogeneity_dollars_with_website_full.pdf"),
   order_by = "wtp"
 )
 
-cat("\n--- Fig C.5(b): Top-2 Information (full) ---\n")
-g_full <- make_top2_info_plot(use_full_sample = TRUE)
-ggsave(paste0(FIGURES_DIR, "top2_privacy_attributes_full.pdf"),
-       g_full, width = 8, height = 6)
-cat("Saved: top2_privacy_attributes_full.pdf\n")
-
-cat("\n=== Appendix C.4: Extension vs Survey Comparison ===\n\n")
-cat("--- Pooled WTP median order, smallest at top ---\n")
+cat("\n=== Appendix: Extension vs Survey WTP ===\n\n")
 make_comparison_plot(
   with_web_dollars,
   paste0(FIGURES_DIR, "individual_heterogeneity_experiment_vs_survey.pdf")
 )
 
-cat("\nAll plots complete!\n")
+cat("\nAll conjoint WTP outputs complete!\n")
