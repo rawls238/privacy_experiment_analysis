@@ -6,6 +6,7 @@
 #   Appendix D [Section sec:app-self-reported-changes]
 #     Fig D.1 [fig:freeform_change_responses, "Self-reported Changes in Behavior"]:
 #       output/figures/freeform_change_responses.pdf
+#     Inline scalar: \freeformNoChangeInfoPP
 #
 # Inputs:
 #   ../data/Survey/freefrom_responses_coded.csv         (MTurk-coded responses)
@@ -15,9 +16,15 @@
 #   replication_files/utils/plot_rules.R   (TREATMENT_ORDER, ERRORBAR_WIDTH,
 #                                           theme_privacy_experiment,
 #                                           scale_fill_treatment)
+#   replication_files/utils/number_format_helpers.R  (format_pct)
 #
 # Outputs:
 #   output/figures/freeform_change_responses.pdf
+#   output/values/freeform_values.tex
+#     \freeformNoChangeInfoPP
+#
+# NOTE: main.tex must \input{output/values/freeform_values} in the preamble
+# alongside the other output/values/ files.
 #
 # Weight spec: only "unweighted" is implemented (the paper Appendix D figure
 # is unweighted). See the WEIGHT_SPEC flag block below for a future-weighted
@@ -58,13 +65,16 @@ stopifnot(WEIGHT_SPEC == "unweighted")  # remove this guard when weighted is imp
 
 # Source utility scripts
 source("replication_files/utils/plot_rules.R")
+source("replication_files/utils/number_format_helpers.R")
 
 # Load required libraries
 library(tidyverse)
 library(binom)
+library(savetexvalue)
 
-# Output directory
+# Output directories
 FIGURES_DIR <- "output/figures/"
+VALUES_DIR  <- "output/values/"
 
 # -----------------------------------------------------------------------------
 # Load and clean MTurk-coded freeform responses
@@ -146,7 +156,43 @@ plot_data_ci <- final_choice %>%
   ) %>%
   ungroup()
 
+# -----------------------------------------------------------------------------
+# Inline scalar: info-vs-control gap in the "No Change" share
+# -----------------------------------------------------------------------------
+# Each participant is assigned exactly one dominant category above, so the four
+# category shares sum to one within each condition. The "No Change" share is the
+# one category where the information arm differs from control by a magnitude
+# worth reporting in the text. Computed on raw condition/category labels (before
+# the recode used for plotting) so the value does not depend on display names.
+
+no_change_shares <- plot_data_ci %>%
+  filter(Category == "NoChange") %>%
+  select(Input.experiment_condition, prop)
+
+stopifnot(all(c("control", "info") %in% no_change_shares$Input.experiment_condition))
+
+pp_no_change_info <- 100 * (
+  no_change_shares$prop[no_change_shares$Input.experiment_condition == "control"] -
+    no_change_shares$prop[no_change_shares$Input.experiment_condition == "info"]
+)
+
+cat(sprintf("No Change share: control %.1f%%, info %.1f%% (gap %.1f pp)\n",
+            100 * no_change_shares$prop[no_change_shares$Input.experiment_condition == "control"],
+            100 * no_change_shares$prop[no_change_shares$Input.experiment_condition == "info"],
+            pp_no_change_info))
+
+freeform_values_file <- file.path(VALUES_DIR, "freeform_values.tex")
+suppressWarnings(file.remove(freeform_values_file))
+
+save_tex_value(format_pct(pp_no_change_info),
+               name = "freeformNoChangeInfoPP", file = freeform_values_file)
+
+cat(sprintf("Saved 1 macro to %s\n", freeform_values_file))
+
+# -----------------------------------------------------------------------------
 # Relabel and order conditions / categories to match paper.
+# -----------------------------------------------------------------------------
+
 plot_data_ci <- plot_data_ci %>%
   mutate(
     Input.experiment_condition = recode(
@@ -192,3 +238,5 @@ g <- ggplot(plot_data_ci,
 
 ggsave(paste0(FIGURES_DIR, "freeform_change_responses", OUTPUT_SUFFIX, ".pdf"),
        g, width = 8, height = 6)
+
+cat("=== DONE ===\n")
