@@ -124,7 +124,7 @@ pdflscape,subcaption,array,hyperref, subfiles,adjustbox,threeparttable
 \input{output/values/privacy_settings_values}
 \input{output/values/data_sharing_selfreport_values}
 \input{output/values/data_sharing_cookie_str_values}
-\input{output/values/freeform_values}
+\input{output/values/free}
    
 \begin{document}
 \title{What is Online Privacy Worth? Evidence from an Information Provision Experiment%
@@ -1561,25 +1561,25 @@ Our first objective measure is whether a user ever visits a privacy settings pag
 \caption*{\scriptsize \textsc{Notes}: This table reports OLS estimates from Equation~\eqref{eq:data_sharing_ols} on privacy settings page visits during the four-week information intervention. Settings-page visits are identified from keyword-detected page visits in the extension logs, manually classified by the research team. The measure captures visits to settings pages, not whether settings were modified, and coverage is a lower bound since only pages triggering the keyword detector are classified. Column~(1) is an indicator for ever visiting a settings page on at least one website, column~(2) the total number of visits, and column~(3) the number of distinct websites with a settings visit. All specifications include block-by-wave fixed effects, with standard errors clustered at the participant level.}
 \end{table}
 
-Our second objective measure is the number of third-party cookies per visit on a website. A decline in this measure may indicate that a participant took steps to reduce third-party tracking. We use the following difference-in-differences specification to estimate treatment-induced changes in data sharing at the participant--website level:
+Our second objective measure is third-party cookie activity on the websites that participants continue to visit. A decline may indicate that a participant took steps to reduce third-party tracking. We use two measures: third-party cookies per visit, and the number of unique third-party cookies observed on a website in a day.
 \begin{equation}\label{eq:data_sharing_did}
 y_{ijt}
 =
 \beta \cdot \Big(\mathbf{1}\{\text{Post}\}\cdot T_i\Big)
 +\eta_i+\eta_t+\eta_j+\epsilon_{ijt},
 \end{equation}
-where $T_i$ indicates assignment to the relevant treatment group and $\eta_i$, $\eta_t$, and $\eta_j$ are participant, calendar-date, and website fixed effects. Standard errors are clustered at the participant level. We estimate the specification on a balanced panel of participant--website pairs observed both before and after the intervention. Table~\ref{tab:cpv_balanced_panel} reports small and statistically insignificant estimates for both interventions using $\log(1+\text{third-party cookies per visit})$ as the dependent variable.
+where $T_i$ indicates assignment to the relevant treatment group and $\eta_i$, $\eta_t$, and $\eta_j$ are participant, calendar-date, and website fixed effects. Standard errors are clustered at the participant level. We estimate the specification on a balanced panel of participant--website pairs observed both before and after the intervention. Table~\ref{tab:cpv_balanced_panel} reports small and statistically insignificant estimates for both interventions and both measures. For third-party cookies per visit, the estimate is \cpvBalSalCoef{} ($p = \cpvBalSalPval{}$) for the saliency group and \cpvBalInfoCoef{} ($p = \cpvBalInfoPval{}$) for the information group. The corresponding estimates for unique third-party cookies are \cpvBalUcSalCoef{} ($p = \cpvBalUcSalPval{}$) and \cpvBalUcInfoCoef{} ($p = \cpvBalUcInfoPval{}$).
 
 Overall, the self-reported and objective measures both suggest minimal changes in participants' data-sharing behavior in response to either intervention.
 
 \begin{table}[ht]
 \centering
-\caption{Treatment Effect on Within-Website Third-Party Cookies per Visit}
+\caption{Treatment Effect on Within-Website Third-Party Cookies}
 \label{tab:cpv_balanced_panel}
 \scalebox{0.9}{
 \input{./output/tables/info_treatment_balanced_panel_did.tex}
 }
-\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the treatment effect on $\log(1+\text{third-party cookies per visit})$ at the participant--website--day level. Equation~\eqref{eq:data_sharing_did} is estimated on a balanced panel of participant--website pairs observed at least once before and at least once after the intervention. A pair is a participant--website combination and an observation is a participant--website--day. The restriction retains \cpvBalPairPct\% of pairs and \cpvBalObsPct\% of observations, covering \cpvBalNUsers{} participants. The sample covers the information-experiment period and ends before cookie deletion begins.}
+\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the treatment effect on third-party cookie activity at the participant--website--day level. Column~(1) uses $\log(1+\text{third-party cookies per visit})$, which normalizes the count of third-party cookie events by the number of visits. Column~(2) uses $\log(1+\text{unique third-party cookies})$, the number of distinct third-party cookies observed for a participant on a given website and day; this measure is not normalized by visits and is unaffected by dynamic websites that repeatedly re-set the same cookie through background requests. Equation~\eqref{eq:data_sharing_did} is estimated on a balanced panel of participant--website pairs observed at least once before and at least once after the intervention. A pair is a participant--website combination and an observation is a participant--website--day. The restriction retains \cpvBalPairPct\% of pairs and \cpvBalObsPct\% of observations, covering \cpvBalNUsers{} participants. The sample covers the information-experiment period and ends before cookie deletion begins.}
 \end{table}
 
 \section{Analysis of Cookie Deletion Intervention}\label{subsec:deletion_overall_effects}
