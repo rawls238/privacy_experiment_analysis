@@ -77,6 +77,14 @@
 # USAGE
 #   setwd("~/Dropbox/spring2025experiment/code_github")
 #   source("replication_files/data_sharing_n_cookie_deletion/data_sharing.R")
+# change 0813
+#   - TIME SOURCE CHANGED. Browsing time and visit counts now come from
+#     get_time_panel() instead of panel_merged_CLEAN.fst: deduplicated to one
+#     row per (participant, website, day) by taking the maximum, corrupted
+#     dates and malformed ids removed, and a 30-second minimum dwell applied.
+#   - The cookie join is now an inner merge rather than a left merge with
+#     zero-filling, since unmatched cells are collection gaps, not genuine
+#     zeros. The match-rate guard is no longer needed.
 # =============================================================================
 
 library(jsonlite)   # MUST precede utils: time_usage_helpers.R uses fromJSON()
@@ -108,49 +116,54 @@ SIGNIF <- c("***" = 0.01, "**" = 0.05, "*" = 0.1)
 # =============================================================================
 # 1. DATA PREP
 # =============================================================================
-panel <- read_fst("../data/tracker_panel/panel_merged_CLEAN.fst", as.data.table = TRUE)
+# Browsing time and visit counts come from get_time_panel(), the shared entry
+# point, which deduplicates to one row per (participant, website, day) by
+# taking the maximum, drops corrupted dates and malformed ids, and applies the
+# 30-second minimum dwell. It replaces panel_merged_CLEAN.fst, whose time
+# columns were verified byte-identical to a rebuild from time_data_2.csv.
+#
+# Cookie measures come from panel_cookies_v2.fst, joined with an INNER merge:
+# a cell enters the sample only if it has both a browsing record and a cookie
+# record. The previous version started from the legacy panel and left-joined
+# the rebuilt one, filling unmatched cells with zero cookies -- but those cells
+# are collection gaps rather than genuine zeros (their heaviest sites are
+# youtube, facebook and x, which certainly set cookies), so imputing zero was
+# not defensible. The old base panel also required a time match, so the
+# resulting sample is the same object as before; the merge is explicit now,
+# and the match-rate guard it needed is gone.
+#
+# The legacy n_cookies_third_party column disappears with panel_merged_CLEAN.
+# It classified third-party cookies by substring match, contradicting the
+# registrable-domain definition stated in the paper.
 
-# --- [CHANGED] align the cookie measure with cookie_deletion.R --------------
-# Drop the old substring-matched columns, deduplicate, and merge the rebuilt
-# cookie panel (registrable-domain classification, gate-validated).
-panel[, date := as.Date(date)]
-panel[, c("n_cookies_third_party", "n_trackers_third_party",
-          "cookies_per_visit") := NULL]
-
-n_before <- nrow(panel)
-panel <- unique(panel, by = c("experiment_id", "website", "date"))
-cat(sprintf("Dedupe: %d -> %d rows (%d dropped)\n",
-            n_before, nrow(panel), n_before - nrow(panel)))
+time_panel <- get_time_panel(
+  path = "../data/final_extension_data/time_data_2.csv",
+  min_seconds = 30,
+  verbose = TRUE
+)
 
 cookies <- read_fst("../data/processed_data/panel_cookies_v2.fst",
                     as.data.table = TRUE)
 cookies[, date := as.Date(date)]
-panel <- merge(panel,
-               cookies[, .(experiment_id, website, date,
-                           cookie_events_3rd_p, unique_cookies_3rd_p)],
-               by = c("experiment_id", "website", "date"), all.x = TRUE)
 
-# Guard: a key-type mismatch would yield an all-NA merge, which the
-# fill-with-zero step below would silently turn into a valid-looking all-zero
-# outcome, with no error anywhere downstream.
-match_rate <- 100 * mean(!is.na(panel$cookie_events_3rd_p))
-cat(sprintf("Cookie merge match rate: %.1f%%\n", match_rate))
-stopifnot(match_rate > 50)
+panel <- merge(
+  time_panel,
+  cookies[, .(experiment_id, website, date,
+              cookie_events_3rd_p, unique_cookies_3rd_p)],
+  by = c("experiment_id", "website", "date")
+)
 
-# Unmatched rows are (user, site, day) cells with no third-party cookie
-# activity: panel_cookies_v2 only holds cells where an event fired. Verified
-# non-differential across treatment x post before adopting this fill.
-panel[is.na(cookie_events_3rd_p),  cookie_events_3rd_p  := 0L]
-panel[is.na(unique_cookies_3rd_p), unique_cookies_3rd_p := 0L]
-rm(cookies); gc(verbose = FALSE)
+cat(sprintf("Cookie join: %s browsing cells -> %s with a cookie record (%.1f%%)\n",
+            format(nrow(time_panel), big.mark = ","),
+            format(nrow(panel), big.mark = ","),
+            100 * nrow(panel) / nrow(time_panel)))
+
+rm(cookies, time_panel); gc(verbose = FALSE)
 
 ec <- fread("../data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
 ec_clean <- ec[in_experiment == "true" & !experiment_id %in% BAD_USERS]
 ec_clean[wave_id == 3, wave_id := 2L]
 
-drop_cols <- intersect(c("treatment", "experiment_condition", "wave_id", "block_idx"),
-                       names(panel))
-if (length(drop_cols) > 0) panel[, (drop_cols) := NULL]
 panel <- panel[experiment_id %in% ec_clean$experiment_id]
 panel <- merge(panel, ec_clean[, .(experiment_id, wave_id, experiment_condition)],
                by = "experiment_id", all.x = TRUE)
@@ -177,12 +190,16 @@ panel[, post      := as.integer(date >= treatment_date)]
 panel[, treatment := factor(experiment_condition,
                             levels = c("control", "saliency", "info"))]
 
-# --- [CHANGED] dependent variables -----------------------------------------
 # CPV normalizes event counts by visits (intensity). UC is NOT divided by
 # visits: a unique-cookie count does not scale linearly with visit count, so
 # dividing would inject spurious variation. Matches cookie_deletion.R.
 panel[, log_cpv := log(1 + cookie_events_3rd_p / visit_count)]
 panel[, log_uc  := log(1 + unique_cookies_3rd_p)]
+
+cat(sprintf("Analysis sample: %s cells | %s participants | %s sites\n",
+            format(nrow(panel), big.mark = ","),
+            format(uniqueN(panel$experiment_id), big.mark = ","),
+            format(uniqueN(panel$website), big.mark = ",")))
 
 # =============================================================================
 # 2. BALANCED PANEL: (user, website) pairs observed pre AND post
