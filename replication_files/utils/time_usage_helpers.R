@@ -79,7 +79,7 @@ AUX_DATA_DIR <- "../auxiliary_data/"
 # Arguments:
 #   min_seconds  passed to get_time_panel(); NULL keeps every visit.
 # =============================================================================
-get_clean_time_data <- function(min_seconds = 30) {
+get_clean_time_data <- function(min_seconds = NULL) {
   
   time_panel   <- get_time_panel(paste0(EXT_DATA_DIR, "time_data_2.csv"),
                                  min_seconds = min_seconds, verbose = FALSE)
@@ -1626,7 +1626,7 @@ clean_site <- function(x) {
 #   experiment_id, website, date, time_spent, visit_count, elicitation_count
 # =============================================================================
 get_time_panel <- function(path = "../data/final_extension_data/time_data_2.csv",
-                           min_seconds = 30,
+                           min_seconds = NULL,
                            verbose = TRUE) {
   
   stopifnot(requireNamespace("data.table", quietly = TRUE))

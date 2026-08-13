@@ -349,7 +349,7 @@ QUINT_LAB <- paste0(
 
 time_panel <- get_time_panel(
   path = "../data/final_extension_data/time_data_2.csv",
-  min_seconds = 30,
+  min_seconds = NULL,
   verbose = TRUE
 )
 

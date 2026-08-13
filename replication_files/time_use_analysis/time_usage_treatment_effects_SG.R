@@ -6,14 +6,16 @@
 #   Main paper:
 #     Figure 6 [fig:extensive,
 #               "Browsing Behavior Treatment Effects: Extensive Margin"]
-#       Fig 6(a) [fig:extensive_a]:
-#         output/figures/assortment_concentration[_wt].pdf
-#       Fig 6(b) [fig:extensive_b]:
-#         output/figures/assortment_privacy[_wt].pdf
+#       Fig 6(a) [fig:extensive_a]: output/figures/assortment_concentration[_wt].pdf
+#       Fig 6(b) [fig:extensive_b]: output/figures/assortment_privacy[_wt].pdf
 #     Extensive-margin scalars cited in the website-choice prose:
 #       output/values/assortment_did_values.tex
 #       (4 macros: \extensiveHHIPvalue, \extensiveTopSharePvalue,
 #        \privacyDifferentialPctSD, \portfolioPrivacyPctSD)
+#     Robustness copy of the same four macros under the legacy dwell rule:
+#       output/values/assortment_did_values_min30.tex
+#       (\extensiveHHIPvalueMinThirty, \extensiveTopSharePvalueMinThirty,
+#        \privacyDifferentialPctSDMinThirty, \portfolioPrivacyPctSDMinThirty)
 #   Appendix:
 #     Figure C.9 [fig:intensive,
 #                 "Browsing Behavior Treatment Effects: Intensive Margin"]
@@ -22,97 +24,79 @@
 #       Fig C.9(b) [fig:intensive_b]:
 #         output/figures/preregistered_triple_interaction_baseline[_wt].pdf
 #
-#   `_wt` suffix is empty for unweighted and `_{weight_spec}` otherwise. Set
-#   WEIGHT_SPEC at the top of the script: "unweighted", "weight_census",
-#   "weight_pew", "weight_combined", or "all" to loop over all four. Paper
-#   figures are unweighted; the weighted variants are robustness checks (no
-#   paper artifact). The savetexvalue macros are written for the unweighted
-#   spec only.
+#   `_wt` suffix is empty for unweighted and `_{weight_spec}` otherwise. Paper
+#   figures are unweighted; the weighted variants are robustness checks. The
+#   savetexvalue macros are written for the unweighted spec only.
 #
 # Inputs:
 #   ../data/processed_data/joined_time_data.csv   (cached; default path)
 #   ../data/Survey/individual_level_weights.csv   (only if WEIGHT_SPEC != "unweighted")
-#
-#   CONSTRUCT_FROM_SCRATCH = TRUE branch additionally reads:
+#   CONSTRUCT_FROM_SCRATCH = TRUE additionally reads:
 #     ../data/Survey/survey_merged_final.csv
 #     ../data/final_extension_data/experiment_conditions_pilot_july_2024.csv
 #     ../data/final_extension_data/privacy_info.csv
 #     (and the helper-function inputs in utils/time_usage_helpers.R)
 #
 # Dependencies:
-#   replication_files/utils/values.R              (BAD_USERS, SURVEY_WEBSITES,
-#                                                  TREATMENT_DATE_WAVE_*)
+#   replication_files/utils/values.R
 #   replication_files/utils/time_usage_helpers.R  (get_time_panel,
-#                                                  get_clean_time_data,
-#                                                  high_level_aggregate, etc.)
+#                                                  get_clean_time_data, ...)
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/plot_rules.R
 #   replication_files/utils/number_format_helpers.R
 #   replication_files/time_use_analysis/analysis_assortment_did.R
-#     (provides run_assortment_analysis + run_preregistered_specs)
 #   savetexvalue (devtools::install_github("Ori-Shoham/savetexvalue"))
-#
-# Outputs:
-#   output/figures/preregistered_spec_i_baseline[_wt].pdf
-#   output/figures/preregistered_triple_interaction_baseline[_wt].pdf
-#   output/figures/assortment_concentration[_wt].pdf
-#   output/figures/assortment_privacy[_wt].pdf
-#   output/values/assortment_did_values.tex
 #
 # CHANGES this version:
 #   - SURVEY FILTER BUG FIXED. The filtered object was assigned to `full_dat`
 #     and written to the CSV, but `full_time_dat` -- which every downstream
-#     analysis uses -- was never reassigned. The CONSTRUCT_FROM_SCRATCH = TRUE
-#     branch therefore analysed data that still contained survey platforms
-#     (24.1% of recorded hours), while the FALSE branch read the filtered CSV.
-#     The two branches produced different samples.
-#   - SURVEY FILTER RULE CHANGED to an exact match against
-#     website_aggregated_high_level, matching the rest of the pipeline.
-#     Substring matching on the raw domain overcaught ordinary browsing whose
-#     domain merely contains a platform name (mturk.notion.site,
-#     usertesting.wistia.com, socoandtheocmix.com).
-#   - WINSORIZING TURNED OFF. get_balanced_panel is called with its 0.0 / 1.0
-#     defaults. The 5/95 trim existed only for the untransformed visit count,
-#     whose OLS standard error it shrank ~14x; Poisson is robust to those
-#     outliers and reproduces the trimmed answer without modifying data. The
-#     trim also computed its cutoffs within post x condition, so the cutoffs
-#     themselves carried a difference-in-differences structure.
+#     analysis uses -- was never reassigned, so the CONSTRUCT_FROM_SCRATCH =
+#     TRUE branch analysed data that still contained survey platforms (24.1% of
+#     recorded hours) while the FALSE branch read the filtered CSV.
+#     VERIFIED IMMATERIAL for this script's outputs: the four Figure 6 macros
+#     reproduce the published 0.069 / 0.058 / 4.4 / 10.2 exactly, because
+#     survey sites carry no privacy score and both regression functions already
+#     require one.
+#   - SURVEY FILTER RULE CHANGED to an exact match on
+#     website_aggregated_high_level. Substring matching on the raw domain
+#     overcaught ordinary browsing whose domain merely contains a platform name
+#     (mturk.notion.site, usertesting.wistia.com, socoandtheocmix.com).
+#     Also verified immaterial here, for the same reason.
+#   - WINSORIZING TURNED OFF. get_balanced_panel keeps its 0.0 / 1.0 defaults.
+#     The 5/95 trim existed only for the untransformed visit count, and its
+#     cutoffs were computed within post x condition, so they carried their own
+#     difference-in-differences structure. Figure 6 never touched
+#     get_balanced_panel, so this too leaves its macros unchanged; it affects
+#     only Figure C.9's visit-count panel.
+#   - MINIMUM-DWELL RULE NOW A CONSTANT, defaulting to OFF. `time_spent > 30`
+#     used to be hard-coded here and appeared in no other script, with one
+#     commit and no documented rationale. A threshold sweep showed it is the
+#     ONLY factor that moves Figure 6, and that it is a dial rather than a data
+#     rule: privacy_differential rises monotonically with the cutoff (0.0159
+#     p=.280 at 0s, 0.0376 p=.034 at 30s, 0.0479 p=.021 at 60s) while
+#     privacy_change falls monotonically over the same range, so the cutoff
+#     chooses which of the two privacy results is significant. In Appendix E
+#     the same rule flips the sign of the headline browsing-time result, with
+#     the entire decline carried by cells under five seconds. Main output
+#     therefore applies no dwell rule; the legacy 30-second version is written
+#     alongside as an explicit robustness file.
 #   - APPENDIX C TOP-WEBSITES BLOCK REMOVED. It wrote the same
-#     top_websites_values.tex as time_use_baseline_scalars.R but with
-#     different numbers, because this script applies time_spent > 30 and
-#     BAD_USERS and that one does not -- so whichever ran last won. The table
-#     is a descriptive statistic and now belongs solely to
-#     time_use_baseline_scalars.R.
-#   - Browsing time now arrives through get_time_panel() (via
-#     get_clean_time_data()), which deduplicates to one row per
-#     (participant, website, day) by taking the maximum and applies
-#     time_spent > 30 upstream. No change was needed here for that.
+#     top_websites_values.tex as time_use_baseline_scalars.R but with different
+#     numbers, so whichever ran last won. That table is a descriptive statistic
+#     and now belongs solely to time_use_baseline_scalars.R.
+#   - Browsing time arrives through get_time_panel() (via get_clean_time_data),
+#     which deduplicates to one row per (participant, website, day) by taking
+#     the maximum -- the extension stores time as a cumulative daily snapshot
+#     that is never cleared after upload, so summing repeated rows
+#     double-counts.
 #
-# Note: Previous version of this driver also produced (now removed as dead
-# code, not in paper):
-#   - time_spent_log.pdf
-#   - baseline_privacy_requested.pdf, baseline_privacy_full.pdf
-#   - delta_privacy_full_overall.pdf, delta_privacy_requested.pdf
-#   - overlay_privacy_full_density.pdf, overlay_privacy_requested_density.pdf
-#   - pre_decile_shift_requested.pdf, pre_decile_shift_full.pdf
-#   plus the three run_did_analysis() panels (balanced/full/unbalanced) and
-#   plot_privacy_summary() (did_main_results_*.tex, did_triple_diff_*.tex,
-#   did_analysis_summary_*.txt, privacy_summary_by_model.png,
-#   privacy_summary_across_panels.txt). See analysis_assortment_did.R header
-#   for the function-level cleanup notes.
-# Removed dead computation:
-#   - extension_inactivity <- read.csv(...) (loaded but never used)
-#   - Panel constructions balanced_panel_weeks,
-#     balanced_panel_weeks_extensive_margin, unbalanced_panel,
-#     balanced_panel_post_extensive_margin and the to_factor() calls on them
-#     (only balanced_panel_post feeds the kept Fig C.9 call).
-#   - personalized_scores, top_site_per_category_overall,
-#     top_site_per_category_requested (only fed the removed CF / overlay /
-#     pre-decile plots).
-#   - All user_weighted / user_site_baseline / cf_results / scores_long /
-#     make_pre_decile_plot helper objects (fed only the removed plots).
-#   - Second run_preregistered_specs() call on
-#     balanced_panel_post_extensive_margin (paper only uses _baseline).
+# Note: this driver previously also produced a set of exploratory figures and
+# panel constructions that are not in the paper (time_spent_log,
+# baseline/delta/overlay privacy plots, pre-decile shifts, the three
+# run_did_analysis panels, plot_privacy_summary, balanced_panel_weeks and its
+# variants, personalized_scores, and a second run_preregistered_specs call).
+# All were removed as dead code; see analysis_assortment_did.R for the
+# function-level cleanup notes.
 # =============================================================================
 
 library(tidyverse)
@@ -128,13 +112,22 @@ library(savetexvalue)
 # Set working directory to code_github root so all relative paths resolve.
 setwd("~/Dropbox/spring2025experiment/code_github")
 
-# Toggle: TRUE re-runs the full data-construction pipeline (~150 lines below);
-# FALSE reads the cached `joined_time_data.csv` produced by an earlier run.
+# Toggle: TRUE re-runs the full data-construction pipeline; FALSE reads the
+# cached `joined_time_data.csv` produced by an earlier run.
 CONSTRUCT_FROM_SCRATCH <- TRUE
 # Flag for whether to use population averages (FALSE) or individual measures
 # (TRUE) when constructing privacy scores. Consumed only inside the
 # CONSTRUCT_FROM_SCRATCH branch.
 individual_weights <- FALSE
+
+# --- Minimum-dwell rule ------------------------------------------------------
+# MIN_SECONDS governs the MAIN outputs; ROBUSTNESS_SECONDS governs the extra
+# macro file. NULL means no rule. To swap which arm is headline, exchange the
+# two values -- but note the NULL arm must be the main one if you want the
+# robustness arm to stay a cheap post-construction filter rather than a second
+# full reconstruction.
+MIN_SECONDS        <- NULL
+ROBUSTNESS_SECONDS <- 30
 
 # Output directories
 FIGURES_DIR <- "output/figures/"
@@ -142,13 +135,14 @@ TABLES_DIR  <- "output/tables/"
 VALUES_DIR  <- "output/values/"
 
 ## [WEIGHT MODIFICATION] ======================================================
-## Set to one of: "unweighted", "weight_census", "weight_pew",
-## "weight_combined", "all". "all" loops over all four specs at the bottom
-## without re-loading data.
+## One of: "unweighted", "weight_census", "weight_pew", "weight_combined",
+## "all". "all" loops over all four specs at the bottom without re-loading.
 WEIGHT_SPEC   <- "unweighted"
 OUTPUT_SUFFIX <- if (WEIGHT_SPEC == "unweighted") "" else paste0("_", WEIGHT_SPEC)
 cat("=== Weight specification:", WEIGHT_SPEC, "===\n")
-cat("=== Output suffix:",       OUTPUT_SUFFIX, "===\n\n")
+cat("=== Output suffix:",       OUTPUT_SUFFIX, "===\n")
+cat("=== Minimum dwell (main):", ifelse(is.null(MIN_SECONDS), "none",
+                                        paste0("> ", MIN_SECONDS, "s")), "===\n\n")
 ## =============================================================================
 
 # Source utility scripts
@@ -201,12 +195,9 @@ run_weighted_feols <- function(fml, data, cluster_var, wt_spec = WEIGHT_SPEC) {
 # =============================================================================
 # get_balanced_panel(): build a balanced panel of (user, website) tuples
 # observed in `values_to_include` and impute zeros across `all_values`.
-# values_to_include = c(-2, -1) -> sites visited in both baseline weeks;
-# values_to_include = c()       -> no baseline restriction (full panel).
 #
 # lower_pct / upper_pct winsorize the aggregated measures. They default to
-# 0.0 / 1.0, i.e. OFF, and the paper calls now leave them at the default --
-# see the CHANGES note in the header.
+# 0.0 / 1.0, i.e. OFF, and the paper calls leave them at the default.
 # =============================================================================
 
 get_balanced_panel <- function(dat,
@@ -226,7 +217,7 @@ get_balanced_panel <- function(dat,
     slice(1) %>%
     ungroup()
   
-  # Winsorize (no-op at the 0.0 / 1.0 defaults).
+  # Winsorize (a no-op at the 0.0 / 1.0 defaults).
   dat <- dat %>%
     group_by(!!idx, experiment_condition) %>%
     mutate(
@@ -272,9 +263,9 @@ get_balanced_panel <- function(dat,
     )) %>%
     distinct() %>%
     # Collapse to one row per (user, site). A few user-site pairs (the "x" /
-    # twitter alias) carry both an NA and a non-NA privacy_for_requested_attribute
-    # row, which makes the downstream left_join many-to-many. Keep the non-NA
-    # privacy row so the join stays 1:1.
+    # twitter alias) carry both an NA and a non-NA
+    # privacy_for_requested_attribute row, which makes the downstream
+    # left_join many-to-many. Keep the non-NA row so the join stays 1:1.
     group_by(experiment_id, website_aggregated_high_level) %>%
     arrange(is.na(privacy_for_requested_attribute), .by_group = TRUE) %>%
     slice(1) %>%
@@ -358,8 +349,8 @@ get_balanced_panel <- function(dat,
   balanced_panel <- balanced_panel %>%
     left_join(individual_website,
               by = c("experiment_id", "website_aggregated_high_level")) %>%
-    mutate(has_visits                  = total_visit_count > 0,
-           privacy_discretized_median  = privacy_for_requested_attribute > med)
+    mutate(has_visits                 = total_visit_count > 0,
+           privacy_discretized_median = privacy_for_requested_attribute > med)
   
   return(balanced_panel)
 }
@@ -377,11 +368,11 @@ if (CONSTRUCT_FROM_SCRATCH) {
       Age != 5,
       (RaceSimple_1 == 1 | RaceSimple_2 == 1 | RaceSimple_3 == 1 |
          RaceSimple_4 == 1 | RaceSimple_5 == 1 | RaceSimple_6 == 1),
-      !is.na(favoritewebsite)         & trimws(favoritewebsite) != "",
-      !is.na(conjcat_conjCategory)    & trimws(conjcat_conjCategory) != ""
+      !is.na(favoritewebsite)      & trimws(favoritewebsite) != "",
+      !is.na(conjcat_conjCategory) & trimws(conjcat_conjCategory) != ""
     )
   
-  time_data <- get_clean_time_data()
+  time_data <- get_clean_time_data(min_seconds = MIN_SECONDS)
   
   personalized_info <- get_personalized_info_only() %>%
     select(email, experiment_id, q1_feature, q1_field, q2_feature, q2_field) %>%
@@ -502,10 +493,10 @@ if (CONSTRUCT_FROM_SCRATCH) {
   full_time_dat <- compute_privacy_scores(full_time_dat)
   full_time_dat <- compute_exposed_privacy_scores(full_time_dat)
   
-  # [CHANGED] Survey-platform filter: exact match on the aggregated domain, and
-  # the result is assigned back to full_time_dat. Previously the filtered object
+  # Survey-platform filter: exact match on the aggregated domain, and the
+  # result IS assigned back to full_time_dat. Previously the filtered object
   # went only to `full_dat` and the CSV, leaving the in-memory analysis
-  # unfiltered -- so this branch and the cached-CSV branch analysed different
+  # unfiltered, so this branch and the cached-CSV branch analysed different
   # samples.
   full_dat <- full_time_dat %>%
     filter(!(tolower(website_aggregated_high_level) %in% SURVEY_WEBSITES))
@@ -524,13 +515,19 @@ if (CONSTRUCT_FROM_SCRATCH) {
 # =============================================================================
 # Post-load cleaning
 # =============================================================================
-# time_spent > 30 is now applied upstream in get_time_panel(), so for data
-# built by the current pipeline this filter is a no-op. It is kept as a guard
-# in case the cached CSV predates that change.
+# The minimum-dwell rule is applied here only if MIN_SECONDS is set; the
+# default is NULL. See the CHANGES note in the header for why.
 
 full_time_dat <- full_time_dat %>%
-  filter(!(experiment_id %in% BAD_USERS)) %>%
-  filter(time_spent > 30)
+  filter(!(experiment_id %in% BAD_USERS))
+
+if (!is.null(MIN_SECONDS)) {
+  n_before      <- nrow(full_time_dat)
+  full_time_dat <- full_time_dat %>% filter(time_spent > MIN_SECONDS)
+  cat(sprintf("Minimum dwell (> %ss): %s -> %s rows\n", MIN_SECONDS,
+              format(n_before, big.mark = ","),
+              format(nrow(full_time_dat), big.mark = ",")))
+}
 
 cat(sprintf("Analysis sample: %s rows | %s participants | %s sites\n",
             format(nrow(full_time_dat), big.mark = ","),
@@ -539,10 +536,9 @@ cat(sprintf("Analysis sample: %s rows | %s participants | %s sites\n",
                    big.mark = ",")))
 
 # =============================================================================
-# Build the one panel that feeds Fig 6 + Fig C.9:
-#   balanced_panel_post -> baseline-restricted panel, indexed by post.
+# Build the one panel that feeds Figure C.9
 # =============================================================================
-# [CHANGED] winsorizing left at the 0.0 / 1.0 defaults -- see the header.
+# Winsorizing left at the 0.0 / 1.0 defaults -- see the header.
 
 balanced_panel_post <- get_balanced_panel(
   full_time_dat,
@@ -578,9 +574,43 @@ source("replication_files/utils/plot_rules.R")
 source("replication_files/time_use_analysis/analysis_assortment_did.R")
 
 # =============================================================================
-# [WEIGHT MODIFICATION] Run paper Fig 6 + Fig C.9 across all requested specs.
-# When WEIGHT_SPEC == "all", loops over all four; otherwise runs the single
-# spec. Data loading above runs ONCE; only the regression/plot calls loop.
+# Extract the four extensive-margin scalars from a fitted assortment object.
+# Used for both the main file and the dwell-rule robustness file.
+# =============================================================================
+
+assortment_scalars <- function(ext) {
+  list(
+    hhi_p    = ext$model_hhi$coeftable["experiment_conditioninfo",  "Pr(>|t|)"],
+    top1_p   = ext$model_top1$coeftable["experiment_conditioninfo", "Pr(>|t|)"],
+    diff_pct = 100 * ext$model_differential$coeftable["experiment_conditioninfo", "Estimate"] /
+      sd(ext$user_entry_exit$privacy_differential, na.rm = TRUE),
+    pchg_pct = 100 * ext$model_privacy_change$coeftable["experiment_conditioninfo", "Estimate"] /
+      sd(ext$concentration_wide$privacy_change, na.rm = TRUE)
+  )
+}
+
+write_assortment_values <- function(s, file_stem, suffix = "") {
+  full <- paste0(VALUES_DIR, file_stem, ".tex")
+  if (file.exists(full)) file.remove(full)
+  
+  save_tex_value(values = format_pvalue(s$hhi_p),
+                 names = paste0("extensiveHHIPvalue", suffix),
+                 file_name = file_stem, path = VALUES_DIR)
+  save_tex_value(values = format_pvalue(s$top1_p),
+                 names = paste0("extensiveTopSharePvalue", suffix),
+                 file_name = file_stem, path = VALUES_DIR)
+  save_tex_value(values = format_pct(s$diff_pct),
+                 names = paste0("privacyDifferentialPctSD", suffix),
+                 file_name = file_stem, path = VALUES_DIR)
+  save_tex_value(values = format_pct(s$pchg_pct),
+                 names = paste0("portfolioPrivacyPctSD", suffix),
+                 file_name = file_stem, path = VALUES_DIR)
+  
+  cat(sprintf("Saved 4 macros to %s\n", full))
+}
+
+# =============================================================================
+# [WEIGHT MODIFICATION] Run Figure 6 + Figure C.9 across all requested specs.
 # =============================================================================
 
 .ALL_SPECS <- c("unweighted", "weight_census", "weight_pew", "weight_combined")
@@ -594,7 +624,7 @@ for (.ws in .specs_to_run) {
   
   .wt_suffix <- if (.ws == "unweighted") "" else paste0("_", .ws)
   
-  # Fig 6: extensive-margin assortment analysis.
+  # Figure 6: extensive-margin assortment analysis.
   extensive <- run_assortment_analysis(
     full_time_dat,
     output_dir  = TABLES_DIR,
@@ -604,45 +634,59 @@ for (.ws in .specs_to_run) {
   )
   
   # -------------------------------------------------------------------------
-  # Scalar macros: extensive-margin numbers cited in the website-choice prose.
-  # Unweighted spec only; all values pulled from the assortment models / data
-  # above, never hard-coded.
+  # Scalar macros cited in the website-choice prose. Unweighted spec only; all
+  # values pulled from the models above, never hard-coded.
   #   \extensiveHHIPvalue        info-vs-control p-value, HHI change
   #   \extensiveTopSharePvalue   info-vs-control p-value, top-1 share change
-  #                              (referred to as "top-2 share" in the prose)
+  #                              (called "top-2 share" in the prose)
   #   \privacyDifferentialPctSD  info coef / SD, privacy differential
   #   \portfolioPrivacyPctSD     info coef / SD, portfolio privacy change
   # -------------------------------------------------------------------------
   if (.ws == "unweighted") {
-    p_hhi  <- extensive$model_hhi$coeftable["experiment_conditioninfo",  "Pr(>|t|)"]
-    p_top1 <- extensive$model_top1$coeftable["experiment_conditioninfo", "Pr(>|t|)"]
+    write_assortment_values(assortment_scalars(extensive), "assortment_did_values")
     
-    sd_diff <- sd(extensive$user_entry_exit$privacy_differential, na.rm = TRUE)
-    sd_pc   <- sd(extensive$concentration_wide$privacy_change,    na.rm = TRUE)
-    b_diff  <- extensive$model_differential$coeftable["experiment_conditioninfo",   "Estimate"]
-    b_pc    <- extensive$model_privacy_change$coeftable["experiment_conditioninfo", "Estimate"]
-    
-    assortment_values_file <- "assortment_did_values"
-    assortment_values_full <- paste0(VALUES_DIR, assortment_values_file, ".tex")
-    if (file.exists(assortment_values_full)) file.remove(assortment_values_full)
-    
-    save_tex_value(values = format_pvalue(p_hhi),
-                   names = "extensiveHHIPvalue",
-                   file_name = assortment_values_file, path = VALUES_DIR)
-    save_tex_value(values = format_pvalue(p_top1),
-                   names = "extensiveTopSharePvalue",
-                   file_name = assortment_values_file, path = VALUES_DIR)
-    save_tex_value(values = format_pct(100 * b_diff / sd_diff),
-                   names = "privacyDifferentialPctSD",
-                   file_name = assortment_values_file, path = VALUES_DIR)
-    save_tex_value(values = format_pct(100 * b_pc / sd_pc),
-                   names = "portfolioPrivacyPctSD",
-                   file_name = assortment_values_file, path = VALUES_DIR)
-    
-    cat(sprintf("\nSaved 4 macros to %s%s.tex\n", VALUES_DIR, assortment_values_file))
+    # -----------------------------------------------------------------------
+    # Robustness: the same four scalars under the legacy dwell rule. Applied
+    # as a post-construction filter, which is exactly what the previous
+    # version of this script did, so the numbers are comparable to the
+    # published ones. Macro names carry a MinThirty suffix so both sets can
+    # coexist in the manuscript.
+    # -----------------------------------------------------------------------
+    if (!is.null(ROBUSTNESS_SECONDS)) {
+      cat(sprintf("\n--- Robustness arm: minimum dwell > %ss ---\n",
+                  ROBUSTNESS_SECONDS))
+      
+      full_time_dat_rb <- full_time_dat %>%
+        filter(time_spent > ROBUSTNESS_SECONDS)
+      
+      cat(sprintf("Robustness sample: %s rows | %s participants | %s sites\n",
+                  format(nrow(full_time_dat_rb), big.mark = ","),
+                  format(n_distinct(full_time_dat_rb$experiment_id), big.mark = ","),
+                  format(n_distinct(full_time_dat_rb$website_aggregated_high_level),
+                         big.mark = ",")))
+      
+      extensive_rb <- run_assortment_analysis(
+        full_time_dat_rb,
+        output_dir  = TABLES_DIR,
+        figures_dir = paste0(tempdir(), "/"),   # robustness figures not kept
+        wt_spec     = .ws,
+        wt_suffix   = "_min30"
+      )
+      
+      write_assortment_values(assortment_scalars(extensive_rb),
+                              "assortment_did_values_min30",
+                              suffix = "MinThirty")
+      
+      # Side-by-side console summary.
+      s_main <- assortment_scalars(extensive)
+      s_rb   <- assortment_scalars(extensive_rb)
+      cat("\nmacro                       main      >30s\n")
+      for (n in names(s_main))
+        cat(sprintf("  %-24s %8.4f  %8.4f\n", n, s_main[[n]], s_rb[[n]]))
+    }
   }
   
-  # Fig C.9: pre-registered intensive-margin specs on the baseline panel.
+  # Figure C.9: pre-registered intensive-margin specs on the baseline panel.
   preregistered_balanced <- run_preregistered_specs(
     balanced_panel = balanced_panel_post,
     full_time_dat  = full_time_dat,
