@@ -4,28 +4,23 @@
 #
 # Produces:
 #   Main paper:
-#     Section 7 Fig 9 [fig:intensive,
-#                      "Browsing Behavior Treatment Effects: Intensive Margin"]
-#       Fig 9(a) [fig:intensive_a]:
-#         output/figures/preregistered_spec_i_baseline[_wt].png
-#       Fig 9(b) [fig:intensive_b]:
-#         output/figures/preregistered_triple_interaction_baseline[_wt].png
-#     Section 7 Fig 10 [fig:extensive,
-#                       "Browsing Behavior Treatment Effects: Extensive Margin"]
-#       Fig 10(a) [fig:extensive_a]:
-#         output/figures/assortment_concentration[_wt].png
-#       Fig 10(b) [fig:extensive_b]:
-#         output/figures/assortment_privacy[_wt].png
-#     Section 7 extensive-margin scalars cited in prose (v2 lines 652/654):
+#     Figure 6 [fig:extensive,
+#               "Browsing Behavior Treatment Effects: Extensive Margin"]
+#       Fig 6(a) [fig:extensive_a]:
+#         output/figures/assortment_concentration[_wt].pdf
+#       Fig 6(b) [fig:extensive_b]:
+#         output/figures/assortment_privacy[_wt].pdf
+#     Extensive-margin scalars cited in the website-choice prose:
 #       output/values/assortment_did_values.tex
 #       (4 macros: \extensiveHHIPvalue, \extensiveTopSharePvalue,
 #        \privacyDifferentialPctSD, \portfolioPrivacyPctSD)
-#   Appendix C:
-#     Table [tab:top_websites, "Top Websites used by Participants"]:
-#       output/values/top_websites_values.tex
-#       (60 savetexvalue macros: \topWeb<Rank><Field>, Rank in
-#        One..Fifteen, Field in Domain/ActiveHours/NUsers/AllHours;
-#        the LaTeX tabular itself is hand-written in writeup_v3.tex)
+#   Appendix:
+#     Figure C.9 [fig:intensive,
+#                 "Browsing Behavior Treatment Effects: Intensive Margin"]
+#       Fig C.9(a) [fig:intensive_a]:
+#         output/figures/preregistered_spec_i_baseline[_wt].pdf
+#       Fig C.9(b) [fig:intensive_b]:
+#         output/figures/preregistered_triple_interaction_baseline[_wt].pdf
 #
 #   `_wt` suffix is empty for unweighted and `_{weight_spec}` otherwise. Set
 #   WEIGHT_SPEC at the top of the script: "unweighted", "weight_census",
@@ -47,7 +42,8 @@
 # Dependencies:
 #   replication_files/utils/values.R              (BAD_USERS, SURVEY_WEBSITES,
 #                                                  TREATMENT_DATE_WAVE_*)
-#   replication_files/utils/time_usage_helpers.R  (get_balanced_panel inputs,
+#   replication_files/utils/time_usage_helpers.R  (get_time_panel,
+#                                                  get_clean_time_data,
 #                                                  high_level_aggregate, etc.)
 #   replication_files/utils/info_acq_helpers.R
 #   replication_files/utils/plot_rules.R
@@ -57,12 +53,40 @@
 #   savetexvalue (devtools::install_github("Ori-Shoham/savetexvalue"))
 #
 # Outputs:
-#   output/figures/preregistered_spec_i_baseline[_wt].png
-#   output/figures/preregistered_triple_interaction_baseline[_wt].png
-#   output/figures/assortment_concentration[_wt].png
-#   output/figures/assortment_privacy[_wt].png
-#   output/values/top_websites_values.tex
+#   output/figures/preregistered_spec_i_baseline[_wt].pdf
+#   output/figures/preregistered_triple_interaction_baseline[_wt].pdf
+#   output/figures/assortment_concentration[_wt].pdf
+#   output/figures/assortment_privacy[_wt].pdf
 #   output/values/assortment_did_values.tex
+#
+# CHANGES this version:
+#   - SURVEY FILTER BUG FIXED. The filtered object was assigned to `full_dat`
+#     and written to the CSV, but `full_time_dat` -- which every downstream
+#     analysis uses -- was never reassigned. The CONSTRUCT_FROM_SCRATCH = TRUE
+#     branch therefore analysed data that still contained survey platforms
+#     (24.1% of recorded hours), while the FALSE branch read the filtered CSV.
+#     The two branches produced different samples.
+#   - SURVEY FILTER RULE CHANGED to an exact match against
+#     website_aggregated_high_level, matching the rest of the pipeline.
+#     Substring matching on the raw domain overcaught ordinary browsing whose
+#     domain merely contains a platform name (mturk.notion.site,
+#     usertesting.wistia.com, socoandtheocmix.com).
+#   - WINSORIZING TURNED OFF. get_balanced_panel is called with its 0.0 / 1.0
+#     defaults. The 5/95 trim existed only for the untransformed visit count,
+#     whose OLS standard error it shrank ~14x; Poisson is robust to those
+#     outliers and reproduces the trimmed answer without modifying data. The
+#     trim also computed its cutoffs within post x condition, so the cutoffs
+#     themselves carried a difference-in-differences structure.
+#   - APPENDIX C TOP-WEBSITES BLOCK REMOVED. It wrote the same
+#     top_websites_values.tex as time_use_baseline_scalars.R but with
+#     different numbers, because this script applies time_spent > 30 and
+#     BAD_USERS and that one does not -- so whichever ran last won. The table
+#     is a descriptive statistic and now belongs solely to
+#     time_use_baseline_scalars.R.
+#   - Browsing time now arrives through get_time_panel() (via
+#     get_clean_time_data()), which deduplicates to one row per
+#     (participant, website, day) by taking the maximum and applies
+#     time_spent > 30 upstream. No change was needed here for that.
 #
 # Note: Previous version of this driver also produced (now removed as dead
 # code, not in paper):
@@ -81,7 +105,7 @@
 #   - Panel constructions balanced_panel_weeks,
 #     balanced_panel_weeks_extensive_margin, unbalanced_panel,
 #     balanced_panel_post_extensive_margin and the to_factor() calls on them
-#     (only balanced_panel_post feeds the kept Fig 9 call).
+#     (only balanced_panel_post feeds the kept Fig C.9 call).
 #   - personalized_scores, top_site_per_category_overall,
 #     top_site_per_category_requested (only fed the removed CF / overlay /
 #     pre-decile plots).
@@ -89,8 +113,6 @@
 #     make_pre_decile_plot helper objects (fed only the removed plots).
 #   - Second run_preregistered_specs() call on
 #     balanced_panel_post_extensive_margin (paper only uses _baseline).
-#   - xtable construction for top_websites.tex (replaced by 60 savetexvalue
-#     calls; LaTeX tabular moved into writeup_v3.tex itself).
 # =============================================================================
 
 library(tidyverse)
@@ -155,7 +177,7 @@ join_weights <- function(df, wt_spec, weight_col = "survey_weight") {
   }
   
   weights_df <- weights_df %>%
-    filter(sample == "extension") %>%                   # <-- ADD THIS LINE
+    filter(sample == "extension") %>%
     select(experiment_id, !!weight_col := all_of(wt_spec))
   
   n_before  <- nrow(df)
@@ -181,6 +203,10 @@ run_weighted_feols <- function(fml, data, cluster_var, wt_spec = WEIGHT_SPEC) {
 # observed in `values_to_include` and impute zeros across `all_values`.
 # values_to_include = c(-2, -1) -> sites visited in both baseline weeks;
 # values_to_include = c()       -> no baseline restriction (full panel).
+#
+# lower_pct / upper_pct winsorize the aggregated measures. They default to
+# 0.0 / 1.0, i.e. OFF, and the paper calls now leave them at the default --
+# see the CHANGES note in the header.
 # =============================================================================
 
 get_balanced_panel <- function(dat,
@@ -200,7 +226,7 @@ get_balanced_panel <- function(dat,
     slice(1) %>%
     ungroup()
   
-  # Winsorize.
+  # Winsorize (no-op at the 0.0 / 1.0 defaults).
   dat <- dat %>%
     group_by(!!idx, experiment_condition) %>%
     mutate(
@@ -476,11 +502,21 @@ if (CONSTRUCT_FROM_SCRATCH) {
   full_time_dat <- compute_privacy_scores(full_time_dat)
   full_time_dat <- compute_exposed_privacy_scores(full_time_dat)
   
-  full_time_dat_leisure <- full_time_dat %>%
-    filter(!str_detect(website, str_c(SURVEY_WEBSITES, collapse = "|")))
-  full_dat <- full_time_dat_leisure
+  # [CHANGED] Survey-platform filter: exact match on the aggregated domain, and
+  # the result is assigned back to full_time_dat. Previously the filtered object
+  # went only to `full_dat` and the CSV, leaving the in-memory analysis
+  # unfiltered -- so this branch and the cached-CSV branch analysed different
+  # samples.
+  full_dat <- full_time_dat %>%
+    filter(!(tolower(website_aggregated_high_level) %in% SURVEY_WEBSITES))
+  
+  cat(sprintf("Survey-platform filter: %s -> %s rows (%s removed)\n",
+              format(nrow(full_time_dat), big.mark = ","),
+              format(nrow(full_dat), big.mark = ","),
+              format(nrow(full_time_dat) - nrow(full_dat), big.mark = ",")))
   
   write.csv(full_dat, "../data/processed_data/joined_time_data.csv", row.names = FALSE)
+  full_time_dat <- full_dat
 } else {
   full_time_dat <- read.csv("../data/processed_data/joined_time_data.csv")
 }
@@ -488,140 +524,31 @@ if (CONSTRUCT_FROM_SCRATCH) {
 # =============================================================================
 # Post-load cleaning
 # =============================================================================
+# time_spent > 30 is now applied upstream in get_time_panel(), so for data
+# built by the current pipeline this filter is a no-op. It is kept as a guard
+# in case the cached CSV predates that change.
 
 full_time_dat <- full_time_dat %>%
   filter(!(experiment_id %in% BAD_USERS)) %>%
   filter(time_spent > 30)
 
-# =============================================================================
-# App C [tab:top_websites]: Top websites used by participants
-# =============================================================================
-# Emits 60 \newcommand macros (15 rows x 4 fields) to
-# output/values/top_websites_values.tex via savetexvalue. The paper's LaTeX
-# tabular (rlrrr / \hline / header / caption) lives in writeup_v3.tex and
-# references each cell via \topWeb<Rank><Field>:
-#   Rank  in {One, Two, ..., Fifteen}
-#   Field in {Domain, ActiveHours, NUsers, AllHours}
-# Adding a new top-15 domain: extend website_display_name() lookup below if
-# the str_to_title() fallback doesn't capitalize correctly.
-
-# --- Capitalization lookup for known domains. str_to_title() is the fallback.
-website_display_name <- function(slugs) {
-  lookup <- c(
-    youtube   = "Youtube",
-    google    = "Google",
-    facebook  = "Facebook",
-    amazon    = "Amazon",
-    reddit    = "Reddit",
-    netflix   = "Netflix",
-    chatgpt   = "Chatgpt",
-    twitch    = "Twitch",
-    x         = "X",
-    hulu      = "Hulu",
-    yahoo     = "Yahoo",
-    walmart   = "Walmart",
-    microsoft = "Microsoft",
-    ebay      = "eBay",
-    linkedin  = "LinkedIn"
-  )
-  out <- lookup[slugs]
-  fallback <- stringr::str_to_title(slugs)
-  ifelse(is.na(out), fallback, out)
-}
-
-# --- English ordinals for macro names (LaTeX command names cannot contain digits)
-rank_word <- c("One", "Two", "Three", "Four", "Five",
-               "Six", "Seven", "Eight", "Nine", "Ten",
-               "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen")
-
-# --- Compute top-15 summary on the baseline (weeks -2, -1) window.
-filtered <- full_time_dat %>%
-  filter(weeks_since_intervention %in% c(-2, -1) & privacy_exist)
-
-users_all <- filtered %>%
-  summarise(n = n_distinct(experiment_id)) %>%
-  pull(n)
-
-summary_table <- filtered %>%
-  group_by(website_aggregated_high_level, experiment_id, date) %>%
-  summarise(daily_hours = sum(time_spent) / 3600, .groups = "drop_last") %>%
-  group_by(website_aggregated_high_level, experiment_id) %>%
-  summarise(avg_daily_hours = mean(daily_hours), .groups = "drop_last") %>%
-  group_by(website_aggregated_high_level) %>%
-  summarise(
-    avg_daily_hours_per_active_user = mean(avg_daily_hours),
-    n_users                         = n_distinct(experiment_id),
-    .groups = "drop"
-  ) %>%
-  filter(n_users >= 50) %>%
-  mutate(avg_daily_hours_all_users = (avg_daily_hours_per_active_user * n_users) / users_all) %>%
-  arrange(desc(avg_daily_hours_all_users)) %>%
-  slice_head(n = 15) %>%
-  mutate(
-    rank         = row_number(),
-    domain_label = website_display_name(website_aggregated_high_level)
-  )
-
-cat("Top 15 websites (baseline window, n_users >= 50):\n")
-print(summary_table)
-
-# --- savetexvalue is append-only; wipe values file before writing so reruns
-# --- do not accumulate duplicate \newcommand definitions.
-values_file <- "top_websites_values"
-values_full <- file.path(VALUES_DIR, paste0(values_file, ".tex"))
-if (file.exists(values_full)) file.remove(values_full)
-
-# --- 4 vectorized calls: one per field, each writes 15 macros at once.
-# --- Domain: string passthrough (no accuracy / percent formatting).
-save_tex_value(
-  values    = summary_table$domain_label,
-  names     = paste0("topWeb", rank_word[summary_table$rank], "Domain"),
-  file_name = values_file,
-  path      = VALUES_DIR
-)
-
-# --- Daily Hours (per Active User): 2 decimals (matches v2 formatting).
-save_tex_value(
-  values    = summary_table$avg_daily_hours_per_active_user,
-  names     = paste0("topWeb", rank_word[summary_table$rank], "ActiveHours"),
-  file_name = values_file,
-  path      = VALUES_DIR,
-  accuracy  = 0.01
-)
-
-# --- Number of Users: integer (pass as string to bypass savetexvalue's
-# --- scales::number() default, which would insert thousands commas and
-# --- a trailing ".00" — we want bare digits like "935" / "1441").
-save_tex_value(
-  values    = as.character(summary_table$n_users),
-  names     = paste0("topWeb", rank_word[summary_table$rank], "NUsers"),
-  file_name = values_file,
-  path      = VALUES_DIR
-)
-
-# --- Daily Hours (over all users): 2 decimals.
-save_tex_value(
-  values    = summary_table$avg_daily_hours_all_users,
-  names     = paste0("topWeb", rank_word[summary_table$rank], "AllHours"),
-  file_name = values_file,
-  path      = VALUES_DIR,
-  accuracy  = 0.01
-)
-
-cat("Saved:", values_full, "\n")
+cat(sprintf("Analysis sample: %s rows | %s participants | %s sites\n",
+            format(nrow(full_time_dat), big.mark = ","),
+            format(n_distinct(full_time_dat$experiment_id), big.mark = ","),
+            format(n_distinct(full_time_dat$website_aggregated_high_level),
+                   big.mark = ",")))
 
 # =============================================================================
-# Build the one panel that feeds Fig 9 + Fig 10:
+# Build the one panel that feeds Fig 6 + Fig C.9:
 #   balanced_panel_post -> baseline-restricted panel, indexed by post.
 # =============================================================================
+# [CHANGED] winsorizing left at the 0.0 / 1.0 defaults -- see the header.
 
 balanced_panel_post <- get_balanced_panel(
   full_time_dat,
   index_var         = "post",
   values_to_include = c(0),
-  all_values        = c(0, 1),
-  lower_pct = 0.05,
-  upper_pct = 0.95
+  all_values        = c(0, 1)
 )
 
 to_factor <- function(df,
@@ -651,7 +578,7 @@ source("replication_files/utils/plot_rules.R")
 source("replication_files/time_use_analysis/analysis_assortment_did.R")
 
 # =============================================================================
-# [WEIGHT MODIFICATION] Run paper Fig 9 + Fig 10 across all requested specs.
+# [WEIGHT MODIFICATION] Run paper Fig 6 + Fig C.9 across all requested specs.
 # When WEIGHT_SPEC == "all", loops over all four; otherwise runs the single
 # spec. Data loading above runs ONCE; only the regression/plot calls loop.
 # =============================================================================
@@ -667,7 +594,7 @@ for (.ws in .specs_to_run) {
   
   .wt_suffix <- if (.ws == "unweighted") "" else paste0("_", .ws)
   
-  # Fig 10: extensive-margin assortment analysis.
+  # Fig 6: extensive-margin assortment analysis.
   extensive <- run_assortment_analysis(
     full_time_dat,
     output_dir  = TABLES_DIR,
@@ -677,14 +604,14 @@ for (.ws in .specs_to_run) {
   )
   
   # -------------------------------------------------------------------------
-  # Scalar macros: extensive-margin numbers cited in Section 7 prose
-  # (v2 lines 652/654). Unweighted spec only; all values pulled from the
-  # assortment models / data above, never hard-coded.
-  #   \extensiveHHIPvalue        info-vs-control p-value, HHI change      (v2 0.063)
-  #   \extensiveTopSharePvalue   info-vs-control p-value, top-1 share chg (v2 0.065,
-  #                              referred to as "top-2 share" in the prose)
-  #   \privacyDifferentialPctSD  info coef / SD, privacy differential     (v2 11%)
-  #   \portfolioPrivacyPctSD     info coef / SD, portfolio privacy change (v2 3%)
+  # Scalar macros: extensive-margin numbers cited in the website-choice prose.
+  # Unweighted spec only; all values pulled from the assortment models / data
+  # above, never hard-coded.
+  #   \extensiveHHIPvalue        info-vs-control p-value, HHI change
+  #   \extensiveTopSharePvalue   info-vs-control p-value, top-1 share change
+  #                              (referred to as "top-2 share" in the prose)
+  #   \privacyDifferentialPctSD  info coef / SD, privacy differential
+  #   \portfolioPrivacyPctSD     info coef / SD, portfolio privacy change
   # -------------------------------------------------------------------------
   if (.ws == "unweighted") {
     p_hhi  <- extensive$model_hhi$coeftable["experiment_conditioninfo",  "Pr(>|t|)"]
@@ -696,7 +623,7 @@ for (.ws in .specs_to_run) {
     b_pc    <- extensive$model_privacy_change$coeftable["experiment_conditioninfo", "Estimate"]
     
     assortment_values_file <- "assortment_did_values"
-    assortment_values_full <- file.path(VALUES_DIR, paste0(assortment_values_file, ".tex"))
+    assortment_values_full <- paste0(VALUES_DIR, assortment_values_file, ".tex")
     if (file.exists(assortment_values_full)) file.remove(assortment_values_full)
     
     save_tex_value(values = format_pvalue(p_hhi),
@@ -715,7 +642,7 @@ for (.ws in .specs_to_run) {
     cat(sprintf("\nSaved 4 macros to %s%s.tex\n", VALUES_DIR, assortment_values_file))
   }
   
-  # Fig 9: pre-registered intensive-margin specs on the baseline panel.
+  # Fig C.9: pre-registered intensive-margin specs on the baseline panel.
   preregistered_balanced <- run_preregistered_specs(
     balanced_panel = balanced_panel_post,
     full_time_dat  = full_time_dat,

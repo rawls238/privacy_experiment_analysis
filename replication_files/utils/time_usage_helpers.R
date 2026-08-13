@@ -53,36 +53,69 @@ AUX_DATA_DIR <- "../auxiliary_data/"
 # Core data loading
 # =============================================================================
 
-get_clean_time_data <- function() {
-  time_data_2 <- fread(paste0(EXT_DATA_DIR, "time_data_2.csv"))
-  privacy_info <- get_privacy_info_wide()
+# =============================================================================
+# get_clean_time_data()
+#
+# The analysis-sample layer for the time-use scripts. Data-quality cleaning now
+# lives in get_time_panel() -- dedup to max, corrupted dates, malformed ids and
+# websites, and the minimum-dwell rule -- so this function is only responsible
+# for sample selection and enrichment: wave windows, website aggregation,
+# privacy matching, and the event-time variables.
+#
+# CHANGED from the previous version:
+#   - Reads through get_time_panel() instead of fread()ing time_data_2.csv, so
+#     browsing time has exactly one entry point. This is what brings dedup and
+#     the 30-second rule into every time-use script at once.
+#   - Dropped na.omit(): time_data_2.csv has zero NAs in every column, so it
+#     removed nothing, and applied to all columns it was a hazard rather than a
+#     filter.
+#   - Dropped filter(!grepl("http", website)): now done in get_time_panel().
+#   - Dropped mutate(date = mdy(date)): get_time_panel() already returns a Date.
+#   - Dropped tstamp, user_id and timezone from the returned columns. After
+#     deduplicating to one row per (experiment_id, website, date) these have no
+#     unique value. Verified no consumer outside utils/ uses them; the one
+#     script that does use tstamp, exp_balance_table.R, reads its own raw data.
+#
+# Arguments:
+#   min_seconds  passed to get_time_panel(); NULL keeps every visit.
+# =============================================================================
+get_clean_time_data <- function(min_seconds = 30) {
+  
+  time_panel   <- get_time_panel(paste0(EXT_DATA_DIR, "time_data_2.csv"),
+                                 min_seconds = min_seconds, verbose = FALSE)
+  time_panel   <- as.data.frame(time_panel)
+  
+  privacy_info   <- get_privacy_info_wide()
   exp_conditions <- fread(paste0(EXT_DATA_DIR, "experiment_conditions_pilot_july_2024.csv"))
+  
   experiment_users <- exp_conditions[experiment_condition != "" & in_experiment == 'true']
+  experiment_users <- experiment_users %>%
+    mutate(wave_id = ifelse(wave_id == 3, 2, wave_id)) %>%
+    mutate(block_by_wave = paste(wave_id, block_idx, sep = '_'))
   
-  experiment_users <- experiment_users %>% mutate(wave_id = ifelse(wave_id == 3, 2, wave_id)) %>%
-    mutate(block_by_wave = paste(wave_id,block_idx,sep = '_'))
+  time_data_2 <- time_panel %>%
+    left_join(experiment_users %>%
+                select(experiment_id, wave_id, experiment_condition, block_by_wave),
+              by = "experiment_id")
   
-  time_data_2 <- time_data_2 %>% left_join(experiment_users %>% select(experiment_id, wave_id, experiment_condition, block_by_wave), by="experiment_id")
+  target_wave_ids <- exp_conditions[experiment_condition != "" & in_experiment == 'true',
+                                    experiment_id]
   
+  # Sample selection: experiment participants, inside their own wave window.
+  # `date` arrives as a Date from get_time_panel(), so no mdy() is needed.
+  filtered_time_data <- time_data_2 %>%
+    filter(experiment_id %in% target_wave_ids) %>%
+    filter((wave_id == 1 & date >= START_DATE_WAVE_1 & date < END_DATE_WAVE_1) |
+             (wave_id == 2 & date >= START_DATE_WAVE_2 & date < END_DATE_WAVE_2))
   
-  target_wave_ids <- exp_conditions[experiment_condition != "" & in_experiment == 'true', experiment_id]
-  # Filter time data
-  filtered_time_data <- time_data_2[experiment_id %in% target_wave_ids]
-  filtered_time_data <- filtered_time_data  %>% filter((wave_id == 1 & mdy(date) >= START_DATE_WAVE_1 & mdy(date) < END_DATE_WAVE_1) |
-                                                         (wave_id == 2 & mdy(date) >= START_DATE_WAVE_2 & mdy(date) < END_DATE_WAVE_2))
-  # Clean data following pipeline
   time_data_2_dropna <- filtered_time_data %>%
-    na.omit() %>%
-    filter(!grepl("http", website))
-  
-  time_data_2_dropna <- time_data_2_dropna %>%
     mutate(website = case_when(
       str_detect(tolower(website), "twitter\\.com") ~ "x.com",
       TRUE ~ website
     ))
   
   # Aggregate following the pipeline
-  time_data_2_aggregated <- aggregate_time_data(time_data_2_dropna)
+  time_data_2_aggregated      <- aggregate_time_data(time_data_2_dropna)
   time_data_2_aggregated_high <- high_level_aggregate(time_data_2_aggregated)
   
   # BUGFIX: rename twitter -> x in ALL website columns BEFORE the privacy
@@ -113,14 +146,13 @@ get_clean_time_data <- function() {
   # Privacy matching (now sees slug "x", merges correctly against privacy
   # domain_aggregated_high_level "x")
   privacy_unique <- unique(privacy_info, by = "domain")
-  time_data_2_aggregated_high_privacy <- map_privacy_data(time_data_2_aggregated_high, privacy_unique)
+  time_data_2_aggregated_high_privacy <- map_privacy_data(time_data_2_aggregated_high,
+                                                          privacy_unique)
   
-  # Select final columns (twitter->x rename moved above, before the join)
   final_data <- time_data_2_aggregated_high_privacy %>%
-    select(tstamp, date, user_id, experiment_id, website, website_aggregated,
-           website_aggregated_high_level, privacy_exist, time_spent, timezone,
-           elicitation_count, visit_count, wave_id, experiment_condition) %>%
-    mutate(date = mdy(date))
+    select(date, experiment_id, website, website_aggregated,
+           website_aggregated_high_level, privacy_exist, time_spent,
+           elicitation_count, visit_count, wave_id, experiment_condition)
   
   final_data <- final_data %>%
     mutate(
@@ -134,6 +166,7 @@ get_clean_time_data <- function() {
       ),
       weeks_since_intervention = as.integer(floor((date - ymd(treatment_date)) / 7))
     )
+  
   return(final_data)
 }
 
@@ -1536,4 +1569,126 @@ clean_site <- function(x) {
     if (last2 %in% MULTI_TLDS && n >= 3) paste(parts[n-2], last2, sep = ".")
     else last2
   }, character(1), USE.NAMES = FALSE)
+}
+
+# =============================================================================
+# get_time_panel()
+#
+# The single entry point for browsing time and visit counts. Everything that
+# needs time_spent or visit_count should come through here, so the cleaning
+# rules cannot drift between scripts again.
+#
+# Replaces reading panel_merged_CLEAN.fst for time. That file is a legacy
+# artifact of source_scripts/regressions.R; its time_spent and visit_count were
+# verified byte-identical to a rebuild from time_data_2.csv (100.0000% on all
+# 669,309 shared cells, zero cells unique to it), so it adds nothing.
+#
+# WHAT THIS FUNCTION DOES -- data quality only:
+#   1. Drops unattributable records: experiment_id "UNKNOWN", ids containing
+#      "test", ids whose length is not 7. UNKNOWN in particular is a key
+#      collision: dozens of different people on chromewebstore.google.com
+#      before the extension knows who they are.
+#   2. Drops corrupted dates (outside 2024-2026). Only 12 rows: 1969 x1,
+#      2010 x4, 2013 x6, 2089 x1. source_scripts/regressions.R intended this
+#      filter but its result was overwritten by the next line, so it never
+#      took effect.
+#   3. Drops malformed website values containing "http".
+#   4. Deduplicates to one row per (experiment_id, website, date) by taking the
+#      MAXIMUM. The extension stores browsing time as a per-(domain, date)
+#      cumulative total in `tabs`, and unlike trackers/ads/logs that object is
+#      NEVER cleared after a successful upload -- so repeated rows are repeated
+#      snapshots of a running total, and summing them double-counts. Only
+#      0.0774% of keys are affected and sum() vs max() differs by 0.0653% of
+#      all recorded seconds, so this is about being correct rather than about
+#      magnitude.
+#   5. Optionally drops visits under 30 seconds (default TRUE). These are
+#      mistaken opens and redirect hops: median 1 visit of 6 seconds, and the
+#      most-affected domains are auth/redirect pages and survey routers
+#      (t.maze.co 96%, router.cint.com 92%, gds.google.com 90%). The rule
+#      keeps 68.6% of rows but 99.51% of seconds and 93.3% of visits, is not
+#      selective on cookies-per-visit (median 2 in both the kept and dropped
+#      groups), and is not differential across treatment x post (p = 0.33 and
+#      0.17). The 30-second threshold is a convention, not a break in the
+#      distribution -- report a robustness cutoff if it matters.
+#
+# WHAT THIS FUNCTION DOES NOT DO -- left to each script:
+#   - website aggregation (aggregate_time_data / high_level_aggregate)
+#   - SURVEY_WEBSITES filtering, which needs the aggregated name
+#   - BAD_USERS, wave windows, treatment assignment: sample selection, not
+#     data quality
+#   - privacy-info matching
+#
+# Arguments:
+#   min_seconds   drop rows at or below this many seconds. NULL disables.
+#   verbose       print what each step removes.
+#
+# Returns a data.table keyed on (experiment_id, website, date) with columns
+#   experiment_id, website, date, time_spent, visit_count, elicitation_count
+# =============================================================================
+get_time_panel <- function(path = "../data/final_extension_data/time_data_2.csv",
+                           min_seconds = 30,
+                           verbose = TRUE) {
+  
+  stopifnot(requireNamespace("data.table", quietly = TRUE))
+  `%+%` <- function(a, b) paste0(a, b)
+  say <- function(...) if (verbose) cat(sprintf(...))
+  
+  raw <- data.table::fread(path)
+  n0 <- nrow(raw)
+  say("get_time_panel: %s raw rows\n", format(n0, big.mark = ","))
+  
+  # --- 1. unattributable ids ------------------------------------------------
+  raw <- raw[experiment_id != "UNKNOWN" &
+               !grepl("test", experiment_id, ignore.case = TRUE) &
+               nchar(experiment_id) == 7]
+  say("  after dropping UNKNOWN / test / malformed ids : %s (-%s)\n",
+      format(nrow(raw), big.mark = ","), format(n0 - nrow(raw), big.mark = ","))
+  
+  # --- 2. corrupted dates ---------------------------------------------------
+  n1 <- nrow(raw)
+  raw[, date := as.Date(date, format = "%m/%d/%Y")]
+  raw <- raw[!is.na(date) &
+               date >= as.Date("2024-01-01") & date <= as.Date("2026-12-31")]
+  say("  after dropping corrupted dates                : %s (-%s)\n",
+      format(nrow(raw), big.mark = ","), format(n1 - nrow(raw), big.mark = ","))
+  
+  # --- 3. malformed website values -------------------------------------------
+  n2 <- nrow(raw)
+  raw <- raw[!grepl("http", website, fixed = TRUE)]
+  say("  after dropping websites containing 'http'     : %s (-%s)\n",
+      format(nrow(raw), big.mark = ","), format(n2 - nrow(raw), big.mark = ","))
+  
+  # --- 4. one row per key, taking the running total's high-water mark --------
+  n3 <- nrow(raw)
+  keep_cols <- intersect(c("time_spent", "visit_count", "elicitation_count"),
+                         names(raw))
+  panel <- raw[, lapply(.SD, function(x) max(x, na.rm = TRUE)),
+               by = .(experiment_id, website, date), .SDcols = keep_cols]
+  say("  after deduplicating to one row per key (max)  : %s (-%s)\n",
+      format(nrow(panel), big.mark = ","), format(n3 - nrow(panel), big.mark = ","))
+  
+  # --- 5. minimum dwell ------------------------------------------------------
+  if (!is.null(min_seconds)) {
+    n4 <- nrow(panel)
+    panel <- panel[!is.na(time_spent) & time_spent > min_seconds]
+    say("  after requiring time_spent > %-4s             : %s (-%s)\n",
+        min_seconds, format(nrow(panel), big.mark = ","),
+        format(n4 - nrow(panel), big.mark = ","))
+  }
+  
+  data.table::setkey(panel, experiment_id, website, date)
+  
+  # Guards: the key must be unique and the measures non-negative, or something
+  # upstream changed and every downstream number is suspect.
+  stopifnot(!anyDuplicated(panel, by = c("experiment_id", "website", "date")))
+  stopifnot(all(panel$time_spent  >= 0, na.rm = TRUE))
+  stopifnot(all(panel$visit_count >= 0, na.rm = TRUE))
+  
+  say("  final: %s cells | %s participants | %s websites | %s to %s\n",
+      format(nrow(panel), big.mark = ","),
+      format(data.table::uniqueN(panel$experiment_id), big.mark = ","),
+      format(data.table::uniqueN(panel$website), big.mark = ","),
+      min(panel$date), max(panel$date))
+  
+  panel[]
 }

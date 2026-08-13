@@ -46,6 +46,15 @@
 #   output/values/privacy_seeking_values.tex
 #   output/tables/cookie_banner_interactions_treatment[_suffix].tex
 #
+# CHANGES this version:
+#   - Section 3 (Appendix C cookie-banner table): dropped block_by_wave from the
+#     fixed effects. Each participant belongs to exactly one wave-by-block, so
+#     participant FE already absorbs it; the two are nested and the estimates are
+#     unchanged. The redundant "Block FE" row is removed from the table so it no
+#     longer implies an extra layer of control. block_by_wave is still built in
+#     user_grid because Section 2's Fig 7(a) regression uses it (that spec has no
+#     participant FE, so block FE is doing real work there).
+#
 # Note: Previous version of this script also produced (now removed as dead code,
 # not in paper):
 #   - privacy_policy_treatment_effects_visits.pdf (exploratory)
@@ -355,6 +364,8 @@ cat("\n=== Section 2: Info Acquisition (Fig 7a) ===\n")
 info_acq_full <- join_weights(info_acq_full)
 
 # Fig 7(a) regression: weekly DiD on number of info-acquisition events.
+# block_by_wave FE is kept here: this specification has no participant FE, so
+# the block effects are not otherwise absorbed.
 t3 <- run_weighted_feols(
   number_of_visits ~ experiment_condition * as.factor(weeks_since_intervention) | block_by_wave,
   cluster = ~experiment_id,
@@ -437,24 +448,29 @@ cookie_banner_interaction_full$experiment_condition <- factor(
 cat("\n=== Section 3: Cookie Banner (App C Table) ===\n")
 cookie_banner_interaction_full <- join_weights(cookie_banner_interaction_full)
 
+# [CHANGED] block_by_wave dropped from the fixed effects. Each participant sits
+# in exactly one wave-by-block, so participant FE already absorbs it; the two
+# are nested and the estimates are unchanged. Removing it also drops the
+# redundant "Block FE" row from the table, which otherwise implies an extra
+# layer of control that is not there.
 t_total <- run_weighted_feols(
   number_of_cookie_banner_interactions ~ experiment_condition * as.factor(post)
-  | as.factor(weeks_since_intervention) + experiment_id + block_by_wave,
+  | as.factor(weeks_since_intervention) + experiment_id,
   cluster = ~experiment_id,
   data    = cookie_banner_interaction_full
 )
 t_distinct <- run_weighted_feols(
   distinct_domains ~ experiment_condition * as.factor(post)
-  | as.factor(weeks_since_intervention) + experiment_id + block_by_wave,
+  | as.factor(weeks_since_intervention) + experiment_id,
   cluster = ~experiment_id,
   data    = cookie_banner_interaction_full
 )
 
+# [CHANGED] block_by_wave entry removed from the dictionary along with the FE.
 dict <- c(
   "experiment_conditioninfo:as.factor(post)1"     = "Information Treatment x Post",
   "experiment_conditionsaliency:as.factor(post)1" = "Saliency Treatment x Post",
   "experiment_id"                                 = "Participant FE",
-  "block_by_wave"                                 = "Block FE",
   "as.factor(weeks_since_intervention)"           = "Weeks FE"
 )
 

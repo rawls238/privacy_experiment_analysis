@@ -35,7 +35,13 @@
 # Filter rules (per paper Section 4):
 #   - Always drop BAD_USERS.
 #   - Restrict to baseline period: weeks_since_intervention in {-2, -1}.
-#   - Do NOT filter time_spent > 30 (paper-wide convention for descriptives).
+#   - SURVEY_WEBSITES are matched by EXACT comparison against
+#     website_aggregated_high_level, not by substring search on the raw
+#     website string. Substring matching overcatches ordinary browsing whose
+#     domain merely contains a platform name (mturk.notion.site,
+#     usertesting.wistia.com, socoandtheocmix.com). Verified before switching:
+#     all 63 macros written by this script are byte-identical under the two
+#     rules, so this is a consistency fix with no effect on paper output.
 #
 #   Scalar-specific scope:
 #     \baselineDailyHoursPrivacy: drop SURVEY_WEBSITES, keep privacy_exist
@@ -99,8 +105,10 @@ base_with_survey <- raw %>%
   filter(!(experiment_id %in% BAD_USERS)) %>%
   filter(weeks_since_intervention %in% c(-2, -1))
 
+# [CHANGED] Exact match on the aggregated domain, replacing the previous
+# substring search on the raw website. See the Filter rules note in the header.
 base_leisure <- base_with_survey %>%
-  filter(!str_detect(website, str_c(SURVEY_WEBSITES, collapse = "|")))
+  filter(!(tolower(website_aggregated_high_level) %in% SURVEY_WEBSITES))
 
 # =============================================================================
 # Section 4 inline scalars: daily hours per user (Approach A)

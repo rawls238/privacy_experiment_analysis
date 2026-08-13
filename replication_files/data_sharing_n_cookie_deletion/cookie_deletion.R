@@ -78,7 +78,16 @@
 #   - CPV and unique-cookie specifications use participant and website fixed
 #     effects without day-of-week fixed effects.
 #   - Browsing-time specifications retain day-of-week fixed effects.
-# =============================================================================
+# new change 0813 2026
+#   - Browsing time and visit counts now come from get_time_panel() instead of
+#     panel_merged_CLEAN.fst: deduplicated to one row per
+#     (participant, website, day) by taking the maximum, corrupted dates and
+#     malformed ids removed, and a 30-second minimum dwell applied.
+#   - The cookie join is now an inner merge rather than a left merge with
+#     zero-filling, since unmatched cells are collection gaps, not genuine
+#     zeros.
+#   - cookie_treatment_idx now comes from the experiment-conditions file,
+#     which was always its source.
 
 library(jsonlite)
 library(data.table)
@@ -322,30 +331,26 @@ QUINT_LAB <- paste0(
 # =============================================================================
 # 0. DATA PREPARATION
 # =============================================================================
+# Browsing time and visit counts come from get_time_panel(), the shared entry
+# point, which deduplicates to one row per (participant, website, day) by
+# taking the maximum, drops corrupted dates and malformed ids, and applies the
+# 30-second minimum dwell. It replaces panel_merged_CLEAN.fst, whose time
+# columns were verified byte-identical to a rebuild from time_data_2.csv.
+#
+# Cookie measures come from panel_cookies_v2.fst. The two are joined with an
+# INNER merge: a cell enters the sample only if it has both a browsing record
+# and a cookie record. The previous version started from the legacy cookie
+# panel and left-joined the rebuilt one, filling unmatched cells with zero
+# cookies -- but those cells are collection gaps rather than genuine zeros
+# (their heaviest sites are youtube, facebook and x, which certainly set
+# cookies), so imputing zero was not defensible. Because the old base panel
+# also required a time match, the resulting sample is the same object as
+# before; the merge is simply explicit now.
 
-panel <- read_fst(
-  "../data/tracker_panel/panel_merged_CLEAN.fst",
-  as.data.table = TRUE
-)
-
-panel[, date := as.Date(date)]
-
-panel[
-  ,
-  c(
-    "n_cookies_third_party",
-    "n_trackers_third_party",
-    "cookies_per_visit"
-  ) := NULL
-]
-
-panel <- unique(
-  panel,
-  by = c(
-    "experiment_id",
-    "website",
-    "date"
-  )
+time_panel <- get_time_panel(
+  path = "../data/final_extension_data/time_data_2.csv",
+  min_seconds = 30,
+  verbose = TRUE
 )
 
 cookies <- read_fst(
@@ -353,8 +358,13 @@ cookies <- read_fst(
   as.data.table = TRUE
 )
 
+cookies[
+  ,
+  date := as.Date(date)
+]
+
 panel <- merge(
-  panel,
+  time_panel,
   cookies[
     ,
     .(
@@ -369,21 +379,19 @@ panel <- merge(
     "experiment_id",
     "website",
     "date"
-  ),
-  all.x = TRUE
+  )
 )
 
-panel[
-  is.na(cookie_events_3rd_p),
-  cookie_events_3rd_p := 0L
-]
+cat(
+  sprintf(
+    "Cookie join: %s browsing cells -> %s with a cookie record (%.1f%%)\n",
+    format(nrow(time_panel), big.mark = ","),
+    format(nrow(panel), big.mark = ","),
+    100 * nrow(panel) / nrow(time_panel)
+  )
+)
 
-panel[
-  is.na(unique_cookies_3rd_p),
-  unique_cookies_3rd_p := 0L
-]
-
-rm(cookies)
+rm(cookies, time_panel)
 gc(verbose = FALSE)
 
 ec <- fread(
@@ -403,23 +411,12 @@ ec_clean[
   wave_id := 2L
 ]
 
-drop_cols <- intersect(
-  c(
-    "wave_id",
-    "treatment",
-    "experiment_condition"
-  ),
-  names(panel)
-)
-
-if (length(drop_cols) > 0) {
-  panel[, (drop_cols) := NULL]
-}
-
 panel <- panel[
   experiment_id %in% ec_clean$experiment_id
 ]
 
+# cookie_treatment_idx used to arrive with panel_merged_CLEAN.fst. It now comes
+# from the experiment-conditions file, which was always its original source.
 panel <- merge(
   panel,
   ec_clean[
@@ -427,7 +424,8 @@ panel <- merge(
     .(
       experiment_id,
       wave_id,
-      experiment_condition
+      experiment_condition,
+      cookie_treatment_idx
     )
   ],
   by = "experiment_id",
@@ -557,6 +555,15 @@ t_full <- panel_full[
     !is.na(visit_count) &
     visit_count > 0
 ]
+
+cat(
+  sprintf(
+    "Analysis sample t1: %s cells | %s participants | %s sites\n",
+    format(nrow(t1), big.mark = ","),
+    format(uniqueN(t1$experiment_id), big.mark = ","),
+    format(uniqueN(t1$website), big.mark = ",")
+  )
+)
 
 t_full[
   ,
@@ -778,7 +785,6 @@ top15_sites <- ranked_sites[
   1:N_TOP_SITES,
   website
 ]
-
 
 # =============================================================================
 # SECTION 1: DID DELETION HAPPEN, AND WHAT ARE THE OVERALL EFFECTS?
