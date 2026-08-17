@@ -1,278 +1,375 @@
+#!/usr/bin/env Rscript
 # =============================================================================
-# data_sharing.R   (replication_files pipeline version)
+# data_sharing.R -- Appendix D within-website data sharing
 #
-# Within-website data sharing: balanced-panel CPV DiD -- Appendix D
-# (main_v2.tex, D.2 Data Sharing, Table D.3 [tab:cpv_balanced_panel]).
-#
-# RESEARCH QUESTION
-#   Did the information intervention change data sharing WITHIN the websites
-#   users continue to use? Outcomes are measured at the (user, website, day)
-#   level, so with user + website FE the estimate captures within-user,
-#   within-site changes -- not substitution across sites (site choice is
-#   analyzed elsewhere in the paper).
-#
-# SPECIFICATION (Table D.3)
-#   y_ijt = b1*(Sal_i x Post_t) + b2*(Info_i x Post_t)
-#           + eta_i + eta_j + eta_t + eps_ijt
-#   User, website, and calendar-date FE; SEs clustered at the user level.
-#   Two dependent variables:
-#     (1) log(1 + third-party cookies per visit)   -- event intensity
-#     (2) log(1 + unique third-party cookies)      -- exposure breadth
-#
-# BALANCED PANEL
-#   Restricted to (user, website) pairs observed at least once in BOTH the
-#   pre-intervention and post-intervention periods, so the coefficient is
-#   identified from within-pair changes. Strictly-daily balance is infeasible
-#   (<1% of pairs); the >=1-day-each-side definition retains ~18% of pairs
-#   and ~60% of observations.
-#
-# SAMPLE
-#   Information-intervention experiment window (pre + post info, excluding
-#   the cookie-deletion period):
-#     Wave 1: 06/14 - 07/25   Wave 2: 06/28 - 08/08
-#
-# CHANGES vs previous version of this script:
-#   - COOKIE MEASURE REPLACED. The old panel column n_cookies_third_party
-#     classified third-party cookies by substring match, which contradicts the
-#     definition stated in the paper (registrable domain: cookies set by
-#     accounts.google.com on mail.google.com are FIRST party). Cookie measures
-#     now come from panel_cookies_v2.fst, the same rebuilt panel used by
-#     cookie_deletion.R, so Appendix D and Appendix E share one definition.
-#     The old panel's ~4k duplicated (user, website, day) keys are removed
-#     before the merge; verified lossless (duplicated keys agree on
-#     time_spent and visit_count in every case).
-#   - SECOND DEPENDENT VARIABLE ADDED. log(1 + unique_cookies_3rd_p) joins CPV
-#     as column (2), mirroring Table E.1. CPV is an event count and is
-#     inflated on dynamic sites (Gmail, Drive) that re-set the same cookie
-#     through background polling; the unique count is not.
-#   - COLUMN HEADERS ADDED so the dependent variable is named, matching the
-#     format of Tables D.1 and D.2.
-#   - Four \cpvBalUc* macros added.
-#
-#   Earlier version had also REMOVED Spec 1 (user-level cross-section), Spec 2
-#   (user-level DiD), and the event-time trend plot, plus their 8 macros
-#   (\cpvXs*, \cpvDid*). User-level aggregation mixes within-site changes with
-#   cross-site substitution; per author decision (Guy, Slack) this section is
-#   about within-site changes only. The corresponding paper content was moved
-#   into a \begin{comment} block.
-#
-# Inputs:
-#   ../data/tracker_panel/panel_merged_CLEAN.fst
-#   ../data/processed_data/panel_cookies_v2.fst
-#   ../data/final_extension_data/experiment_conditions_pilot_july_2024.csv
-#
-# Dependencies:
-#   replication_files/utils/values.R
-#   replication_files/utils/time_usage_helpers.R
-#   replication_files/utils/number_format_helpers.R
-#   replication_files/utils/tex_helpers.R
-#
-# Outputs:
-#   output/tables/info_treatment_balanced_panel_did.tex
-#   output/values/data_sharing_info_values.tex
-#     \cpvBalSalCoef   \cpvBalSalPval   \cpvBalInfoCoef   \cpvBalInfoPval
-#     \cpvBalUcSalCoef \cpvBalUcSalPval \cpvBalUcInfoCoef \cpvBalUcInfoPval
-#     \cpvBalPairPct   \cpvBalObsPct    \cpvBalNUsers
-#
-# USAGE
-#   setwd("~/Dropbox/spring2025experiment/code_github")
-#   source("replication_files/data_sharing_n_cookie_deletion/data_sharing.R")
-# change 0813
-#   - TIME SOURCE CHANGED. Browsing time and visit counts now come from
-#     get_time_panel() instead of panel_merged_CLEAN.fst: deduplicated to one
-#     row per (participant, website, day) by taking the maximum, corrupted
-#     dates and malformed ids removed, and a 30-second minimum dwell applied.
-#   - The cookie join is now an inner merge rather than a left merge with
-#     zero-filling, since unmatched cells are collection gaps, not genuine
-#     zeros. The match-rate guard is no longer needed.
+# Confirmed design
+#   - Continuing participant-website pairs are defined from browsing data only.
+#   - No minimum-dwell threshold.
+#   - Cookie data are left-joined only after the browsing sample is fixed.
+#   - Missing cookie-panel rows remain missing; observed zeros remain zero.
+#   - Cookies per Visit: third-party Set-Cookie actions, PPML with visits as
+#     exposure (implemented as offset = log(visit_count)).
+#   - Unique Third-Party Cookies: distinct third-party cookie identities seen
+#     in request snapshots during the participant-website-day, PPML in levels.
+#     "Snapshot" is a construction detail, not the displayed outcome name.
+#   - Participant, website, and calendar-date FE; participant-clustered SE.
+#   - No winsorization and no named-website exclusions.
 # =============================================================================
 
-library(jsonlite)   # MUST precede utils: time_usage_helpers.R uses fromJSON()
-library(data.table)
-library(fst)
-library(fixest)
-library(savetexvalue)
+suppressMessages({
+  library(jsonlite)  # Must precede time_usage_helpers.R.
+  library(data.table)
+  library(fst)
+  library(fixest)
+  library(savetexvalue)
+})
 
 setwd("~/Dropbox/spring2025experiment/code_github")
 
-source("replication_files/utils/values.R")              # SURVEY_WEBSITES, BAD_USERS, dates
-source("replication_files/utils/time_usage_helpers.R")  # aggregate_time_data, high_level_aggregate
+source("replication_files/utils/values.R")
+source("replication_files/utils/time_usage_helpers.R")
 source("replication_files/utils/number_format_helpers.R")
-source("replication_files/utils/tex_helpers.R")         # write_tabular_only
+source("replication_files/utils/tex_helpers.R")
 
-select <- dplyr::select  # prevent data.table masking
+select <- dplyr::select
+setDTthreads(4L)
+options(datatable.verbose = FALSE, scipen = 999)
 
-TABLES_DIR <- "output/tables/"
-VALUES_DIR <- "output/values/"
+TIME_PATH <- "../data/final_extension_data/time_data_2.csv"
+COOKIE_PATH <- "../data/processed_data/panel_cookies.fst"
+ASSIGNMENT_PATH <- paste0(
+  "../data/final_extension_data/",
+  "experiment_conditions_pilot_july_2024.csv"
+)
 
-# Cookie-deletion-specific bad users (deletion-loop logging artifacts), kept
-# consistent with cookie_deletion.R:
-#   6ccc7d5 - 200k AUTOMATIC_COOKIE_DELETION events in 10 min
-#   7d6864c - 5 deletion events on a day with 0 panel browsing
+TABLE_PATH <- "output/tables/info_treatment_balanced_panel_did.tex"
+VALUES_PATH <- "output/values/data_sharing_info_values.tex"
+RESULTS_PATH <- paste0(
+  "output/diagnostics/appendix_d_ppml/",
+  "appendix_d_ppml_coefficients.csv"
+)
+
+KEY <- c("experiment_id", "website", "date")
+SIGNIF <- c("***" = 0.01, "**" = 0.05, "*" = 0.1)
 BAD_USERS <- union(BAD_USERS, c("6ccc7d5", "7d6864c"))
 
-SIGNIF <- c("***" = 0.01, "**" = 0.05, "*" = 0.1)
+dir.create(dirname(TABLE_PATH), recursive = TRUE, showWarnings = FALSE)
+dir.create(dirname(VALUES_PATH), recursive = TRUE, showWarnings = FALSE)
+dir.create(dirname(RESULTS_PATH), recursive = TRUE, showWarnings = FALSE)
+
+require_columns <- function(x, required, label) {
+  missing <- setdiff(required, names(x))
+  if (length(missing)) {
+    stop(label, " is missing: ", paste(missing, collapse = ", "))
+  }
+}
+
 
 # =============================================================================
-# 1. DATA PREP
+# 1. Browsing-defined continuing participant-website pairs
 # =============================================================================
-# Browsing time and visit counts come from get_time_panel(), the shared entry
-# point, which deduplicates to one row per (participant, website, day) by
-# taking the maximum, drops corrupted dates and malformed ids, and applies the
-# 30-second minimum dwell. It replaces panel_merged_CLEAN.fst, whose time
-# columns were verified byte-identical to a rebuild from time_data_2.csv.
-#
-# Cookie measures come from panel_cookies_v2.fst, joined with an INNER merge:
-# a cell enters the sample only if it has both a browsing record and a cookie
-# record. The previous version started from the legacy panel and left-joined
-# the rebuilt one, filling unmatched cells with zero cookies -- but those cells
-# are collection gaps rather than genuine zeros (their heaviest sites are
-# youtube, facebook and x, which certainly set cookies), so imputing zero was
-# not defensible. The old base panel also required a time match, so the
-# resulting sample is the same object as before; the merge is explicit now,
-# and the match-rate guard it needed is gone.
-#
-# The legacy n_cookies_third_party column disappears with panel_merged_CLEAN.
-# It classified third-party cookies by substring match, contradicting the
-# registrable-domain definition stated in the paper.
 
-time_panel <- get_time_panel(
-  path = "../data/final_extension_data/time_data_2.csv",
-  min_seconds = NULL,
+ec <- fread(ASSIGNMENT_PATH)
+require_columns(
+  ec,
+  c("experiment_id", "in_experiment", "wave_id", "experiment_condition"),
+  "Assignment file"
+)
+ec[, experiment_id := as.character(experiment_id)]
+ec[, wave_id := as.integer(wave_id)]
+ec <- ec[
+  tolower(as.character(in_experiment)) == "true" &
+    !experiment_id %in% BAD_USERS
+]
+ec[wave_id == 3L, wave_id := 2L]
+ec <- ec[
+  wave_id %in% c(1L, 2L) &
+    experiment_condition %in% c("control", "saliency", "info"),
+  .(experiment_id, wave_id, experiment_condition)
+]
+if (anyDuplicated(ec$experiment_id)) stop("Duplicate experiment_id in assignment")
+
+panel <- get_time_panel(
+  path = TIME_PATH,
+  min_seconds = 0,
   verbose = TRUE
 )
-
-cookies <- read_fst("../data/processed_data/panel_cookies_v2.fst",
-                    as.data.table = TRUE)
-cookies[, date := as.Date(date)]
+require_columns(panel, c(KEY, "time_spent", "visit_count"), "Time panel")
+panel[, experiment_id := as.character(experiment_id)]
+panel[, date := as.Date(date)]
+if (anyDuplicated(panel, by = KEY)) stop("Duplicate key in time panel")
 
 panel <- merge(
-  time_panel,
-  cookies[, .(experiment_id, website, date,
-              cookie_events_3rd_p, unique_cookies_3rd_p)],
-  by = c("experiment_id", "website", "date")
+  panel[experiment_id %in% ec$experiment_id],
+  ec,
+  by = "experiment_id",
+  all.x = TRUE,
+  sort = FALSE
 )
 
-cat(sprintf("Cookie join: %s browsing cells -> %s with a cookie record (%.1f%%)\n",
-            format(nrow(time_panel), big.mark = ","),
-            format(nrow(panel), big.mark = ","),
-            100 * nrow(panel) / nrow(time_panel)))
+panel[, wave_start := fifelse(
+  wave_id == 1L, START_DATE_WAVE_1, START_DATE_WAVE_2
+)]
+panel[, treatment_date := fifelse(
+  wave_id == 1L, TREATMENT_DATE_WAVE_1, TREATMENT_DATE_WAVE_2
+)]
+panel[, cookie_cutoff := fifelse(
+  wave_id == 1L, COOKIE_TREATMENT_WAVE_1_1, COOKIE_TREATMENT_WAVE_2_1
+)]
+panel <- panel[
+  date >= wave_start & date < cookie_cutoff &
+    !is.na(visit_count) & visit_count > 0
+]
 
-rm(cookies, time_panel); gc(verbose = FALSE)
-
-ec <- fread("../data/final_extension_data/experiment_conditions_pilot_july_2024.csv")
-ec_clean <- ec[in_experiment == "true" & !experiment_id %in% BAD_USERS]
-ec_clean[wave_id == 3, wave_id := 2L]
-
-panel <- panel[experiment_id %in% ec_clean$experiment_id]
-panel <- merge(panel, ec_clean[, .(experiment_id, wave_id, experiment_condition)],
-               by = "experiment_id", all.x = TRUE)
-panel[wave_id == 3, wave_id := 2L]
-
-# Info-experiment timeline (values.R constants)
-panel[, wave_start     := fifelse(wave_id == 1L, START_DATE_WAVE_1,     START_DATE_WAVE_2)]
-panel[, treatment_date := fifelse(wave_id == 1L, TREATMENT_DATE_WAVE_1, TREATMENT_DATE_WAVE_2)]
-panel[, cookie_cutoff  := fifelse(wave_id == 1L, COOKIE_TREATMENT_WAVE_1_1,
-                                  COOKIE_TREATMENT_WAVE_2_1)]
-panel <- panel[date >= wave_start & date < cookie_cutoff &
-                 !is.na(visit_count) & visit_count > 0]
-
-# SURVEY_WEBSITES filter (via aggregated domain to avoid substring overcatch)
-site_df <- data.frame(website = unique(panel$website), stringsAsFactors = FALSE)
+# Existing survey-platform exclusion.
+site_df <- data.frame(website = unique(panel$website))
 site_df <- aggregate_time_data(site_df, field = "website")
 site_df <- high_level_aggregate(site_df, field = "website_aggregated")
 site_lookup <- as.data.table(unique(
-  site_df[, c("website", "website_aggregated_high_level")]))
-panel <- merge(panel, site_lookup, by = "website", all.x = TRUE)
-panel <- panel[!(tolower(website_aggregated_high_level) %in% SURVEY_WEBSITES)]
+  site_df[, c("website", "website_aggregated_high_level")]
+))
+panel <- merge(panel, site_lookup, by = "website", all.x = TRUE, sort = FALSE)
+panel <- panel[
+  !(tolower(website_aggregated_high_level) %in% SURVEY_WEBSITES)
+]
 
-panel[, post      := as.integer(date >= treatment_date)]
-panel[, treatment := factor(experiment_condition,
-                            levels = c("control", "saliency", "info"))]
+panel[, post := as.integer(date >= treatment_date)]
+panel[, treatment := factor(
+  experiment_condition,
+  levels = c("control", "saliency", "info")
+)]
 
-# CPV normalizes event counts by visits (intensity). UC is NOT divided by
-# visits: a unique-cookie count does not scale linearly with visit count, so
-# dividing would inject spurious variation. Matches cookie_deletion.R.
-panel[, log_cpv := log(1 + cookie_events_3rd_p / visit_count)]
-panel[, log_uc  := log(1 + unique_cookies_3rd_p)]
+# This pair list is determined before cookie availability is examined.
+pair_support <- panel[, .(
+  has_pre = any(post == 0L),
+  has_post = any(post == 1L)
+), by = .(experiment_id, website)]
+continuing_pairs <- pair_support[
+  has_pre & has_post,
+  .(experiment_id, website)
+]
 
-cat(sprintf("Analysis sample: %s cells | %s participants | %s sites\n",
-            format(nrow(panel), big.mark = ","),
-            format(uniqueN(panel$experiment_id), big.mark = ","),
-            format(uniqueN(panel$website), big.mark = ",")))
+pair_pct <- 100 * nrow(continuing_pairs) / nrow(pair_support)
+bal_browsing <- merge(
+  panel,
+  continuing_pairs,
+  by = c("experiment_id", "website"),
+  sort = FALSE
+)
+obs_pct <- 100 * nrow(bal_browsing) / nrow(panel)
+if (anyDuplicated(bal_browsing, by = KEY)) {
+  stop("Duplicate key in continuing-pair browsing sample")
+}
 
-# =============================================================================
-# 2. BALANCED PANEL: (user, website) pairs observed pre AND post
-# =============================================================================
-pw <- panel[, .(n_pre = sum(post == 0), n_post = sum(post == 1)),
-            by = .(experiment_id, website)]
-pair_pct <- 100 * pw[n_pre > 0 & n_post > 0, .N] / nrow(pw)
-
-bal <- merge(panel, pw[n_pre > 0 & n_post > 0, .(experiment_id, website)],
-             by = c("experiment_id", "website"))
-obs_pct <- 100 * nrow(bal) / nrow(panel)
-
-cat(sprintf("Balanced panel: %.1f%% of pairs, %.1f%% of observations, %d users, %d sites\n",
-            pair_pct, obs_pct, uniqueN(bal$experiment_id), uniqueN(bal$website)))
-
-# =============================================================================
-# 3. TABLE D.3: within-site DiD -> info_treatment_balanced_panel_did.tex
-# =============================================================================
-# [CHANGED] Two dependent variables, mirroring Table E.1, with column headers
-# naming each one so the format matches Tables D.1 and D.2.
-m_bal_cpv <- feols(log_cpv ~ i(treatment, post, ref = "control")
-                   | experiment_id + website + date,
-                   data = bal, cluster = ~experiment_id, notes = FALSE)
-m_bal_uc  <- feols(log_uc ~ i(treatment, post, ref = "control")
-                   | experiment_id + website + date,
-                   data = bal, cluster = ~experiment_id, notes = FALSE)
-
-DICT_BAL <- c(`treatment::saliency:post` = "Saliency $\\times$ Post",
-              `treatment::info:post`     = "Information $\\times$ Post",
-              `experiment_id`            = "Participant FE",
-              `website`                  = "Website FE",
-              `date`                     = "Date FE")
-
-bal_tex <- etable(m_bal_cpv, m_bal_uc,
-                  headers = c("log(CPV)", "log(Unique 3rd Party Cookies)"),
-                  dict = DICT_BAL, digits = 3, signif.code = SIGNIF,
-                  depvar = FALSE, fitstat = c("n", "r2"), tex = TRUE)
-write_tabular_only(bal_tex,
-                   file = paste0(TABLES_DIR, "info_treatment_balanced_panel_did.tex"))
 
 # =============================================================================
-# 4. INLINE SCALARS -> data_sharing_info_values.tex
+# 2. Attach cookie outcomes without redefining the browsing sample
 # =============================================================================
-info_values_file <- paste0(VALUES_DIR, "data_sharing_info_values.tex")
-suppressWarnings(file.remove(info_values_file))
 
-# --- column (1): cookies per visit ------------------------------------------
-save_tex_value(format_coef(coef(m_bal_cpv)["treatment::saliency:post"]),
-               name = "cpvBalSalCoef", file = info_values_file)
-save_tex_value(format_pvalue(pvalue(m_bal_cpv)["treatment::saliency:post"]),
-               name = "cpvBalSalPval", file = info_values_file)
-save_tex_value(format_coef(coef(m_bal_cpv)["treatment::info:post"]),
-               name = "cpvBalInfoCoef", file = info_values_file)
-save_tex_value(format_pvalue(pvalue(m_bal_cpv)["treatment::info:post"]),
-               name = "cpvBalInfoPval", file = info_values_file)
+cookies <- read_fst(COOKIE_PATH, as.data.table = TRUE)
+require_columns(
+  cookies,
+  c(
+    KEY,
+    "tracker_record_observed",
+    "set_cookie_actions_3rd_p",
+    "unique_snapshot_cookies_3rd_p"
+  ),
+  "Cookie panel"
+)
+cookies[, experiment_id := as.character(experiment_id)]
+cookies[, date := as.Date(date)]
+if (anyDuplicated(cookies, by = KEY)) stop("Duplicate key in cookie panel")
 
-# --- [CHANGED] column (2): unique third-party cookies -----------------------
-save_tex_value(format_coef(coef(m_bal_uc)["treatment::saliency:post"]),
-               name = "cpvBalUcSalCoef", file = info_values_file)
-save_tex_value(format_pvalue(pvalue(m_bal_uc)["treatment::saliency:post"]),
-               name = "cpvBalUcSalPval", file = info_values_file)
-save_tex_value(format_coef(coef(m_bal_uc)["treatment::info:post"]),
-               name = "cpvBalUcInfoCoef", file = info_values_file)
-save_tex_value(format_pvalue(pvalue(m_bal_uc)["treatment::info:post"]),
-               name = "cpvBalUcInfoPval", file = info_values_file)
+bal <- merge(
+  bal_browsing,
+  cookies[, .(
+    experiment_id,
+    website,
+    date,
+    tracker_record_observed,
+    set_cookie_actions_3rd_p,
+    unique_snapshot_cookies_3rd_p
+  )],
+  by = KEY,
+  all.x = TRUE,
+  sort = FALSE
+)
+if (nrow(bal) != nrow(bal_browsing)) stop("Cookie join changed row count")
+if (anyDuplicated(bal, by = KEY)) stop("Cookie join produced duplicate keys")
 
-# --- sample composition ------------------------------------------------------
+bal[, cookie_measurement_observed := !is.na(tracker_record_observed)]
+cookie_coverage_pct <- 100 * mean(bal$cookie_measurement_observed)
+
+# Missing tracker-panel rows stay missing and do not enter the cookie models.
+# Matched rows with zero recorded cookies remain valid zeros.
+bal <- bal[cookie_measurement_observed]
+if (anyNA(bal[, .(
+  visit_count,
+  set_cookie_actions_3rd_p,
+  unique_snapshot_cookies_3rd_p
+)])) {
+  stop("Matched cookie rows contain missing model variables")
+}
+if (any(bal$visit_count <= 0)) stop("visit_count exposure must be positive")
+if (any(bal$set_cookie_actions_3rd_p < 0) ||
+    any(bal$unique_snapshot_cookies_3rd_p < 0)) {
+  stop("Cookie outcomes must be nonnegative")
+}
+
+cat(sprintf(
+  paste0(
+    "Continuing sample: %.1f%% of pairs, %.1f%% of browsing rows, ",
+    "%d participants, %d websites\n"
+  ),
+  pair_pct, obs_pct, uniqueN(bal$experiment_id), uniqueN(bal$website)
+))
+cat(sprintf(
+  "Cookie measurement coverage within continuing browsing rows: %.1f%%\n",
+  cookie_coverage_pct
+))
+
+
+# =============================================================================
+# 3. PPML models and Table D.3
+# =============================================================================
+
+# The offset fixes the coefficient on log(visit_count) at one:
+# E[Set-Cookie actions | X] = visit_count * exp(X beta + fixed effects).
+m_bal_cpv <- fepois(
+  set_cookie_actions_3rd_p ~ i(treatment, post, ref = "control") |
+    experiment_id + website + date,
+  data = bal,
+  offset = ~log(visit_count),
+  cluster = ~experiment_id,
+  notes = FALSE
+)
+
+# Displayed name: Unique Third-Party Cookies. Internally this is deduplicated
+# within participant-website-day from request-cookie snapshots.
+m_bal_uc <- fepois(
+  unique_snapshot_cookies_3rd_p ~ i(treatment, post, ref = "control") |
+    experiment_id + website + date,
+  data = bal,
+  cluster = ~experiment_id,
+  notes = FALSE
+)
+
+DICT_BAL <- c(
+  `treatment::saliency:post` = "Saliency $\\times$ Post",
+  `treatment::info:post` = "Information $\\times$ Post",
+  `experiment_id` = "Participant FE",
+  `website` = "Website FE",
+  `date` = "Date FE"
+)
+
+bal_tex <- etable(
+  m_bal_cpv,
+  m_bal_uc,
+  headers = c("Cookies per Visit", "Unique Third-Party Cookies"),
+  dict = DICT_BAL,
+  digits = 3,
+  signif.code = SIGNIF,
+  depvar = FALSE,
+  fitstat = c("n", "pr2"),
+  tex = TRUE
+)
+write_tabular_only(bal_tex, file = TABLE_PATH)
+
+
+# =============================================================================
+# 4. Readable percentage effects and LaTeX macros
+# =============================================================================
+
+model_result <- function(model, term, outcome, treatment_name) {
+  if (!term %in% names(coef(model))) {
+    stop("Model did not estimate required term: ", term)
+  }
+  beta <- unname(coef(model)[term])
+  interval <- confint(model, parm = term, level = 0.95)
+  data.table(
+    outcome = outcome,
+    treatment = treatment_name,
+    beta_log_scale = beta,
+    se_log_scale = unname(se(model)[term]),
+    percent_effect = 100 * (exp(beta) - 1),
+    percent_ci_low = 100 * (exp(interval[1, 1]) - 1),
+    percent_ci_high = 100 * (exp(interval[1, 2]) - 1),
+    p_value = unname(pvalue(model)[term]),
+    observations = nobs(model)
+  )
+}
+
+results <- rbindlist(list(
+  model_result(
+    m_bal_cpv, "treatment::saliency:post",
+    "Cookies per Visit", "Saliency"
+  ),
+  model_result(
+    m_bal_cpv, "treatment::info:post",
+    "Cookies per Visit", "Information"
+  ),
+  model_result(
+    m_bal_uc, "treatment::saliency:post",
+    "Unique Third-Party Cookies", "Saliency"
+  ),
+  model_result(
+    m_bal_uc, "treatment::info:post",
+    "Unique Third-Party Cookies", "Information"
+  )
+))
+fwrite(results, RESULTS_PATH)
+print(results)
+
+suppressWarnings(file.remove(VALUES_PATH))
+
+cpv_sal <- results[outcome == "Cookies per Visit" & treatment == "Saliency"]
+cpv_info <- results[outcome == "Cookies per Visit" & treatment == "Information"]
+uc_sal <- results[
+  outcome == "Unique Third-Party Cookies" & treatment == "Saliency"
+]
+uc_info <- results[
+  outcome == "Unique Third-Party Cookies" & treatment == "Information"
+]
+
+# Existing coefficient/p-value macro names are preserved for compatibility.
+save_tex_value(format_coef(cpv_sal$beta_log_scale),
+               name = "cpvBalSalCoef", file = VALUES_PATH)
+save_tex_value(format_pvalue(cpv_sal$p_value),
+               name = "cpvBalSalPval", file = VALUES_PATH)
+save_tex_value(format_coef(cpv_info$beta_log_scale),
+               name = "cpvBalInfoCoef", file = VALUES_PATH)
+save_tex_value(format_pvalue(cpv_info$p_value),
+               name = "cpvBalInfoPval", file = VALUES_PATH)
+save_tex_value(format_coef(uc_sal$beta_log_scale),
+               name = "cpvBalUcSalCoef", file = VALUES_PATH)
+save_tex_value(format_pvalue(uc_sal$p_value),
+               name = "cpvBalUcSalPval", file = VALUES_PATH)
+save_tex_value(format_coef(uc_info$beta_log_scale),
+               name = "cpvBalUcInfoCoef", file = VALUES_PATH)
+save_tex_value(format_pvalue(uc_info$p_value),
+               name = "cpvBalUcInfoPval", file = VALUES_PATH)
+
+# New percentage-effect macros for the revised writeup.
+save_tex_value(format_pct(cpv_sal$percent_effect),
+               name = "cpvBalSalPct", file = VALUES_PATH)
+save_tex_value(format_pct(cpv_info$percent_effect),
+               name = "cpvBalInfoPct", file = VALUES_PATH)
+save_tex_value(format_pct(uc_sal$percent_effect),
+               name = "cpvBalUcSalPct", file = VALUES_PATH)
+save_tex_value(format_pct(uc_info$percent_effect),
+               name = "cpvBalUcInfoPct", file = VALUES_PATH)
+
 save_tex_value(format_pct(pair_pct),
-               name = "cpvBalPairPct", file = info_values_file)
+               name = "cpvBalPairPct", file = VALUES_PATH)
 save_tex_value(format_pct(obs_pct),
-               name = "cpvBalObsPct", file = info_values_file)
+               name = "cpvBalObsPct", file = VALUES_PATH)
+save_tex_value(format_pct(cookie_coverage_pct),
+               name = "cpvBalCookieCoveragePct", file = VALUES_PATH)
 save_tex_value(format_count(uniqueN(bal$experiment_id)),
-               name = "cpvBalNUsers", file = info_values_file)
+               name = "cpvBalNUsers", file = VALUES_PATH)
 
-cat(sprintf("Saved 11 macros to %s\n", info_values_file))
+cat(sprintf("Saved Table D.3 to %s\n", TABLE_PATH))
+cat(sprintf("Saved 16 macros to %s\n", VALUES_PATH))
+cat(sprintf("Saved coefficient results to %s\n", RESULTS_PATH))
 cat("=== DONE ===\n")
