@@ -5,16 +5,16 @@
 # Produces (via the two exported functions below; output filenames depend on
 # panel_label and wt_suffix passed by the calling driver):
 #
-#   run_assortment_analysis() -> Section 7 Fig 10 [fig:extensive,
+#   run_assortment_analysis() -> Section 7 Fig 6 [fig:extensive,
 #     "Browsing Behavior Treatment Effects: Extensive Margin"]:
-#       Fig 10(a) [fig:extensive_a]: <figures_dir>/assortment_concentration[_wt].png
-#       Fig 10(b) [fig:extensive_b]: <figures_dir>/assortment_privacy[_wt].png
+#       Fig 6(a) [fig:extensive_a]: <figures_dir>/assortment_concentration[_wt].pdf
+#       Fig 6(b) [fig:extensive_b]: <figures_dir>/assortment_privacy[_wt].pdf
 #
-#   run_preregistered_specs() -> Section 7 Fig 9 [fig:intensive,
+#   run_preregistered_specs() -> Appendix Fig C.9 [fig:intensive,
 #     "Browsing Behavior Treatment Effects: Intensive Margin"] when called
 #     with panel_label = "Baseline":
-#       Fig 9(a) [fig:intensive_a]: <figures_dir>/preregistered_spec_i_baseline[_wt].png
-#       Fig 9(b) [fig:intensive_b]: <figures_dir>/preregistered_triple_interaction_baseline[_wt].png
+#       Fig C.9(a): <figures_dir>/preregistered_spec_i_baseline[_wt].pdf
+#       Fig C.9(b): <figures_dir>/preregistered_triple_interaction_baseline[_wt].pdf
 #
 # This file does not set its own setwd / source utils. The driver
 # (time_usage_treatment_effects_SG.R) is expected to be running with
@@ -22,11 +22,11 @@
 # replication_files/utils/plot_rules.R (ERRORBAR_WIDTH, LINE_WIDTH,
 # POINT_SIZE, DODGE_WIDTH_2, scale_color_treatment, theme_privacy_experiment,
 # geom_hline_zero) and defined the weight helpers join_weights() /
-# run_weighted_feols().
+# run_weighted_feols() / run_weighted_fepois().
 #
 # Weight params: both functions retain `wt_spec` / `wt_suffix` parameters so
 # the driver can run weighted variants for robustness. Paper figures are
-# unweighted; weighted PNGs are produced only if the driver calls these
+# unweighted; weighted PDFs are produced only if the driver calls these
 # functions with a non-"unweighted" wt_spec.
 #
 # Note: Previous version of this file also defined (now removed as dead code,
@@ -63,11 +63,11 @@
 
 
 # =============================================================================
-# ANALYSIS 2: WEBSITE ASSORTMENT CHANGE ANALYSIS -> Fig 10 (Section 7)
+# ANALYSIS 2: WEBSITE ASSORTMENT CHANGE ANALYSIS -> Fig 6 (Section 7)
 # =============================================================================
 # Treatment effects on portfolio composition: entry/exit privacy
 # differentials, concentration (HHI / top-1 share), and time-weighted privacy
-# change. Output is two coefficient plots (Fig 10a + 10b).
+# change. Output is two coefficient plots (Fig 6a + 6b).
 
 run_assortment_analysis <- function(full_dat,
                                     output_dir = TABLES_DIR,
@@ -102,7 +102,7 @@ run_assortment_analysis <- function(full_dat,
   cat("Site shares calculated:", nrow(site_shares), "observations\n")
   
   # -------------------------------------------------------------------------
-  # 2.2: Entry/Exit Analysis -> privacy_differential regression (Fig 10b)
+  # 2.2: Entry/Exit Analysis -> privacy_differential regression (Fig 6b)
   # -------------------------------------------------------------------------
   
   site_privacy_pre <- site_shares %>%
@@ -223,7 +223,7 @@ run_assortment_analysis <- function(full_dat,
   cat("\nPrivacy Change Regression:\n");      print(summary(model_privacy_change))
   
   # -------------------------------------------------------------------------
-  # 2.4: Fig 10(a) - Concentration coefficient plot (HHI + Top Site Share)
+  # 2.4: Fig 6(a) - Concentration coefficient plot (HHI + Top Site Share)
   # -------------------------------------------------------------------------
   
   concentration_coefs <- bind_rows(
@@ -261,7 +261,7 @@ run_assortment_analysis <- function(full_dat,
   cat("Saved: assortment_concentration", wt_suffix, ".pdf\n", sep = "")
   
   # -------------------------------------------------------------------------
-  # 2.5: Fig 10(b) - Privacy coefficient plot (Differential + Score)
+  # 2.5: Fig 6(b) - Privacy coefficient plot (Differential + Score)
   # -------------------------------------------------------------------------
   
   privacy_coefs <- bind_rows(
@@ -317,11 +317,11 @@ run_assortment_analysis <- function(full_dat,
 
 
 # =============================================================================
-# ANALYSIS 4.2: PRE-REGISTERED WEBSITE CHOICE SPECIFICATIONS -> Fig 9 (Section 7)
+# ANALYSIS 4.2: PRE-REGISTERED WEBSITE CHOICE SPECIFICATIONS -> Appendix Fig C.9
 # =============================================================================
-# Pre-registered specifications (i) aggregate ATE on log time / n visits and
-# (ii) triple-difference with privacy heterogeneity. Both as coefficient
-# plots (Fig 9a, 9b) when panel_label = "Baseline".
+# Pre-registered specifications (i) aggregate ATE on raw time (PPML) / n visits
+# and (ii) triple-difference with privacy heterogeneity. Both as coefficient
+# plots (Fig C.9a, C.9b) when panel_label = "Baseline".
 
 run_preregistered_specs <- function(balanced_panel,
                                     full_time_dat,
@@ -349,17 +349,15 @@ run_preregistered_specs <- function(balanced_panel,
       post = if (is.factor(post)) as.numeric(as.character(post)) == 1 else as.logical(post)
     )
   
-  if (!"log_time" %in% names(panel_data)) {
-    panel_data <- panel_data %>%
-      mutate(log_time = log1p(total_time_spent / 60),
-             n_visits = total_visit_count)
-  }
-  
   panel_data <- panel_data %>%
-    group_by(experiment_id) %>%
-    mutate(participant_med_privacy = median(privacy_score, na.rm = TRUE),
-           high_privacy            = privacy_score > participant_med_privacy) %>%
-    ungroup()
+    mutate(
+      time_minutes = total_time_spent / 60,
+      n_visits     = total_visit_count
+    )
+  
+  if (any(!is.finite(panel_data$time_minutes) | panel_data$time_minutes < 0)) {
+    stop("PPML time outcome must be finite and non-negative.")
+  }
   
   global_med_privacy <- median(panel_data$privacy_score, na.rm = TRUE)
   
@@ -375,8 +373,8 @@ run_preregistered_specs <- function(balanced_panel,
   #   y_ijt = T_i * Post_t + eta_j + eta_i + e_ijt
   # -------------------------------------------------------------------------
   
-  spec_i_time <- run_weighted_feols(
-    log_time ~ experiment_condition * post
+  spec_i_time <- run_weighted_fepois(
+    time_minutes ~ experiment_condition * post
     | experiment_id + website_aggregated_high_level,
     data = panel_data, cluster_var = ~experiment_id, wt_spec = wt_spec
   )
@@ -391,7 +389,7 @@ run_preregistered_specs <- function(balanced_panel,
     )
   }
   
-  cat("Specification (i) - Log Time:\n");   print(summary(spec_i_time))
+  cat("Specification (i) - Raw Time PPML:\n"); print(summary(spec_i_time))
   if (!is.null(spec_i_visits)) {
     cat("\nSpecification (i) - Number of Visits:\n"); print(summary(spec_i_visits))
   }
@@ -401,55 +399,70 @@ run_preregistered_specs <- function(balanced_panel,
   #   y_ijt = P_ij * T_i * Post_t + ... + eta_j + eta_i + e_ijt
   # -------------------------------------------------------------------------
   
-  spec_ii_continuous <- run_weighted_feols(
-    log_time ~ privacy_score * experiment_condition * post
+  spec_ii_continuous <- run_weighted_fepois(
+    time_minutes ~ privacy_score * experiment_condition * post
     | experiment_id + website_aggregated_high_level,
     data = panel_data, cluster_var = ~experiment_id, wt_spec = wt_spec
   )
   
-  spec_ii_discrete <- run_weighted_feols(
-    log_time ~ high_privacy * experiment_condition * post
-    | experiment_id + website_aggregated_high_level,
-    data = panel_data, cluster_var = ~experiment_id, wt_spec = wt_spec
-  )
-  
-  spec_ii_discrete_visits <- NULL
+  spec_ii_continuous_visits <- NULL
   if ("n_visits" %in% names(panel_data) || "total_visit_count" %in% names(panel_data)) {
     visit_col <- if ("n_visits" %in% names(panel_data)) "n_visits" else "total_visit_count"
-    spec_ii_discrete_visits <- run_weighted_feols(
+    spec_ii_continuous_visits <- run_weighted_feols(
       as.formula(paste(visit_col,
-                       "~ high_privacy * experiment_condition * post | experiment_id + website_aggregated_high_level")),
+                       "~ privacy_score * experiment_condition * post | experiment_id + website_aggregated_high_level")),
       data = panel_data, cluster_var = ~experiment_id, wt_spec = wt_spec
     )
   }
   
   cat("\nSpecification (ii) - Continuous Privacy Score:\n")
   print(summary(spec_ii_continuous))
-  cat("\nSpecification (ii) - Discrete Privacy (High vs Low) - Log Time:\n")
-  print(summary(spec_ii_discrete))
-  if (!is.null(spec_ii_discrete_visits)) {
-    cat("\nSpecification (ii) - Discrete Privacy (High vs Low) - N Visits:\n")
-    print(summary(spec_ii_discrete_visits))
+  if (!is.null(spec_ii_continuous_visits)) {
+    cat("\nSpecification (ii) - Continuous Privacy Score - N Visits:\n")
+    print(summary(spec_ii_continuous_visits))
   }
   
   # -------------------------------------------------------------------------
-  # Fig 9(a) - Spec (i) coefficient plot
-  # File: preregistered_spec_i_{panel}[_wt].png
+  # Fig C.9(a) - Spec (i) coefficient plot
+  # File: preregistered_spec_i_{panel}[_wt].pdf
   # -------------------------------------------------------------------------
   
   suffix <- paste0("_", gsub(" ", "_", tolower(panel_label)))
   
-  spec_i_coefs <- broom::tidy(spec_i_time) %>%
+  # Convert PPML log coefficients and their confidence limits to proportional
+  # effects in percentage points. Visit-count OLS coefficients stay in levels.
+  tidy_ppml_percent <- function(model) {
+    broom::tidy(model) %>%
+      mutate(
+        conf.low  = 100 * (exp(estimate - 1.96 * std.error) - 1),
+        conf.high = 100 * (exp(estimate + 1.96 * std.error) - 1),
+        estimate  = 100 * (exp(estimate) - 1)
+      )
+  }
+  
+  tidy_level_effect <- function(model) {
+    broom::tidy(model) %>%
+      mutate(
+        conf.low  = estimate - 1.96 * std.error,
+        conf.high = estimate + 1.96 * std.error
+      )
+  }
+  
+  spec_i_coefs <- tidy_ppml_percent(spec_i_time) %>%
     filter(grepl(":post", term)) %>%
-    mutate(outcome   = "Log Time",
+    mutate(outcome   = "Time Spent (% Change)",
            Treatment = case_when(grepl("info",     term) ~ "Information",
                                  grepl("saliency", term) ~ "Saliency"),
            Treatment = factor(Treatment, levels = c("Saliency", "Information")))
   
+  if (nrow(spec_i_coefs) != 2L) {
+    stop("Figure C.9(a): expected two treatment-by-post PPML coefficients.")
+  }
+  
   if (!is.null(spec_i_visits)) {
     spec_i_coefs <- bind_rows(
       spec_i_coefs,
-      broom::tidy(spec_i_visits) %>%
+      tidy_level_effect(spec_i_visits) %>%
         filter(grepl(":post", term)) %>%
         mutate(outcome   = "N Visits",
                Treatment = case_when(grepl("info",     term) ~ "Information",
@@ -458,12 +471,18 @@ run_preregistered_specs <- function(balanced_panel,
     )
   }
   
+  # Keep time on the left and visits on the right in Figure C.9(a).
+  spec_i_coefs <- spec_i_coefs %>%
+    mutate(outcome = factor(
+      outcome,
+      levels = c("Time Spent (% Change)", "N Visits")
+    ))
+  
   p_spec_i <- ggplot(spec_i_coefs,
                      aes(x = Treatment, y = estimate, color = Treatment)) +
     geom_hline_zero(linetype = "dashed") +
     geom_errorbar(
-      aes(ymin = estimate - 1.96 * std.error,
-          ymax = estimate + 1.96 * std.error),
+      aes(ymin = conf.low, ymax = conf.high),
       width     = ERRORBAR_WIDTH,
       linewidth = LINE_WIDTH
     ) +
@@ -478,22 +497,30 @@ run_preregistered_specs <- function(balanced_panel,
   cat("Saved: preregistered_spec_i", suffix, wt_suffix, ".pdf\n", sep = "")
   
   # -------------------------------------------------------------------------
-  # Fig 9(b) - Triple-interaction coefficient plot (spec ii discrete)
-  # File: preregistered_triple_interaction_{panel}[_wt].png
+  # Fig C.9(b) - Continuous privacy-score triple-interaction coefficient plot
+  # File: preregistered_triple_interaction_{panel}[_wt].pdf
   # -------------------------------------------------------------------------
   
-  triple_interaction_coefs <- broom::tidy(spec_ii_discrete) %>%
-    filter(grepl("high_privacyTRUE:experiment_condition.*:postTRUE", term)) %>%
-    mutate(outcome   = "Log Time",
+  triple_interaction_coefs <- tidy_ppml_percent(spec_ii_continuous) %>%
+    filter(grepl("privacy_score", term),
+           grepl("experiment_condition", term),
+           grepl("post", term)) %>%
+    mutate(outcome   = "Time Spent (% Change)",
            Treatment = case_when(grepl("info",     term) ~ "Information",
                                  grepl("saliency", term) ~ "Saliency"),
            Treatment = factor(Treatment, levels = c("Saliency", "Information")))
   
-  if (!is.null(spec_ii_discrete_visits)) {
+  if (nrow(triple_interaction_coefs) != 2L) {
+    stop("Figure C.9(b): expected two continuous privacy-by-treatment-by-post PPML coefficients.")
+  }
+  
+  if (!is.null(spec_ii_continuous_visits)) {
     triple_interaction_coefs <- bind_rows(
       triple_interaction_coefs,
-      broom::tidy(spec_ii_discrete_visits) %>%
-        filter(grepl("high_privacyTRUE:experiment_condition.*:postTRUE", term)) %>%
+      tidy_level_effect(spec_ii_continuous_visits) %>%
+        filter(grepl("privacy_score", term),
+               grepl("experiment_condition", term),
+               grepl("post", term)) %>%
         mutate(outcome   = "N Visits",
                Treatment = case_when(grepl("info",     term) ~ "Information",
                                      grepl("saliency", term) ~ "Saliency"),
@@ -501,12 +528,18 @@ run_preregistered_specs <- function(balanced_panel,
     )
   }
   
+  # Use the same outcome order in Figure C.9(b).
+  triple_interaction_coefs <- triple_interaction_coefs %>%
+    mutate(outcome = factor(
+      outcome,
+      levels = c("Time Spent (% Change)", "N Visits")
+    ))
+  
   p_triple_interaction <- ggplot(triple_interaction_coefs,
                                  aes(x = Treatment, y = estimate, color = Treatment)) +
     geom_hline_zero(linetype = "dashed") +
     geom_errorbar(
-      aes(ymin = estimate - 1.96 * std.error,
-          ymax = estimate + 1.96 * std.error),
+      aes(ymin = conf.low, ymax = conf.high),
       width     = ERRORBAR_WIDTH,
       linewidth = LINE_WIDTH
     ) +
@@ -527,8 +560,7 @@ run_preregistered_specs <- function(balanced_panel,
     spec_i_time             = spec_i_time,
     spec_i_visits           = spec_i_visits,
     spec_ii_continuous      = spec_ii_continuous,
-    spec_ii_discrete        = spec_ii_discrete,
-    spec_ii_discrete_visits = spec_ii_discrete_visits,
+    spec_ii_continuous_visits = spec_ii_continuous_visits,
     plots = list(
       spec_i             = p_spec_i,
       triple_interaction = p_triple_interaction

@@ -12,10 +12,6 @@
 #       output/values/assortment_did_values.tex
 #       (4 macros: \extensiveHHIPvalue, \extensiveTopSharePvalue,
 #        \privacyDifferentialPctSD, \portfolioPrivacyPctSD)
-#     Robustness copy of the same four macros under the legacy dwell rule:
-#       output/values/assortment_did_values_min30.tex
-#       (\extensiveHHIPvalueMinThirty, \extensiveTopSharePvalueMinThirty,
-#        \privacyDifferentialPctSDMinThirty, \portfolioPrivacyPctSDMinThirty)
 #   Appendix:
 #     Figure C.9 [fig:intensive,
 #                 "Browsing Behavior Treatment Effects: Intensive Margin"]
@@ -48,6 +44,12 @@
 #   savetexvalue (devtools::install_github("Ori-Shoham/savetexvalue"))
 #
 # CHANGES this version:
+#   - FIGURE C.9 TIME OUTCOME USES PPML ON RAW MINUTES. Zero-time cells remain
+#     in the balanced panel, and plotted coefficients are transformed to
+#     100 * (exp(beta) - 1). Visit-count outcomes remain FE-OLS in levels.
+#   - FIGURE C.9 SAMPLE HOLDS THE PRE-TREATMENT SITE SET FIXED. A participant-
+#     site pair enters only when it has positive browsing time in both baseline
+#     weeks (-2 and -1). A post-period nonvisit remains in the panel as zero.
 #   - SURVEY FILTER BUG FIXED. The filtered object was assigned to `full_dat`
 #     and written to the CSV, but `full_time_dat` -- which every downstream
 #     analysis uses -- was never reassigned, so the CONSTRUCT_FROM_SCRATCH =
@@ -68,18 +70,11 @@
 #     difference-in-differences structure. Figure 6 never touched
 #     get_balanced_panel, so this too leaves its macros unchanged; it affects
 #     only Figure C.9's visit-count panel.
-#   - MINIMUM-DWELL RULE NOW A CONSTANT, defaulting to OFF. `time_spent > 30`
-#     used to be hard-coded here and appeared in no other script, with one
-#     commit and no documented rationale. A threshold sweep showed it is the
-#     ONLY factor that moves Figure 6, and that it is a dial rather than a data
-#     rule: privacy_differential rises monotonically with the cutoff (0.0159
-#     p=.280 at 0s, 0.0376 p=.034 at 30s, 0.0479 p=.021 at 60s) while
-#     privacy_change falls monotonically over the same range, so the cutoff
-#     chooses which of the two privacy results is significant. In Appendix E
-#     the same rule flips the sign of the headline browsing-time result, with
-#     the entire decline carried by cells under five seconds. Main output
-#     therefore applies no dwell rule; the legacy 30-second version is written
-#     alongside as an explicit robustness file.
+#   - THE PAPER SAMPLE USES THE LEGACY 30-SECOND DWELL RULE. Participant-site-
+#     day rows are retained only when time_spent > 30 seconds. The threshold is
+#     applied after construction so the shared joined_time_data.csv cache keeps
+#     the complete browsing panel. Separate threshold tests found that the raw-
+#     time PPML estimates are effectively unchanged with and without this rule.
 #   - APPENDIX C TOP-WEBSITES BLOCK REMOVED. It wrote the same
 #     top_websites_values.tex as time_use_baseline_scalars.R but with different
 #     numbers, so whichever ran last won. That table is a descriptive statistic
@@ -121,13 +116,9 @@ CONSTRUCT_FROM_SCRATCH <- TRUE
 individual_weights <- FALSE
 
 # --- Minimum-dwell rule ------------------------------------------------------
-# MIN_SECONDS governs the MAIN outputs; ROBUSTNESS_SECONDS governs the extra
-# macro file. NULL means no rule. To swap which arm is headline, exchange the
-# two values -- but note the NULL arm must be the main one if you want the
-# robustness arm to stay a cheap post-construction filter rather than a second
-# full reconstruction.
-MIN_SECONDS        <- NULL
-ROBUSTNESS_SECONDS <- 30
+# Paper outputs retain participant-site-day rows with time_spent > 30 seconds.
+# The complete unfiltered panel is still written to the shared cache.
+MIN_SECONDS <- 30
 
 # Output directories
 FIGURES_DIR <- "output/figures/"
@@ -189,6 +180,16 @@ run_weighted_feols <- function(fml, data, cluster_var, wt_spec = WEIGHT_SPEC) {
     feols(fml, cluster = cluster_var, data = data)
   } else {
     feols(fml, cluster = cluster_var, data = data, weights = ~survey_weight)
+  }
+}
+
+#' Run Poisson pseudo-maximum likelihood with optional survey weights.
+#' Used for non-negative browsing-time outcomes so zeros remain in the sample.
+run_weighted_fepois <- function(fml, data, cluster_var, wt_spec = WEIGHT_SPEC) {
+  if (wt_spec == "unweighted" || !"survey_weight" %in% names(data)) {
+    fepois(fml, cluster = cluster_var, data = data)
+  } else {
+    fepois(fml, cluster = cluster_var, data = data, weights = ~survey_weight)
   }
 }
 
@@ -334,23 +335,8 @@ get_balanced_panel <- function(dat,
   select_cols <- intersect(select_cols, names(balanced_panel))
   balanced_panel <- balanced_panel %>% select(all_of(select_cols))
   
-  individual_website <- balanced_panel %>%
-    filter(privacy_exist & !is.na(privacy_for_requested_attribute)) %>%
-    group_by(experiment_id, website_aggregated_high_level) %>%
-    slice(1) %>%
-    ungroup() %>%
-    group_by(experiment_id) %>%
-    mutate(med_privacy = median(privacy_for_requested_attribute, na.rm = TRUE)) %>%
-    ungroup() %>%
-    mutate(indiv_high_privacy = privacy_for_requested_attribute > med_privacy) %>%
-    select(experiment_id, indiv_high_privacy, website_aggregated_high_level)
-  
-  med <- median(balanced_panel$privacy_for_requested_attribute, na.rm = TRUE)
   balanced_panel <- balanced_panel %>%
-    left_join(individual_website,
-              by = c("experiment_id", "website_aggregated_high_level")) %>%
-    mutate(has_visits                 = total_visit_count > 0,
-           privacy_discretized_median = privacy_for_requested_attribute > med)
+    mutate(has_visits = total_visit_count > 0)
   
   return(balanced_panel)
 }
@@ -372,7 +358,9 @@ if (CONSTRUCT_FROM_SCRATCH) {
       !is.na(conjcat_conjCategory) & trimws(conjcat_conjCategory) != ""
     )
   
-  time_data <- get_clean_time_data(min_seconds = MIN_SECONDS)
+  # Keep construction and the shared cache threshold-neutral. The paper's
+  # 30-second rule is applied once, in the post-load cleaning block below.
+  time_data <- get_clean_time_data(min_seconds = NULL)
   
   personalized_info <- get_personalized_info_only() %>%
     select(email, experiment_id, q1_feature, q1_field, q2_feature, q2_field) %>%
@@ -515,8 +503,8 @@ if (CONSTRUCT_FROM_SCRATCH) {
 # =============================================================================
 # Post-load cleaning
 # =============================================================================
-# The minimum-dwell rule is applied here only if MIN_SECONDS is set; the
-# default is NULL. See the CHANGES note in the header for why.
+# Apply the paper's 30-second minimum-dwell rule after either constructing or
+# loading the complete cached panel.
 
 full_time_dat <- full_time_dat %>%
   filter(!(experiment_id %in% BAD_USERS))
@@ -536,12 +524,42 @@ cat(sprintf("Analysis sample: %s rows | %s participants | %s sites\n",
                    big.mark = ",")))
 
 # =============================================================================
-# Build the one panel that feeds Figure C.9
+# Build the stable pre-treatment-site panel that feeds Figure C.9
 # =============================================================================
-# Winsorizing left at the 0.0 / 1.0 defaults -- see the header.
+# The intensive-margin estimand holds the site set fixed at websites used by
+# the participant in BOTH baseline weeks (-2 and -1). Because the 30-second
+# rule has already been applied, a qualifying weekly visit contains at least
+# one participant-site-day with more than 30 seconds of recorded time.
+# Post-period nonvisits remain in the balanced panel as zero time and visits.
+
+stable_pre_pairs <- full_time_dat %>%
+  filter(weeks_since_intervention %in% c(-2, -1)) %>%
+  group_by(experiment_id, website_aggregated_high_level,
+           weeks_since_intervention) %>%
+  summarise(weekly_time = sum(time_spent, na.rm = TRUE), .groups = "drop") %>%
+  filter(weekly_time > 0) %>%
+  count(experiment_id, website_aggregated_high_level,
+        name = "baseline_weeks") %>%
+  filter(baseline_weeks == 2L) %>%
+  select(experiment_id, website_aggregated_high_level)
+
+if (nrow(stable_pre_pairs) == 0L) {
+  stop("No participant-website pairs were visited in both baseline weeks.")
+}
+
+full_time_dat_intensive <- full_time_dat %>%
+  semi_join(stable_pre_pairs,
+            by = c("experiment_id", "website_aggregated_high_level"))
+
+cat(sprintf(
+  "Figure C.9 stable pre-treatment sample: %s participant-site pairs | %s participants | %s sites\n",
+  format(nrow(stable_pre_pairs), big.mark = ","),
+  format(n_distinct(stable_pre_pairs$experiment_id), big.mark = ","),
+  format(n_distinct(stable_pre_pairs$website_aggregated_high_level), big.mark = ",")
+))
 
 balanced_panel_post <- get_balanced_panel(
-  full_time_dat,
+  full_time_dat_intensive,
   index_var         = "post",
   values_to_include = c(0),
   all_values        = c(0, 1)
@@ -575,7 +593,6 @@ source("replication_files/time_use_analysis/analysis_assortment_did.R")
 
 # =============================================================================
 # Extract the four extensive-margin scalars from a fitted assortment object.
-# Used for both the main file and the dwell-rule robustness file.
 # =============================================================================
 
 assortment_scalars <- function(ext) {
@@ -637,59 +654,19 @@ for (.ws in .specs_to_run) {
   # Scalar macros cited in the website-choice prose. Unweighted spec only; all
   # values pulled from the models above, never hard-coded.
   #   \extensiveHHIPvalue        info-vs-control p-value, HHI change
-  #   \extensiveTopSharePvalue   info-vs-control p-value, top-1 share change
-  #                              (called "top-2 share" in the prose)
+  #   \extensiveTopSharePvalue   info-vs-control p-value, top-site share change
   #   \privacyDifferentialPctSD  info coef / SD, privacy differential
   #   \portfolioPrivacyPctSD     info coef / SD, portfolio privacy change
   # -------------------------------------------------------------------------
   if (.ws == "unweighted") {
     write_assortment_values(assortment_scalars(extensive), "assortment_did_values")
     
-    # -----------------------------------------------------------------------
-    # Robustness: the same four scalars under the legacy dwell rule. Applied
-    # as a post-construction filter, which is exactly what the previous
-    # version of this script did, so the numbers are comparable to the
-    # published ones. Macro names carry a MinThirty suffix so both sets can
-    # coexist in the manuscript.
-    # -----------------------------------------------------------------------
-    if (!is.null(ROBUSTNESS_SECONDS)) {
-      cat(sprintf("\n--- Robustness arm: minimum dwell > %ss ---\n",
-                  ROBUSTNESS_SECONDS))
-      
-      full_time_dat_rb <- full_time_dat %>%
-        filter(time_spent > ROBUSTNESS_SECONDS)
-      
-      cat(sprintf("Robustness sample: %s rows | %s participants | %s sites\n",
-                  format(nrow(full_time_dat_rb), big.mark = ","),
-                  format(n_distinct(full_time_dat_rb$experiment_id), big.mark = ","),
-                  format(n_distinct(full_time_dat_rb$website_aggregated_high_level),
-                         big.mark = ",")))
-      
-      extensive_rb <- run_assortment_analysis(
-        full_time_dat_rb,
-        output_dir  = TABLES_DIR,
-        figures_dir = paste0(tempdir(), "/"),   # robustness figures not kept
-        wt_spec     = .ws,
-        wt_suffix   = "_min30"
-      )
-      
-      write_assortment_values(assortment_scalars(extensive_rb),
-                              "assortment_did_values_min30",
-                              suffix = "MinThirty")
-      
-      # Side-by-side console summary.
-      s_main <- assortment_scalars(extensive)
-      s_rb   <- assortment_scalars(extensive_rb)
-      cat("\nmacro                       main      >30s\n")
-      for (n in names(s_main))
-        cat(sprintf("  %-24s %8.4f  %8.4f\n", n, s_main[[n]], s_rb[[n]]))
-    }
   }
   
   # Figure C.9: pre-registered intensive-margin specs on the baseline panel.
   preregistered_balanced <- run_preregistered_specs(
     balanced_panel = balanced_panel_post,
-    full_time_dat  = full_time_dat,
+    full_time_dat  = full_time_dat_intensive,
     panel_label    = "Baseline",
     privacy_col    = "privacy_for_requested_attribute",
     output_dir     = TABLES_DIR,
