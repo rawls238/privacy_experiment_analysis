@@ -1512,6 +1512,7 @@ with site and participant fixed effects $\eta_j$ and $\eta_i$, estimated separat
   \end{subfigure}
 \end{figure}
 
+
 \section{Additional Experimental Results}
 
 \subsection{Self-Reported Changes in Behavior}\label{sec:app-self-reported-changes}
@@ -1520,7 +1521,7 @@ with site and participant fixed effects $\eta_j$ and $\eta_i$, estimated separat
     \centering
     \caption{Self-reported Changes in Behavior}\label{fig:freeform_change_responses}
     \includegraphics[scale=0.5]{./output/figures/freeform_change_responses.pdf}
-    \caption*{\scriptsize\textsc{Notes}: Distribution of qualitatively coded free-form endline responses across four categories: Awareness (heightened awareness of privacy practices), Behavior Change (changes in site choice or data sharing), Fatalism (resignation that data collection is inevitable), and No Change. Responses were coded by three MTurk raters with researcher tiebreaking. Bars denote 95\% Wilson confidence intervals.}
+\caption*{\scriptsize\textsc{Notes}: Bars report the share of endline respondents in each experimental group whose free-form response was assigned to one of four categories: Awareness (heightened awareness of privacy practices), Behavior Change (changes in website choice or data-sharing behavior), Fatalism (resignation that data collection is inevitable), and No Change. Each response was independently coded by three MTurk raters and assigned by majority vote; responses without a majority were adjudicated by the research team. Error bars denote 95\% Wilson confidence intervals for the category shares.}
 \end{figure}
 
 We complement the objective measures from Section \ref{sec:website_choice} with qualitative evidence from free-form responses in the endline survey \citep{haaland2025understanding}. Participants were asked: ``Has this experiment changed your view on privacy online? Have you changed any online behaviors in response to this experiment?'' We recruited MTurk raters to classify each response into four categories: behavioral change (site choice or data sharing), heightened awareness, fatalism (resignation that data collection is inevitable), and no change. Three raters coded each response. In cases where the majority coding was tied, the researchers broke ties based on their own interpretation.
@@ -1549,7 +1550,7 @@ Table~\ref{tab:treatment_effect_data_sharing} presents treatment effects on the 
 
 We complement the self-reported evidence with two objective measures of changes in data-sharing behavior. 
 
-Our first objective measure is whether a user ever visits a privacy settings page, which corresponds to the self-reported measure in column~(4) of Table~\ref{tab:treatment_effect_data_sharing}. We estimate \eqref{eq:data_sharing_ols} using this indicator as the dependent variable. Table~\ref{tab:privacy_settings_visits_xs} shows no significant effect, consistent with the self-reported results. About \settingsEverControlPct{}\% of control participants visit a settings page. The estimated effects are small and insignificant for both the saliency group, at \settingsEverSalCoef{}, and the information group, at \settingsEverInfoCoef{}. Results are similar for the number of visits and the number of distinct websites reported in columns~(2) and (3).
+Our first objective measure is whether a user ever visits a privacy settings page. We estimate \eqref{eq:data_sharing_ols} using this indicator as the dependent variable. Table~\ref{tab:privacy_settings_visits_xs} shows no significant effect, consistent with the self-reported results. About \settingsEverControlPct{}\% of control participants visit a settings page. The estimated effects are small and insignificant for both the saliency group, at \settingsEverSalCoef{}, and the information group, at \settingsEverInfoCoef{}. Results are similar for the number of visits and the number of distinct websites reported in columns~(2) and (3).
 
 \begin{table}[ht]
 \centering
@@ -1561,17 +1562,24 @@ Our first objective measure is whether a user ever visits a privacy settings pag
 \caption*{\scriptsize \textsc{Notes}: This table reports OLS estimates from Equation~\eqref{eq:data_sharing_ols} on privacy settings page visits during the four-week information intervention. Settings-page visits are identified from keyword-detected page visits in the extension logs, manually classified by the research team. The measure captures visits to settings pages, not whether settings were modified, and coverage is a lower bound since only pages triggering the keyword detector are classified. Column~(1) is an indicator for ever visiting a settings page on at least one website, column~(2) the total number of visits, and column~(3) the number of distinct websites with a settings visit. All specifications include block-by-wave fixed effects, with standard errors clustered at the participant level.}
 \end{table}
 
-Our second objective measure is third-party cookie activity on the websites that participants continue to visit. A decline may indicate that a participant took steps to reduce third-party tracking. We use two measures: third-party cookies per visit, and the number of unique third-party cookies observed on a website in a day.
-\begin{equation}\label{eq:data_sharing_did}
-y_{ijt}
-=
-\beta \cdot \Big(\mathbf{1}\{\text{Post}\}\cdot T_i\Big)
-+\eta_i+\eta_t+\eta_j+\epsilon_{ijt},
-\end{equation}
-where $T_i$ indicates assignment to the relevant treatment group and $\eta_i$, $\eta_t$, and $\eta_j$ are participant, calendar-date, and website fixed effects. Standard errors are clustered at the participant level. We estimate the specification on a balanced panel of participant--website pairs observed both before and after the intervention. 
-Table~\ref{tab:cpv_balanced_panel} reports small and statistically insignificant estimates for both interventions and both measures. For third-party cookies per visit, the estimate is \cpvBalSalCoef{} ($p = \cpvBalSalPval{}$) for the saliency group and \cpvBalInfoCoef{} ($p = \cpvBalInfoPval{}$) for the information group. The corresponding estimates for unique third-party cookies are \cpvBalUcSalCoef{} ($p = \cpvBalUcSalPval{}$) and \cpvBalUcInfoCoef{} ($p = \cpvBalUcInfoPval{}$).
+Our second objective measure is third-party cookie activity on the websites that participants continue to visit. A decline may indicate that a participant took steps to reduce third-party tracking. We use two measures: the number of unique third-party cookies, and third-party cookies per visit observed on a website in a day.
 
-Overall, the self-reported and objective measures both suggest minimal changes in participants' data-sharing behavior in response to either intervention.
+Both cookie measures are highly right-skewed and frequently equal to zero because a website may generate no third-party cookie activity for a participant on a given day. The right skew would ordinarily motivate a log transformation, but $\log(y)$ is undefined at zero. Although $\log(1+y)$ accommodates zero outcomes, \citet{chen2024logs} show that its treatment effect is sensitive to the outcome’s units and therefore does not generally have a percentage interpretation. We instead use Poisson pseudo-maximum likelihood (PPML) to estimate the conditional mean of the untransformed outcome. This retains zero observations and allows us to report $\exp(\beta)-1$ as the proportional change in the mean.
+
+Let $\mu_{ijt}$ denote the conditional mean of the cookie outcome. We estimate
+\begin{equation}\label{eq:data_sharing_did}
+\mu_{ijt}
+=
+\exp\left[
+\beta \cdot \Big(\mathbf{1}\{\text{Post}\}\cdot T_i\Big)
++\eta_i+\eta_t+\eta_j
+\right],
+\end{equation}
+where $T_i$ indicates assignment to the relevant treatment group and $\eta_i$, $\eta_t$, and $\eta_j$ are participant, calendar-date, and website fixed effects. For the cookies-per-visit outcome, we account for differences in the number of visits so that the estimates compare cookie activity per visit. The unique-cookie outcome is analyzed as a daily count. Standard errors are clustered at the participant level. We report $100[\exp(\beta)-1]$, which compares the treatment group's proportional pre--post change with that of the control group.
+
+Table~\ref{tab:cpv_balanced_panel} shows no detectable effect of either intervention on third-party cookie activity among websites that participants continued to visit. For third-party cookies per visit, the estimated percentage effect is \cpvBalSalPct\% ($p = \cpvBalSalPval{}$) for the saliency group and \cpvBalInfoPct\% ($p = \cpvBalInfoPval{}$) for the information group. For unique third-party cookies, the corresponding estimates are \cpvBalUcSalPct\% ($p = \cpvBalUcSalPval{}$) and \cpvBalUcInfoPct\% ($p = \cpvBalUcInfoPval{}$).
+
+Overall, we examine both self-reported and objective measures of data-sharing behavior. The self-reported measures provide weak evidence that the information treatment increased opting out, while the objective measures show no detectable effects on privacy-settings visits or third-party cookie activity on websites that participants continued to visit.
 
 \begin{table}[ht]
 \centering
@@ -1580,7 +1588,7 @@ Overall, the self-reported and objective measures both suggest minimal changes i
 \scalebox{0.9}{
 \input{./output/tables/info_treatment_balanced_panel_did.tex}
 }
-\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the treatment effect on third-party cookie activity at the participant--website--day level. Column~(1) uses $\log(1+\text{third-party cookies per visit})$, which normalizes the count of third-party cookie events by the number of visits. Column~(2) uses $\log(1+\text{unique third-party cookies})$, the number of distinct third-party cookies observed for a participant on a given website and day; this measure is not normalized by visits and is unaffected by dynamic websites that repeatedly re-set the same cookie through background requests. Equation~\eqref{eq:data_sharing_did} is estimated on a balanced panel of participant--website pairs observed at least once before and at least once after the intervention. A pair is a participant--website combination and an observation is a participant--website--day. The restriction retains \cpvBalPairPct\% of pairs and \cpvBalObsPct\% of observations, covering \cpvBalNUsers{} participants. The sample covers the information-experiment period and ends before cookie deletion begins.}
+\caption*{\scriptsize \textsc{Notes}: This table reports PPML difference-in-differences estimates of the treatment effect on third-party cookie activity at the participant--website--day level. Column~(1) uses the number of third-party cookies as the outcome and includes the number of visits as an offset, thereby estimating expected cookie activity per visit. Column~(2) uses the number of unique third-party cookies observed for a participant on a website and day, counting each distinct cookie once within the day. Both specifications retain observed zero-valued outcomes and include participant, website, and calendar-date fixed effects. Standard errors are clustered at the participant level. The table reports PPML coefficients, and the percentage effects discussed in the text are calculated as $100[\exp(\beta)-1]$. Equation~\eqref{eq:data_sharing_did} is estimated on participant--website pairs with recorded browsing activity at least once before and at least once after the intervention. Continuing pairs are defined using the browsing data before cookie outcomes are attached. The restriction retains \cpvBalPairPct\% of participant--website pairs and \cpvBalObsPct\% of browsing observations, covering \cpvBalNUsers{} participants. Cookie measurements are available for \cpvBalCookieCoveragePct\% of the retained browsing observations. The sample covers the information-experiment period and ends before cookie deletion begins.}
 \end{table}
 
 \section{Analysis of Cookie Deletion Intervention}\label{subsec:deletion_overall_effects}
@@ -1764,6 +1772,7 @@ Second, if missing deletion logs identified participants whose data collection w
 \end{figure}
 
 Taken together, the three comparisons indicate that the decline in recorded browsing time occurred broadly across the sample rather than being concentrated among particular participants or websites. Specifically, the decline appears throughout the prior-usage distribution, across multiple website categories, and among participants both with and without recorded deletion logs. Combined with the manual tests, the preservation of first-party cookies, the significant time decline in the category with the smallest cookie reduction, and the timing of the decline in Figure~\ref{fig:cookie_deletion_percentage_change}, these results suggest that a substantial part of the observed decline reflects missing records rather than changes in browsing behavior. Although the data do not allow us to partition the decline exactly between these two sources, the distribution of the logging-related loss supports treating the resulting missing records as plausibly missing at random across participant--time periods. When using the cookie-deletion experiment in the structural model in Section~\ref{sec:estimation}, we therefore account for the average \cookieTimePct{}\% reduction in recorded browsing time during the deletion period.
+
 
 \section{Structural Model: Robustness [PRELIM]}
 
