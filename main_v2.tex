@@ -310,7 +310,7 @@ On the treatment side, the extension enables us to manipulate the information en
 
 \subsection{Experimental Design and Implementation}
 
-In this section, we introduce and motivate our experimental design and detail the experimental timeline. Figure \ref{fig:experiment_overview} provides an overview of the experiment. Below, we explain each piece in detail.
+In this section, we analyze the third-party cookie deletion intervention. During this intervention, our Chrome Extension used the EasyList advertising and analytics detector to identify and delete third-party advertising and analytics cookies from participants' browsers. The randomization was designed to shift the privacy-dependent component of website quality in Equation~\eqref{eq:utility}.
 
 \subsubsection{Recruitment \& Baseline Survey}\label{subsec:recruitment}
 
@@ -1593,7 +1593,7 @@ Overall, we examine both self-reported and objective measures of data-sharing be
 
 \section{Analysis of Cookie Deletion Intervention}\label{subsec:deletion_overall_effects}
 
-In this section, we analyze the third-party cookie deletion intervention. During this intervention, our Chrome Extension deleted third-party advertising and analytics cookies from participants' browsers. The randomization was designed to shift the privacy-dependent component of website quality in Equation~\eqref{eq:utility}.
+In this section, we analyze the third-party cookie deletion intervention. During this intervention, our Chrome Extension deleted only third-party cookies associated with advertising and analytics requests identified by its EasyList-based detector. The randomization was designed to shift the privacy-dependent component of website quality in Equation~\eqref{eq:utility}.
 
 When a participant opens a webpage, the browser sends requests to the website and to outside companies that provide embedded services such as advertising and analytics. These requests are automatic messages used to load the page and its related content, and they often include cookies. A cookie is a small record stored in the browser and returned in later requests. This allows a website or company to recognize the same browser over time and often infer that different visits came from the same user. Users can limit or reset this tracking by blocking or deleting cookies through their browser settings or by using private-browsing modes.
 
@@ -1654,22 +1654,12 @@ overall cookie-writing activity relative to visit frequency.
 \resizebox{\textwidth}{!}{
 \input{./output/tables/cookie_deletion_did_regression.tex}
 }
-\caption*{\scriptsize \textsc{Notes}: This table reports difference-in-differences estimates of the effect of cookie deletion on third-party cookies. Column~(1) uses third-party cookies per visit, $\log(1 + \text{daily CPV})$, and column~(2) uses the number of unique third-party cookies observed for each participant--website--day. The treatment group begins cookie deletion one week before the control group. The analysis window spans seven days before and after the treatment group's deletion start time. Equation~\eqref{eq:cookie_deletion_did} is estimated for both dependent variables with participant and website fixed effects. Standard errors are clustered at the participant level.}
+\caption*{\scriptsize \textsc{Notes}: This table reports PPML difference-in-differences estimates of the effect of cookie deletion on first- and third-party cookies. Columns~(1) and~(2) use the numbers of unique first- and third-party cookies, respectively. Columns~(3) and~(4) use first- and third-party CPV, respectively. The treatment group begins cookie deletion one week before the control group. The analysis window spans seven days before and after the treatment group's deletion start time. Equation~\eqref{eq:cookie_deletion_did} is estimated for all four dependent variables with participant, website, and calendar-date fixed effects. Participant--website--day observations with 30 seconds or less of browsing time are excluded. Observation counts differ because some participants or websites have no positive values for a particular outcome and are excluded from that column. Standard errors are clustered at the participant level.}
 \end{table}
 
-We estimate Equation~\eqref{eq:cookie_deletion_did} using these two dependent variables. Table~\ref{tab:cookie_deletion_did} shows that the intervention reduces third-party cookies per visit by approximately \cookieCpvPct{}\% ($\hat{\beta} = \cookieCpvCoef{}$, $p < 0.001$). Recall that the cookies that we delete are only those that would be flagged by the \textrm{easylist} advertising and analytics detector, so this is consistent with the intervention having its intended effect. The number of unique third-party cookies falls by \ucMainPct{}\% ($\hat{\beta} = \ucMainCoef{}$). The similar reductions across the two measures make it unlikely that the per-visit result is driven entirely by changes in recorded visit counts rather than by a reduction in third-party cookie activity.
+We estimate Equation~\eqref{eq:cookie_deletion_did} using the first- and third-party versions of both measures. Table~\ref{tab:cookie_deletion_did} shows that the number of unique third-party cookies falls by \ucMainPct\%. Unique first-party cookies also decline, with an estimated effect of \cookieFirstPartyUcPct\%. However, the decline is substantially larger for third-party cookies, confirming that the intervention reduced the cookies it was designed to target. The secondary CPV measure leads to the same conclusion: third-party CPV falls by \cookieCpvPct\%, while first-party CPV increases by \cookieFirstPartyCpvPct\%.
 
-\begin{figure}[H]
-\centering
-\caption{Baseline Third-Party Cookies per Visit by Website Category}
-\label{fig:cpv_baseline_by_category}
-\includegraphics[width=0.85\textwidth]{./output/figures/cpv_baseline_by_category.pdf}
-\caption*{\scriptsize \textsc{Notes}: This figure reports the baseline level of third-party cookies per visit by website category, measured over the seven days before deletion begins. For each website, we compute its mean third-party cookies per visit over this period. Points show the median of these website-level means within each category. Bars show the interquartile range across websites within each category.}
-\end{figure}
-
-We next document heterogeneity in baseline cookie activity and the intervention's effects within and across website categories. We begin by documenting baseline differences within and across website categories: Figure~\ref{fig:cpv_baseline_by_category} reports the baseline level of third-party cookies per visit in each website category, which measures the scope available for cookie deletion to operate. Recall, however, that not every third-party cookie is targeted by the intervention, since some are set by non-advertising and non-analytics domains. Baseline levels vary widely across categories: the median News website sets roughly \baseCatTopMedCpv{} third-party cookies per visit, while the median website in the lowest category sets roughly \baseCatBottomMedCpv{}, so the deletion mechanism has far more room to operate in some categories than in others. Furthermore, the figure plots the interquartile range within category, highlighting that even in these categories, there is substantial heterogeneity.
-
-Figure~\ref{fig:deletion_by_category} presents the estimates of Equation~\eqref{eq:cookie_deletion_did} for each category separately. The effect is negative and statistically significant in all \nCpvCategories{} categories. The decline is smallest in Internet \& Telecom, which is dominated by Google ecosystem services: most cookie activity on these sites is first-party and thus unaffected by the intervention, leaving little third-party volume to remove. Internet \& Telecom is therefore the category in which cookie deletion had the smallest measured effect on third-party cookie activity.
+We next examine whether this reduction is concentrated in particular website categories. Figure~\ref{fig:deletion_by_category} presents the estimates of Equation~\eqref{eq:cookie_deletion_did} for each category separately, using unique third-party cookies as the outcome. The effect is negative and statistically significant in \nSigNegUcCategories{} categories out of \nUcCategories{}. No category shows a statistically significant increase. The reduction in unique third-party cookies therefore appears broadly across website categories rather than being driven by a small number of categories.
 
 Overall, we conclude that the intervention successfully reduced third-party cookies per visit, confirming that the cookie-deletion treatment operated as intended.
 
@@ -1678,7 +1668,7 @@ Overall, we conclude that the intervention successfully reduced third-party cook
 \caption{Cookie Deletion Effect by Website Category}
 \label{fig:deletion_by_category}
 \includegraphics[width=0.85\textwidth]{./output/figures/cpv_heterogeneity_by_website_category.pdf}
-\caption*{\scriptsize \textsc{Notes}: This figure reports the difference-in-differences estimate from Equation~\eqref{eq:cookie_deletion_did} on $\log(1 + \text{daily CPV})$, estimated separately for each website category. Error bars are 95\% confidence intervals based on participant-clustered standard errors.}
+\caption*{\scriptsize \textsc{Notes}: This figure reports PPML difference-in-differences estimates from Equation~\eqref{eq:cookie_deletion_did} on the number of unique third-party cookies, estimated separately for each website category. Estimates are reported as percentage changes, calculated as $100[\exp(\beta)-1]$. Error bars are 95\% confidence intervals based on participant-clustered standard errors.}
 \end{figure}
 
 \subsection{Browsing Time and the Validity of the Logging Data}\label{subsec:cookie_deletion_time_mar}
