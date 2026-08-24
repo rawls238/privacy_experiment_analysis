@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # =============================================================================
-# cookie_deletion_overall_effects_v5.R
+# cookie_deletion_overall_effects_v6.R
 #
 # Appendix E.1: Overall Effects and Timing of Third-Party Cookie Deletion
 #
@@ -750,7 +750,7 @@ ggsave(
   CATEGORY_FIGURE_PATH,
   plot_category_effects(
     uc_category_results,
-    "Estimated Effect on Unique Third-Party Cookies (%)"
+    "Effect on Unique Third-Party Cookies (%)"
   ),
   width = FIG_W,
   height = FIG_H_CATEGORY
