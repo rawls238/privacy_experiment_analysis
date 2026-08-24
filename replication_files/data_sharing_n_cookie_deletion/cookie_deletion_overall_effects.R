@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # =============================================================================
-# cookie_deletion_overall_effects_v3.R
+# cookie_deletion_overall_effects_v5.R
 #
 # Appendix E.1: Overall Effects and Timing of Third-Party Cookie Deletion
 #
@@ -19,7 +19,7 @@
 # Estimation
 #   - Cookie outcomes: participant-website-day PPML with participant, website,
 #     and calendar-date fixed effects; participant-clustered standard errors.
-#   - Cookies per Visit uses Set-Cookie actions as the outcome and
+#   - CPV uses Set-Cookie actions as the outcome and
 #     log(visit_count) as an offset.
 #   - Unique Cookies uses the raw count of distinct cookie identities observed
 #     during the participant-website-day, without a visit offset.
@@ -36,7 +36,7 @@
 #   output/values/data_sharing_cookie_str_values.tex
 #
 # The two category-figure filenames retain their legacy "cpv" names so the
-# current Overleaf inputs continue to work. Their V3 content uses Unique
+# current Overleaf inputs continue to work. Their V4 content uses Unique
 # Third-Party Cookies, the paper's main cookie measure.
 # =============================================================================
 
@@ -554,7 +554,7 @@ cat("Saved: ", EVENT_FIGURE_PATH, "\n", sep = "")
 
 
 # =============================================================================
-# 5. MAIN COOKIE TABLE: FIRST/THIRD PARTY x CPV/UNIQUE COOKIES
+# 5. MAIN COOKIE TABLE: UNIQUE COOKIES FIRST, CPV SECOND
 # =============================================================================
 
 m_cpv_1p <- fepois(
@@ -606,8 +606,8 @@ main_table <- etable(
   headers = c(
     "Unique First-Party Cookies",
     "Unique Third-Party Cookies",
-    "First-Party Cookies per Visit",
-    "Third-Party Cookies per Visit"
+    "First-Party CPV",
+    "Third-Party CPV"
   ),
   dict = DICT_COOKIE,
   digits = 3,
@@ -834,11 +834,11 @@ summary_results <- rbindlist(list(
     uc_3p_result
   ),
   cbind(
-    data.table(outcome = "First-Party Cookies per Visit"),
+    data.table(outcome = "First-Party CPV"),
     cpv_1p_result
   ),
   cbind(
-    data.table(outcome = "Third-Party Cookies per Visit"),
+    data.table(outcome = "Third-Party CPV"),
     cpv_3p_result
   )
 ))
