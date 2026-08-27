@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # =============================================================================
-# cookie_deletion_overall_effects_v6.R
+# cookie_deletion_overall_effects.R
 #
 # Appendix E.1: Overall Effects and Timing of Third-Party Cookie Deletion
 #
@@ -18,11 +18,11 @@
 #
 # Estimation
 #   - Cookie outcomes: participant-website-day PPML with participant, website,
-#     and calendar-date fixed effects; participant-clustered standard errors.
+#     and day fixed effects; participant-clustered standard errors.
 #   - CPV uses Set-Cookie actions as the outcome and
 #     log(visit_count) as an offset.
-#   - Unique Cookies uses the raw count of distinct cookie identities observed
-#     during the participant-website-day, without a visit offset.
+#   - Unique Third-Party Cookies uses the raw count of distinct cookie
+#     identities observed during the participant-website-day, without an offset.
 #   - Overall timing figure: descriptive daily totals for the early-deletion
 #     group. Cookie and time streams are constructed separately and each
 #     fourteen-day series is standardized using its own mean and SD.
@@ -36,7 +36,7 @@
 #   output/values/data_sharing_cookie_str_values.tex
 #
 # The two category-figure filenames retain their legacy "cpv" names so the
-# current Overleaf inputs continue to work. Their V4 content uses Unique
+# current Overleaf inputs continue to work. Their content uses Unique
 # Third-Party Cookies, the paper's main cookie measure.
 # =============================================================================
 
@@ -93,7 +93,6 @@ CATEGORY_FIGURE_PATH <- file.path(
   FIGURES_DIR,
   "cpv_heterogeneity_by_website_category.pdf"
 )
-
 KEY <- c("experiment_id", "website", "date")
 TAU_MIN <- -7L
 TAU_MAX <- 6L
@@ -107,6 +106,27 @@ POINT_COLOR <- "gray30"
 
 SIGNIF <- c("***" = 0.01, "**" = 0.05, "*" = 0.1)
 BAD_USERS_E <- union(BAD_USERS, c("6ccc7d5", "7d6864c"))
+
+# Fixed to E.1 categories so cookie and browsing-time heterogeneity use the
+# same category set.
+WEBSITE_CATEGORIES <- c(
+  "Arts & Entertainment",
+  "Business & Industrial",
+  "Computers & Electronics",
+  "Finance",
+  "Food & Drink",
+  "Games",
+  "Health",
+  "Hobbies & Leisure",
+  "Home & Garden",
+  "Internet & Telecom",
+  "Jobs & Education",
+  "News",
+  "Online Communities",
+  "Reference",
+  "Shopping",
+  "Travel"
+)
 
 dir.create(FIGURES_DIR, recursive = TRUE, showWarnings = FALSE)
 dir.create(TABLES_DIR, recursive = TRUE, showWarnings = FALSE)
@@ -377,7 +397,7 @@ if (anyNA(cookie_analysis[, ..cookie_outcomes])) {
   stop("Matched cookie rows contain missing cookie outcomes")
 }
 if (any(cookie_analysis$visit_count <= 0)) {
-  stop("Cookies-per-visit exposure must be positive")
+  stop("CPV exposure must be positive")
 }
 
 if (any(vapply(
@@ -595,7 +615,7 @@ DICT_COOKIE <- c(
   post_treated = "Post $\\times$ Cookie Deletion",
   experiment_id = "Participant FE",
   website = "Website FE",
-  date = "Date FE"
+  date = "Day FE"
 )
 
 main_table <- etable(
@@ -650,20 +670,19 @@ cookie_by_category <- cookie_analysis[
   !is.na(category) & category != ""
 ]
 
-big_categories <- cookie_by_category[, .(
-  observations = .N,
-  participants = uniqueN(experiment_id)
-), by = category][
-  observations >= 500L & participants >= 50L,
-  category
-]
-
-if (!length(big_categories)) {
-  stop("No website categories satisfy the E.1 sample thresholds")
+missing_categories <- setdiff(
+  WEBSITE_CATEGORIES,
+  unique(cookie_by_category$category)
+)
+if (length(missing_categories)) {
+  stop(
+    "E.1 categories missing from the cookie-analysis sample: ",
+    paste(missing_categories, collapse = ", ")
+  )
 }
 
 site_baseline <- cookie_by_category[
-  tau < 0L & category %in% big_categories,
+  tau < 0L & category %in% WEBSITE_CATEGORIES,
   .(
     site_mean_unique_3p = mean(
       unique_snapshot_cookies_3rd_p,
@@ -735,12 +754,12 @@ fit_category_uc_ppml <- function(category_name) {
 }
 
 uc_category_results <- rbindlist(lapply(
-  sort(big_categories),
+  WEBSITE_CATEGORIES,
   fit_category_uc_ppml
 ))
 
-if (!nrow(uc_category_results)) {
-  stop("No unique-cookie category-level PPML models were estimable")
+if (!setequal(uc_category_results$category, WEBSITE_CATEGORIES)) {
+  stop("Not all 16 E.1 category-level PPML models were estimable")
 }
 
 setorder(uc_category_results, percent_effect)

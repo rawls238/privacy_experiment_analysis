@@ -203,7 +203,7 @@ cookie_coverage_pct <- 100 * mean(bal$cookie_measurement_observed)
 
 # Missing tracker-panel rows stay missing and do not enter the cookie models.
 # Matched rows with zero recorded cookies remain valid zeros.
-bal <- bal[cookie_measurement_observed]
+bal <- bal[cookie_measurement_observed == TRUE]
 if (anyNA(bal[, .(
   visit_count,
   set_cookie_actions_3rd_p,
